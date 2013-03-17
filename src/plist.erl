@@ -25,7 +25,7 @@
 -module(plist).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
-%% API functions.
+%% Library functions.
 -export([new/0, new/2,
          add/3, add/4,
          delete/2, delete/3,
@@ -47,7 +47,7 @@
 -export_type([plist/0]).
 
 %% ===================================================================
-%% API functions.
+%% Library functions.
 %% ===================================================================
 
 %%--------------------------------------------------------------------
@@ -69,6 +69,14 @@ new() -> new([], []).
 -spec new([key()], [value()]) -> plist().
 %%--------------------------------------------------------------------
 new(Keys, Values) -> new(Keys, Values, []).
+
+new([], [], Acc) -> Acc;
+new([H1 | T1], [H2 | T2], Acc) -> new(T1, T2, [{H1, H2} | Acc]);
+new(KeysT, ValuesT, Acc) ->
+    {Keys, Values} = lists:unzip(Acc),
+    erlang:error(badarg,
+                 [lists:reverse(Keys) ++ KeysT,
+                  lists:reverse(Values) ++ ValuesT]).
 
 %%--------------------------------------------------------------------
 %% Function: add(Key, Values, PList) -> PList.
@@ -167,6 +175,10 @@ find(Key, [_ | T], Value, last) -> find(Key, T, Value, last).
 %%--------------------------------------------------------------------
 find_all(Key, PList) -> find_all(Key, PList, []).
 
+find_all(_, [], Acc) -> lists:reverse(Acc);
+find_all(Key, [{Key, Value} | T], Acc) -> find_all(Key, T, [Value | Acc]);
+find_all(Key, [_ | T], Acc) -> find_all(Key, T, Acc).
+
 %%--------------------------------------------------------------------
 %% Function: keys(PList) -> Keys.
 %% @doc
@@ -217,7 +229,7 @@ replace(Key, Value, PList) -> replace(Key, Value, PList, nocheck).
 -spec replace(key(), value(), plist(), flag()) -> plist().
 %%--------------------------------------------------------------------
 replace(Key, Value, [], nocheck) -> [{Key, Value}];
-replace(_, _, [], check) -> erlang:erlang(badarg);
+replace(_, _, [], check) -> erlang:error(badarg);
 replace(Key, Value, [{Key, _} | T], _) -> [{Key, Value} | T];
 replace(Key, Value, [H | T], Check) -> [H | replace(Key, Value, T, Check)].
 
@@ -231,20 +243,3 @@ replace(Key, Value, [H | T], Check) -> [H | replace(Key, Value, T, Check)].
 %%--------------------------------------------------------------------
 compact([]) ->[];
 compact(List) -> lists:ukeysort(1, List).
-
-%%====================================================================
-%% Internal functions
-%%====================================================================
-
-
-new([], [], Acc) -> Acc;
-new([H1 | T1], [H2 | T2], Acc) -> new(T1, T2, [{H1, H2} | Acc]);
-new(KeysT, ValuesT, Acc) ->
-    {Keys, Values} = lists:unzip(Acc),
-    erlang:error(badarg,
-                 [lists:reverse(Keys) ++ KeysT,
-                  lists:reverse(Values) ++ ValuesT]).
-
-find_all(_, [], Acc) -> lists:reverse(Acc);
-find_all(Key, [{Key, Value} | T], Acc) -> find_all(Key, T, [Value | Acc]);
-find_all(Key, [_ | T], Acc) -> find_all(Key, T, Acc).
