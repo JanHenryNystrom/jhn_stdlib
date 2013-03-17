@@ -17,7 +17,7 @@
 REBAR="./rebar"
 .PHONY: all compile check test doc clean get-deps update-deps real-clean
 
-all: get-deps compile xref
+all: get-deps compile
 
 rebar:
 	mkdir -p deps
