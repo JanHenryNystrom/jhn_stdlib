@@ -23,6 +23,7 @@
 %%%
 %%%   The module generates ref binaries as much as possible so if
 %%%   copies are more suitable apply binary/copy/1 on the result.
+%%%   Functions affected are the sub string family and tokens/2.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
