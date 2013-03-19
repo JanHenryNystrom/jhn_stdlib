@@ -41,7 +41,9 @@
          keyreplace/5, keysearch/4, keysort/3, keystore/5, keytake/4,
          last/1, map/2, mapfoldl/3, mapfoldr/3, max/1, member/2,
          merge/1, merge/2, merge/3, merge3/3, min/1, nth/2, nthtail/2,
-         partition/2, prefix/2, reverse/1, reverse/2, seq/2, seq/3
+         partition/2, prefix/2, reverse/1, reverse/2, seq/2, seq/3,
+         sort/1, sort/2, split/2, splitwith/2, sublist/2, sublist/3,
+         subtract/2
         ]).
 
 %% Types
@@ -838,6 +840,139 @@ seq(From, To, Incr)
 seq1(From, To, Incr, Acc) when Incr > 0, From > To -> Acc;
 seq1(From, To, Incr, Acc) when Incr < 0, From < To -> Acc;
 seq1(From, To, Incr, Acc) -> seq1(From + Incr, To, Incr, <<Acc/binary, From>>).
+
+%%--------------------------------------------------------------------
+%% Function: sort(Binary1) -> Binary2.
+%% @doc
+%%   Returns a binary containing the sorted octets of Binary1.
+%% @end
+%%--------------------------------------------------------------------
+-spec sort(binary()) -> binary().
+%%--------------------------------------------------------------------
+sort(<<>>) -> <<>>;
+sort(<<H>>) -> <<H>>;
+sort(Binary = <<A, B>>) when A =< B -> Binary;
+sort(<<A, B>>) -> <<B, A>>;
+sort(Binary) ->
+    Length = byte_size(Binary),
+    Pivot = (Length div 2),
+    First = binary_part(Binary, {0, Pivot}),
+    Second = binary_part(Binary, {Pivot, Length - Pivot}),
+    merge(sort(First), sort(Second)).
+
+%%--------------------------------------------------------------------
+%% Function: sort(Fun, Binary1) -> Binary2.
+%% @doc
+%%   Returns a binary containing the sorted octets of Binary1, according
+%%   to the ordering function Fun. Fun(A, B) should return true if A
+%%   compares less than or equal to B in the ordering, false otherwise.
+%% @end
+%%--------------------------------------------------------------------
+-spec sort(fun((byte(), byte()) -> boolean()), binary()) -> binary().
+%%--------------------------------------------------------------------
+sort(Fun, <<>>) when is_function(Fun, 2) -> <<>>;
+sort(Fun, <<H>>) when is_function(Fun, 2) -> <<H>>;
+sort(Fun, Binary = <<A, B>>) ->
+    case Fun(A, B) of
+        true -> Binary;
+        false -> <<B, A>>
+    end;
+sort(Fun, Binary) ->
+    Length = byte_size(Binary),
+    Pivot = (Length div 2),
+    First = binary_part(Binary, {0, Pivot}),
+    Second = binary_part(Binary, {Pivot, Length - Pivot}),
+    merge(Fun, sort(Fun, First), sort(Fun, Second)).
+
+%%--------------------------------------------------------------------
+%% Function: split(N, Binary1) -> {Binary2, Binary3}.
+%% @doc
+%%   Splits Binary1 into Binary2 and Binary3. Binary2 contains the first
+%%   N octets and Binary3 the rest of the octets (the Nth tail).
+%% @end
+%%--------------------------------------------------------------------
+-spec split(non_neg_integer(), binary()) -> {binary(), binary()}.
+%%--------------------------------------------------------------------
+split(0, Binary) when is_binary(Binary) -> {<<>>, Binary};
+split(N, Binary) when is_integer(N) ->
+    case byte_size(Binary) of
+        Length when N > Length ->
+            erlang:error(badarg, [N, Binary]);
+        Length ->
+            {binary_part(Binary, {0, N}), binary_part(Binary, {N, Length - N})}
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: splitwith(Pred, Binary) -> {Binary1, Binary2}.
+%% @doc
+%%   Partitions Binary into two binaries according to Pred.
+%%   splitwith/2 behaves as if it is defined as follows:
+%%
+%%   splitwith(Pred, Binary) ->
+%%       {takewhile(Pred, Binary), dropwhile(Pred, Binary)}.
+%% @end
+%%--------------------------------------------------------------------
+-spec splitwith(fun((byte()) -> boolean()), binary()) -> {binary(), binary()}.
+%%--------------------------------------------------------------------
+splitwith(Pred, Binary) when is_function(Pred, 1) ->
+    splitwith(Pred, Binary, <<>>).
+
+splitwith(_, <<>>, Acc) -> {Acc, <<>>};
+splitwith(Pred, Binary = <<H, T/binary>>, Acc) ->
+    case Pred(H) of
+        true -> splitwith(Pred, T, <<Acc/binary, H>>);
+        false -> {Acc, Binary}
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: sublist(Binary1, Len) -> Binary2.
+%% @doc
+%%   Returns the sub-binary of Binary1 starting at position 1 and with
+%%   (max) Len octets. It is not an error for Len to exceed the length
+%%   of the binary, in that case the whole binary is returned.
+%% @end
+%%--------------------------------------------------------------------
+-spec sublist(binary(), pos_integer()) -> binary().
+%%--------------------------------------------------------------------
+sublist(Binary, Len) when is_integer(Len) ->
+    case byte_size(Binary) of
+        Length when Length < Len -> Binary;
+        _ -> binary_part(Binary, {0,  Len})
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: sublist(Binary1, Start, Len) -> Binary2.
+%% @doc
+%%   Returns the sub-binary of Binary1 starting at Start and with (max)
+%%   Len octets. It is not an error for Start+Len to exceed the length
+%%   of the binary.
+%% @end
+%%--------------------------------------------------------------------
+-spec sublist(binary(), pos_integer(), pos_integer()) -> binary().
+%%--------------------------------------------------------------------
+sublist(Binary, Start, Len) when is_integer(Len) ->
+    case byte_size(Binary) of
+        Length when Length + 1 == Start -> <<>>;
+        Length when Length < Start ->
+            erlang:error(badarg, [Binary, Start, Len]);
+        Length when Length < (Start + Len) ->
+            binary_part(Binary, {Start - 1,  Length - Start + 1});
+        _ ->
+            binary_part(Binary, {Start - 1,  Len})
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: subtract(Binary1, Binary2) -> Binary3.
+%% @doc
+%%   Returns a new binary Binary3 which is a copy of Binary1, subjected
+%%   to the following procedure: for each octet in Binary2, its first
+%%   occurrence in Binary1 is deleted.
+%% @end
+%%--------------------------------------------------------------------
+-spec subtract(binary(), binary()) -> binary().
+%%--------------------------------------------------------------------
+subtract(Binary1, Binary2) ->
+    foldl(fun(O, Acc) -> delete(O, Acc) end, Binary1, Binary2).
 
 %% ===================================================================
 %% Internal functions.
