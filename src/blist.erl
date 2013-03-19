@@ -23,6 +23,9 @@
 %%%
 %%%   The module generates ref binaries as much as possible so if
 %%%   copies are more suitable apply binary/copy/1 on the result.
+%%%
+%%%   All functions in the stblib lists that would operate on tuples
+%%    operate on equally sized octet blogs binaries.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -43,14 +46,17 @@
          merge/1, merge/2, merge/3, merge3/3, min/1, nth/2, nthtail/2,
          partition/2, prefix/2, reverse/1, reverse/2, seq/2, seq/3,
          sort/1, sort/2, split/2, splitwith/2, sublist/2, sublist/3,
-         subtract/2
+         subtract/2, suffix/2, takewhile/2, sum/1, ukeymerge/4,
+         ukeysort/3, umerge/1, umerge/2, umerge/3, umerge3/3,
+         unzip/1, unzip3/1, usort/1, usort/2, zip/2, zip3/3,
+         zipwith/3, zipwith3/4
         ]).
 
 %% Types
 -type thing() :: atom() | integer() | float() | string() | binary().
 
 %% Compiler directives
--compile({no_auto_import,[max/2, min/2]}).
+-compile({no_auto_import, [max/2, min/2]}).
 
 %% ===================================================================
 %% Library functions.
@@ -974,9 +980,389 @@ sublist(Binary, Start, Len) when is_integer(Len) ->
 subtract(Binary1, Binary2) ->
     foldl(fun(O, Acc) -> delete(O, Acc) end, Binary1, Binary2).
 
+%%--------------------------------------------------------------------
+%% Function: suffix(Binary1, Binary2) -> Boolean.
+%% @doc
+%%   Returns true if Binary1 is a suffix of Binary2, otherwise false.
+%% @end
+%%--------------------------------------------------------------------
+-spec suffix(binary(), binary()) -> boolean().
+%%--------------------------------------------------------------------
+suffix(Binary1, Binary2) ->
+    case {byte_size(Binary1), byte_size(Binary2)} of
+        {Length1, Length2} when Length1 > Length2 ->
+            false;
+        {Length1, Length2} ->
+            Binary1 == binary_part(Binary2, {Length2 - Length1, Length1})
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: sum(Binary) -> Sum.
+%% @doc
+%%   Returns the sum of the octets in binary.
+%% @end
+%%--------------------------------------------------------------------
+-spec sum(binary()) -> integer().
+%%--------------------------------------------------------------------
+sum(Binary) -> foldl(fun(O, Acc) -> O + Acc end, 0, Binary).
+
+
+%%--------------------------------------------------------------------
+%% Function: takewhile(Pred, Binary1) -> Binary2.
+%% @doc
+%%   Takes octet Octet from Binary1 while Pred(Octet) returns true,
+%%   that is, the function returns the longest prefix of the binary
+%%   for which all octets satisfy the predicate.
+%% @end
+%%--------------------------------------------------------------------
+-spec takewhile(fun((byte()) -> boolean()), binary()) -> binary().
+%%--------------------------------------------------------------------
+takewhile(Pred, Binary) -> takewhile(Pred, Binary, <<>>).
+
+takewhile(Pred, <<>>, Acc) when is_function(Pred, 1) -> Acc;
+takewhile(Pred, <<H, T/binary>>, Acc) ->
+    case Pred(H) of
+        true -> takewhile(Pred, T, <<Acc/binary, H>>);
+        false -> Acc
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: ukeymerge(N, BlobSequence1, BlobSequence2) -> BlobSequence3.
+%% @doc
+%%   Returns the sorted binary formed by merging BlobSequence1 and
+%%   BlobSequence2. The merge is performed on the Nth octet of each blob.
+%%   Both BlobSequence1 and BlobSequence2 must be key-sorted without
+%%   duplicates prior to evaluating this function. When two blobs compare
+%%   equal, the blob from BlobSequence1 is picked and the one from
+%%   BlobSequence2 deleted.
+%% @end
+%%--------------------------------------------------------------------
+-spec ukeymerge(pos_integer(), pos_integer(), binary(), binary()) -> binary().
+%%--------------------------------------------------------------------
+ukeymerge(N, Size, Binary1, Binary2)
+  when is_integer(N), is_integer(Size), is_binary(Binary1),is_binary(Binary2) ->
+    ukeymerge(N, Size, Binary1, Binary2, <<>>).
+
+ukeymerge(_, _, <<>>, Binary, Acc) -> <<Acc/binary, Binary/binary>>;
+ukeymerge(_, _, Binary, <<>>, Acc) -> <<Acc/binary, Binary/binary>>;
+ukeymerge(N, Size, Binary1, Binary2, Acc) ->
+    case {key(N, Binary1), key(N, Binary2)} of
+        {Key, Key} ->
+            ukeymerge(N, Size, next(Size, Binary1), next(Size, Binary2),
+                      <<Acc/binary, (this(Size, Binary1))/binary>>);
+        {Key1, Key2} when Key1 > Key2 ->
+            ukeymerge(N, Size, Binary1, next(Size, Binary2),
+                      <<Acc/binary, (this(Size, Binary2))/binary>>);
+        _ ->
+            ukeymerge(N, Size, next(Size, Binary1), Binary2,
+                      <<Acc/binary, (this(Size, Binary1))/binary>>)
+    end.
+
+
+%%--------------------------------------------------------------------
+%% Function: ukeysort(N, BlobSequence1) -> BlobSequence2
+%% @doc
+%%   Returns a binary containing the sorted octets of the binary
+%%   BlobSequence1 where all but the first blob of the blobs comparing
+%%   equal have been deleted. Sorting is performed on the Nth element
+%%   of the blobs.
+%% @end
+%%--------------------------------------------------------------------
+-spec ukeysort(pos_integer(), pos_integer(), binary()) -> binary().
+%%--------------------------------------------------------------------
+ukeysort(N, Size, <<>>) when is_integer(N), is_integer(Size) -> <<>>;
+ukeysort(N, Size, Binary) when is_integer(N), is_integer(Size) ->
+    case byte_size(Binary) of
+        Size -> Binary;
+        Length when Length rem Size == 0 ->
+            Pivot = ((Length div Size) div 2) * Size,
+            First = binary_part(Binary, {0, Pivot}),
+            Second = binary_part(Binary, {Pivot, Length - Pivot}),
+            ukeymerge(N,
+                      Size,
+                      ukeysort(N, Size,First),
+                      ukeysort(N, Size,Second));
+        _ ->
+            erlang:error(badarg, [N, Size, Binary])
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: umerge(ListOfBinarys) -> Binary1.
+%% @doc
+%%   Returns the sorted binary formed by merging all the sub-binaries of
+%%   ListOfBinaries. All sub-binaries must be sorted and contain no
+%%   duplicates prior to evaluating this function. When two elements compare
+%%   equal, the element from the sub-binaries with the lowest position in
+%%   ListOfBinaries is picked and the other one deleted.
+%% @end
+%%--------------------------------------------------------------------
+-spec umerge([binary()]) -> binary().
+%%--------------------------------------------------------------------
+umerge([]) -> <<>>;
+umerge(Binaries) ->
+    umerge_list(lists:sort(fun umerge_list_comp/2, Binaries), <<>>).
+
+umerge_list([Binary], Acc) -> <<Acc/binary, Binary/binary>>;
+umerge_list([<<>> | T], Acc) -> umerge_list(T, Acc);
+umerge_list([B = <<H, _/binary>>, <<H, T2/binary>> | T], Acc) ->
+    umerge_list([B | umerge_list_bubble([T2 | T])], Acc);
+umerge_list([<<H1, T1/binary>>, B = <<H2, _/binary>> | T], Acc) when H1 < H2 ->
+    umerge_list([T1, B | T], <<Acc/binary, H1>>);
+umerge_list(Binaries, Acc) ->
+    umerge_list(umerge_list_bubble(Binaries), Acc).
+
+umerge_list_bubble([H]) -> [H];
+umerge_list_bubble(L = [<<H1,_/binary>>, <<H2,_/binary>> | _]) when H1 =< H2 ->
+    L;
+umerge_list_bubble([H, H1 | T]) ->
+    [H1 | umerge_list_bubble([H | T])].
+
+umerge_list_comp(<<>>, _) -> true;
+umerge_list_comp(_, <<>>) -> false;
+umerge_list_comp(<<H1, _/binary>>, <<H2, _/binary>>) -> H1 =< H2.
+
+%%--------------------------------------------------------------------
+%% Function: umerge(Binary1, Binary2) -> Binary3.
+%% @doc
+%%   Returns the sorted binary formed by merging Binary1 and Binary2.
+%%   Both Binary1 and Binary2 must be sorted and contain no duplicates
+%%   prior to evaluating this function. When two octets compare equal,
+%%   the octet from Binary1 is picked and the one from Binary2 deleted.
+%% @end
+%%--------------------------------------------------------------------
+-spec umerge(binary(), binary()) -> binary().
+%%--------------------------------------------------------------------
+umerge(B1, B2) when is_binary(B1), is_binary(B2) -> umerge1(B1, B2, <<>>).
+
+umerge1(<<>>, B, Acc) -> <<Acc/binary, B/binary>>;
+umerge1(B, <<>>, Acc) -> <<Acc/binary, B/binary>>;
+umerge1(<<H, T1/binary>>, <<H, T2/binary>>, Acc) ->
+    umerge1(T1, T2, <<Acc/binary, H>>);
+umerge1(<<H1, T1/binary>>, B = <<H2, _/binary>>, Acc) when H1 =< H2 ->
+    umerge1(T1, B, <<Acc/binary, H1>>);
+umerge1(B, <<H, T/binary>>, Acc) ->
+    umerge1(B, T, <<Acc/binary, H>>).
+
+%%--------------------------------------------------------------------
+%% Function: umerge(Fun, Binary1, Binary2) -> Binary3.
+%% @doc
+%%   Returns the sorted binary formed by merging Binary1 and Binary2.
+%%   Both Binary1 and Binary2 must be sorted according to the ordering
+%%   function Fun and contain no duplicates prior to evaluating this
+%%   function. Fun(A, B) should return true if A compares less than or
+%%    equal to B in the ordering, false otherwise. When two octets compare
+%%    equal, the octet from Binary1 is picked and the one from Binary2 deleted.
+%% @end
+%%--------------------------------------------------------------------
+-spec umerge(fun((byte(), byte()) -> boolean()), binary(), binary()) ->
+          binary().
+%%--------------------------------------------------------------------
+umerge(Pred, B1, B2) when is_function(Pred, 2), is_binary(B1), is_binary(B2) ->
+    umerge1(Pred, B1, B2, <<>>).
+
+umerge1(_, <<>>, B, Acc) -> <<Acc/binary, B/binary>>;
+umerge1(_, B, <<>>, Acc) -> <<Acc/binary, B/binary>>;
+umerge1(Pred, <<H, T1/binary>>, <<H, T2/binary>>, Acc) ->
+    umerge1(Pred, T1, T2, <<Acc/binary, H>>);
+umerge1(Pred, B1 = <<H1, T1/binary>>, B2 = <<H2, T2/binary>>, Acc) ->
+    case Pred(H1, H2) of
+        true -> umerge1(Pred, T1, B2, <<Acc/binary, H1>>);
+        false -> umerge1(Pred, B1, T2, <<Acc/binary, H2>>)
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: umerge3(Binary1, Binary2, Binary3) -> Binary4.
+%% @doc
+%%   Returns the sorted binary formed by merging Binary1, Binary2 and
+%%   Binary3. All of Binary1, Binary2 and Binary3 must be sorted and
+%%   contain no duplicates prior to evaluating this function. When two
+%%   octets compare equal, the octet from Binary1 is picked if there is
+%%   such an octet, otherwise the octet from Binary2 is picked, and the
+%%   other one deleted.
+%% @end
+%%--------------------------------------------------------------------
+-spec umerge3(binary(), binary(), binary()) -> binary().
+%%--------------------------------------------------------------------
+umerge3(B1, B2, B3) -> umerge([B1, B2, B3]).
+
+%%--------------------------------------------------------------------
+%% Function: unzip(Binary1) -> {Binary2, Binary3}.
+%% @doc
+%%   "Unzips" a binary of two octet blobs into two binarys, where the first
+%%   binary contains the first octet of each blob, and the second binary
+%%   contains the second octet of each blob.
+%% @end
+%%--------------------------------------------------------------------
+-spec unzip(binary()) -> {binary(), binary()}.
+%%--------------------------------------------------------------------
+unzip(<<>>) -> {<<>>, <<>>};
+unzip(Binary) when byte_size(Binary) rem 2 == 0 ->
+    unzip1(Binary, <<>>, <<>>).
+
+unzip1(<<>>, Binary1, Binary2) -> {Binary1, Binary2};
+unzip1(<<H1, H2, T/binary>>, Binary1, Binary2) ->
+    unzip1(T, <<Binary1/binary, H1>>, <<Binary2/binary, H2>>).
+
+%%--------------------------------------------------------------------
+%% Function: unzip3(Binary1) -> {Binary2, Binary3, Binary4}.
+%% @doc
+%%   "Unzips" a binary of three octet blobs into three binarys, where the first
+%%    binary contains the first octet of each blob, the second binary
+%%    contains the second octet of each blob, and the third binary
+%%    contains the third octet of each blob.
+%% @end
+%%--------------------------------------------------------------------
+-spec unzip3(binary()) -> {binary(), binary(), binary()}.
+%%--------------------------------------------------------------------
+unzip3(<<>>) -> {<<>>, <<>>, <<>>};
+unzip3(Binary) when byte_size(Binary) rem 3 == 0 ->
+    unzip3_1(Binary, <<>>, <<>>, <<>>).
+
+unzip3_1(<<>>, Binary1, Binary2, Binary3) -> {Binary1, Binary2, Binary3};
+unzip3_1(<<H1, H2, H3, T/binary>>, Binary1, Binary2, Binary3) ->
+    unzip3_1(T,
+             <<Binary1/binary, H1>>,
+             <<Binary2/binary, H2>>,
+             <<Binary3/binary, H3>>).
+
+%%--------------------------------------------------------------------
+%% Function: usort(Binary1) -> Binary2.
+%% @doc
+%%   Returns a binary containing the sorted octets of Binary1 where all
+%%   but the first octet of the octets comparing equal have been deleted.
+%% @end
+%%--------------------------------------------------------------------
+-spec usort(binary()) -> binary().
+%%--------------------------------------------------------------------
+usort(<<>>) -> <<>>;
+usort(<<H>>) -> <<H>>;
+usort(<<H, H>>) -> <<H>>;
+usort(Binary = <<A, B>>) when A =< B -> Binary;
+usort(<<A, B>>) -> <<B, A>>;
+usort(Binary) ->
+    Length = byte_size(Binary),
+    Pivot = (Length div 2),
+    First = binary_part(Binary, {0, Pivot}),
+    Second = binary_part(Binary, {Pivot, Length - Pivot}),
+    umerge(usort(First), usort(Second)).
+
+%%--------------------------------------------------------------------
+%% Function: usort(Fun, Binary1) -> Binary2.
+%% @doc
+%%   Returns a binary which contains the sorted octets of Binary1 where
+%%   all but the first octet of the octets comparing equal according to
+%%   the ordering function Fun have been deleted. Fun(A, B) should return
+%%   true if A compares less than or equal to B in the ordering,
+%%   false otherwise.
+%% @end
+%%--------------------------------------------------------------------
+-spec usort(fun((byte(), byte()) -> boolean()), binary()) -> binary().
+%%--------------------------------------------------------------------
+usort(Fun, <<>>) when is_function(Fun, 2) -> <<>>;
+usort(Fun, <<H>>) when is_function(Fun, 2) -> <<H>>;
+usort(Fun, <<H, H>>) when is_function(Fun, 2) -> <<H>>;
+usort(Fun, Binary = <<A, B>>) ->
+    case Fun(A, B) of
+        true -> Binary;
+        false -> <<B, A>>
+    end;
+usort(Fun, Binary) ->
+    Length = byte_size(Binary),
+    Pivot = (Length div 2),
+    First = binary_part(Binary, {0, Pivot}),
+    Second = binary_part(Binary, {Pivot, Length - Pivot}),
+    umerge(Fun, usort(Fun, First), usort(Fun, Second)).
+
+%%--------------------------------------------------------------------
+%% Function: zip(Binary1, Binary2) -> Binary3.
+%% @doc
+%%   "Zips" two binaries of equal length into one binary of two-blobs,
+%%    where the first octet of each blob is taken from the first binary
+%%    and the second octet is taken from corresponding octet in the
+%%    second binary.
+%% @end
+%%--------------------------------------------------------------------
+-spec zip(binary(), binary()) -> binary().
+%%--------------------------------------------------------------------
+zip(Binary1, Binary2) when byte_size(Binary1) == byte_size(Binary2) ->
+    zip1(Binary1, Binary2, <<>>).
+
+zip1(<<>>, _, Acc) -> Acc;
+zip1(<<H1, T1/binary>>, <<H2, T2/binary>>, Acc) ->
+    zip1(T1, T2, <<Acc/binary, H1, H2>>).
+
+
+%%--------------------------------------------------------------------
+%% Function: zip3(Binary1, Binary2, Binary3) -> Binary4.
+%% @doc
+%%   "Zips" three binaries of equal length into one binary of three-blobs,
+%%   where the first octet of each blob is taken from the first binary,
+%%   the second octet is taken from corresponding octet in the second binary,
+%%   and the third octet is taken from the corresponding octet in the
+%%   third binary.
+%% @end
+%%--------------------------------------------------------------------
+-spec zip3(binary(), binary(), binary()) -> binary().
+%%--------------------------------------------------------------------
+zip3(Binary1, Binary2, Binary3)
+  when byte_size(Binary1) == byte_size(Binary2),
+       byte_size(Binary1) == byte_size(Binary3)->
+    zip3_1(Binary1, Binary2, Binary3, <<>>).
+
+zip3_1(<<>>, _, _, Acc) -> Acc;
+zip3_1(<<H1, T1/binary>>, <<H2, T2/binary>>, <<H3, T3/binary>>, Acc) ->
+    zip3_1(T1, T2, T3, <<Acc/binary, H1, H2, H3>>).
+
+%%--------------------------------------------------------------------
+%% Function: zipwith(Combine, Binary1, Binary2) -> Binary3.
+%% @doc
+%%   Combine the octets of two binarys of equal length into one binary.
+%%   For each pair X, Y of binary octets from the two binarys, the binary
+%%   in the result binary will be Combine(X, Y).
+%%
+%%   zipwith(fun(X, Y) -> <<X, Y>> end, Binary1, Binary2) is equivalent
+%%   to zip(Binary1, Binary2).
+%% @end
+%%--------------------------------------------------------------------
+-spec zipwith(fun((byte(), byte()) -> binary()), binary(), binary()) ->
+          binary().
+%%--------------------------------------------------------------------
+zipwith(Fun, Binary1, Binary2) when byte_size(Binary1) == byte_size(Binary2) ->
+    zipwith1(Fun, Binary1, Binary2, <<>>).
+
+zipwith1(_, <<>>, _, Acc) -> Acc;
+zipwith1(Fun, <<H1, T1/binary>>,<<H2, T2/binary>>, Acc) ->
+    zipwith1(Fun, T1, T2, <<Acc/binary, (Fun(H1, H2))/binary>>).
+
+%%--------------------------------------------------------------------
+%% Function: zipwith(Combine, Binary1, Binary2, Binary3) -> Binary4.
+%% @doc
+%%   Combine the octets of three binarys of equal length into one binary.
+%%   For each triple X, Y, Z of binary octets from the thre binarys, the binary
+%%   in the result binary will be Combine(X, Y, Z).
+%%
+%%   zipwith(fun(X, Y, Z) -> <<X, Y, Z>> end, Binary1, Binary2, Binary3) is
+%%   equivalent to zip(Binary1, Binary2. Binary3).
+%% @end
+%%--------------------------------------------------------------------
+-spec zipwith3(fun((byte(), byte(), byte()) -> binary()),
+               binary(),
+               binary(),
+               binary()) -> binary().
+%%--------------------------------------------------------------------
+zipwith3(Fun, Binary1, Binary2, Binary3)
+  when is_function(Fun, 3), byte_size(Binary1) == byte_size(Binary2),
+       byte_size(Binary1) == byte_size(Binary3) ->
+    zipwith3_1(Fun, Binary1, Binary2, Binary3, <<>>).
+
+zipwith3_1(_, <<>>, _, _, Acc) -> Acc;
+zipwith3_1(Fun, <<H1, T1/binary>>, <<H2, T2/binary>>, <<H3, T3/binary>>, Acc) ->
+    zipwith3_1(Fun, T1, T2, T3, <<Acc/binary, (Fun(H1, H2, H3))/binary>>).
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
+
 key(N, Binary) -> <<Key>> = binary_part(Binary, {N - 1, 1}), Key.
 
 next(Size, Binary) -> binary_part(Binary, {Size, byte_size(Binary) - Size}).
