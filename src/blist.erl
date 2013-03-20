@@ -458,16 +458,20 @@ keysearch(Key, N, Size, Binary) ->
 -spec keysort(pos_integer(), pos_integer(), binary()) -> binary().
 %%--------------------------------------------------------------------
 keysort(N, Size, <<>>) when is_integer(N), is_integer(Size) -> <<>>;
-keysort(N, Size, Binary) when is_integer(N), is_integer(Size) ->
+keysort(N, Size, Binary) when
+      is_integer(N), is_integer(Size), byte_size(Binary) rem Size == 0 ->
+    keysort1(N, Size, Binary);
+keysort(N, Size, Binary) ->
+    erlang:error(badarg, [N, Size, Binary]).
+
+keysort1(N, Size, Binary) ->
     case byte_size(Binary) of
         Size -> Binary;
-        Length when Length rem Size == 0 ->
+        Length ->
             Pivot = ((Length div Size) div 2) * Size,
             First = binary_part(Binary, {0, Pivot}),
             Second = binary_part(Binary, {Pivot, Length - Pivot}),
-            keymerge(N, Size, keysort(N, Size,First), keysort(N, Size,Second));
-        _ ->
-            erlang:error(badarg, [N, Size, Binary])
+            keymerge(N, Size, keysort1(N, Size,First), keysort1(N, Size,Second))
     end.
 
 %%--------------------------------------------------------------------
@@ -1071,19 +1075,23 @@ ukeymerge(N, Size, Binary1, Binary2, Acc) ->
 -spec ukeysort(pos_integer(), pos_integer(), binary()) -> binary().
 %%--------------------------------------------------------------------
 ukeysort(N, Size, <<>>) when is_integer(N), is_integer(Size) -> <<>>;
-ukeysort(N, Size, Binary) when is_integer(N), is_integer(Size) ->
+ukeysort(N, Size, Binary)
+  when is_integer(N), is_integer(Size), byte_size(Binary) rem Size == 0 ->
+       ukeysort1(N, Size, Binary);
+ukeysort(N, Size, Binary) ->
+    erlang:error(badarg, [N, Size, Binary]).
+
+ukeysort1(N, Size, Binary) ->
     case byte_size(Binary) of
         Size -> Binary;
-        Length when Length rem Size == 0 ->
+        Length ->
             Pivot = ((Length div Size) div 2) * Size,
             First = binary_part(Binary, {0, Pivot}),
             Second = binary_part(Binary, {Pivot, Length - Pivot}),
             ukeymerge(N,
                       Size,
-                      ukeysort(N, Size,First),
-                      ukeysort(N, Size,Second));
-        _ ->
-            erlang:error(badarg, [N, Size, Binary])
+                      ukeysort1(N, Size,First),
+                      ukeysort1(N, Size,Second))
     end.
 
 %%--------------------------------------------------------------------
