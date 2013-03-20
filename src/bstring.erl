@@ -586,10 +586,11 @@ to_float(Binary) when is_binary(Binary) -> to_float_digit(Binary, "");
 to_float(_) -> {error, not_a_binary}.
 
 to_float_digit(<<>>, _) -> {error, no_float};
-to_float_digit(<<H, T/binary>>, Acc) when ?IS_DIGIT(H)->
-    to_float_digit(T, [H | Acc]);
+to_float_digit(<<$., _/binary>>, []) -> {error, no_float};
 to_float_digit(<<$., H, T/binary>>, Acc) when ?IS_DIGIT(H) ->
     to_float_frac(T, [H, $. | Acc]);
+to_float_digit(<<H, T/binary>>, Acc) when ?IS_DIGIT(H)->
+    to_float_digit(T, [H | Acc]);
 to_float_digit(_, _) ->
     {error, no_float}.
 
