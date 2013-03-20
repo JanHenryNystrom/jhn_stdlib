@@ -545,7 +545,6 @@ centre(Binary, Length, Char)
             N = (Length - Size) div 2,
             LPad = chars(Char, Length - (Size  + N)),
             RPad = chars(Char, N),
-            io:format("Foo:~p ,, ~p~n", [LPad, RPad]),
             <<RPad/binary, Binary/binary, LPad/binary>>
     end.
 
