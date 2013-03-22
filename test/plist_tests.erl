@@ -78,10 +78,18 @@ add_3_test_() ->
      ?_test(?assert(key_val_list_p(plist:add(3, c, ListA)))),
      ?_test(?assert(key_val_list_p(plist:add(3, c, ListB)))),
      ?_test(?assert(key_val_list_p(plist:add(3, c, ListC)))),
+     ?_test(?assert(key_val_list_p(plist:add(1, a, ListB)))),
+     ?_test(?assert(key_val_list_p(plist:add(1, c, ListC)))),
+     ?_test(?assert(key_val_list_p(plist:add(2, b, ListB)))),
+     ?_test(?assert(key_val_list_p(plist:add(2, c, ListC)))),
      ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, [])))),
      ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, ListA)))),
      ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, ListB)))),
-     ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, ListC))))
+     ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, ListC)))),
+     ?_test(?assertEqual(a, plist:find(1, plist:add(1, a, ListB)))),
+     ?_test(?assertEqual(c, plist:find(1, plist:add(1, c, ListC)))),
+     ?_test(?assertEqual(b, plist:find(2, plist:add(2, b, ListB)))),
+     ?_test(?assertEqual(c, plist:find(2, plist:add(2, c, ListC))))
      ].
 
 %%--------------------------------------------------------------------
@@ -95,6 +103,10 @@ add_4_test_() ->
      ?_test(?assert(key_val_list_p(plist:add(3, c, ListA, nocheck)))),
      ?_test(?assert(key_val_list_p(plist:add(3, c, ListB, nocheck)))),
      ?_test(?assert(key_val_list_p(plist:add(3, c, ListC, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:add(1, a, ListB, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:add(1, c, ListC, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:add(2, b, ListB, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:add(2, c, ListC, nocheck)))),
      ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, [], nocheck)))),
      ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, ListA, nocheck)))),
      ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, ListB, nocheck)))),
@@ -104,11 +116,83 @@ add_4_test_() ->
                                  length(ListA) + 1))),
      ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, [], check)))),
      ?_test(?assertEqual(c, plist:find(3, plist:add(3, c, ListA, check)))),
-     ?_test(
-        ?assertError(badarg, plist:add(3, c, ListB, check))),
-     ?_test(
-        ?assertError(badarg, plist:add(3, c, ListC, check)))
+     ?_test(?assertError(badarg, plist:add(3, c, ListB, check))),
+     ?_test(?assertError(badarg, plist:add(3, c, ListC, check))),
+     ?_test(?assertError(badarg, plist:add(1, a, ListB, check))),
+     ?_test(?assertError(badarg, plist:add(1, c, ListC, check))),
+     ?_test(?assertError(badarg, plist:add(2, b, ListB, check))),
+     ?_test(?assertError(badarg, plist:add(2, c, ListC, check))),
+     ?_test(?assertError(badarg, plist:add(3, c, ListB, check))),
+     ?_test(?assertError(badarg, plist:add(3, c, ListC, check)))
      ].
+
+%%--------------------------------------------------------------------
+%% delete/2
+%%--------------------------------------------------------------------
+delete_2_test_() ->
+    ListA = plist:new([1, 2], [a, b]),
+    ListB = plist:new([1, 2, 3], [a, b, c]),
+    ListC = plist:new([1, 2, 3], [a, b, x]),
+    [?_test(?assert(key_val_list_p(plist:delete(3, [])))),
+     ?_test(?assert(key_val_list_p(plist:delete(3, ListA)))),
+     ?_test(?assert(key_val_list_p(plist:delete(3, ListB)))),
+     ?_test(?assert(key_val_list_p(plist:delete(3, ListC)))),
+     ?_test(?assert(key_val_list_p(plist:delete(1, ListB)))),
+     ?_test(?assert(key_val_list_p(plist:delete(2, ListB)))),
+     ?_test(?assertEqual(undefined, plist:find(3, plist:delete(3, [])))),
+     ?_test(?assertEqual(undefined, plist:find(3, plist:delete(3, ListA)))),
+     ?_test(?assertEqual(undefined, plist:find(3, plist:delete(3, ListB)))),
+     ?_test(?assertEqual(undefined, plist:find(3, plist:delete(3, ListC)))),
+     ?_test(?assertEqual(undefined, plist:find(1, plist:delete(1, ListB)))),
+     ?_test(?assertEqual(undefined, plist:find(2, plist:delete(2, ListB))))
+     ].
+
+%%--------------------------------------------------------------------
+%% delete/3
+%%--------------------------------------------------------------------
+delete_3_test_() ->
+    ListA = plist:new([1, 2], [a, b]),
+    ListB = plist:new([1, 2, 3], [a, b, c]),
+    ListC = plist:new([1, 2, 3], [a, b, x]),
+    [?_test(?assert(key_val_list_p(plist:delete(3, [], nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:delete(3, ListA, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:delete(3, ListB, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:delete(3, ListC, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:delete(1, ListB, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:delete(2, ListB, nocheck)))),
+     ?_test(
+        ?assertEqual(undefined, plist:find(3, plist:delete(3, [], nocheck)))),
+     ?_test(
+        ?assertEqual(undefined,
+                     plist:find(3, plist:delete(3, ListA, nocheck)))),
+     ?_test(
+        ?assertEqual(undefined,
+                     plist:find(3, plist:delete(3, ListB, nocheck)))),
+     ?_test(
+        ?assertEqual(undefined,
+                     plist:find(3, plist:delete(3, ListC, nocheck)))),
+     ?_test(
+        ?assertEqual(undefined,
+                     plist:find(1, plist:delete(1, ListB, nocheck)))),
+     ?_test(
+        ?assertEqual(undefined,
+                     plist:find(2, plist:delete(2, ListB, nocheck)))),
+     ?_test(?assertError(badarg, plist:delete(3, [], check))),
+     ?_test(?assertError(badarg, plist:delete(3, ListA, check))),
+     ?_test(?assert(key_val_list_p(plist:delete(3, ListB, check)))),
+     ?_test(?assert(key_val_list_p(plist:delete(3, ListC, check)))),
+     ?_test(?assert(key_val_list_p(plist:delete(1, ListB, check)))),
+     ?_test(?assert(key_val_list_p(plist:delete(2, ListB, check)))),
+     ?_test(
+        ?assertEqual(undefined, plist:find(3, plist:delete(3, ListB, check)))),
+     ?_test(
+        ?assertEqual(undefined, plist:find(3, plist:delete(3, ListC, check)))),
+     ?_test(
+        ?assertEqual(undefined, plist:find(1, plist:delete(1, ListB, check)))),
+     ?_test(
+        ?assertEqual(undefined, plist:find(2, plist:delete(2, ListB, check))))
+     ].
+
 
 
 %% ===================================================================
