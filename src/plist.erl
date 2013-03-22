@@ -168,7 +168,7 @@ find(Key, [_ | T], Value, last) -> find(Key, T, Value, last).
 %%--------------------------------------------------------------------
 %% Function: find_all(Key, PList) -> Values.
 %% @doc
-%%   Finds the all values assosiated with the key.
+%%   Finds the all values associated with the key.
 %% @end
 %%--------------------------------------------------------------------
 -spec find_all(key(), plist()) -> [value()].
