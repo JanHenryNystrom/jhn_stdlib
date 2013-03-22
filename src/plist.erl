@@ -55,7 +55,7 @@
 %% @doc
 %%   Creates an empty plist.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec new() -> plist().
 %%--------------------------------------------------------------------
 new() -> new([], []).
@@ -65,7 +65,7 @@ new() -> new([], []).
 %% @doc
 %%   Creates a plist from the zipping the lists of keys and values.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec new([key()], [value()]) -> plist().
 %%--------------------------------------------------------------------
 new(Keys, Values) -> new(Keys, Values, []).
@@ -83,7 +83,7 @@ new(KeysT, ValuesT, Acc) ->
 %% @doc
 %%   Extends Plist with the property without checking if it exists.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec add(key(), value(), plist()) -> plist().
 %%--------------------------------------------------------------------
 add(Key, Value, PList) -> add(Key, Value, PList, nocheck).
@@ -93,7 +93,7 @@ add(Key, Value, PList) -> add(Key, Value, PList, nocheck).
 %% @doc
 %%   Extends Plist with the property checking if it exists if required.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec add(key(), value(), plist(), flag()) -> plist().
 %%--------------------------------------------------------------------
 add(Key, Value, PList, nocheck) -> [{Key, Value} | PList];
@@ -108,7 +108,7 @@ add(Key, Value, PList, check) ->
 %% @doc
 %%   Restricts Plist on the key without checking if it exists.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec delete(key(), plist()) -> plist().
 %%--------------------------------------------------------------------
 delete(Key, PList) -> delete(Key, PList, nocheck).
@@ -118,7 +118,7 @@ delete(Key, PList) -> delete(Key, PList, nocheck).
 %% @doc
 %%   Restricts Plist on the key without checking if it exists if required.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec delete(key(), plist(), flag()) -> plist().
 %%--------------------------------------------------------------------
 delete(Key, PList, nocheck) -> lists:keydelete(Key, 1, PList);
@@ -131,7 +131,7 @@ delete(Key, [_ | T], check) -> delete(Key, T, check).
 %% @doc
 %%   Finds the value of the property or undefined if not found.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec find(key(), plist()) -> value() | undefined.
 %%--------------------------------------------------------------------
 find(Key, PList) -> find(Key, PList, undefined).
@@ -141,7 +141,7 @@ find(Key, PList) -> find(Key, PList, undefined).
 %% @doc
 %%   Finds the value of the property or Default if not found.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec find(key(), plist(), default()) -> value() | default().
 %%--------------------------------------------------------------------
 find(Key, PList, Default) -> find(Key, PList, Default, first).
@@ -153,7 +153,7 @@ find(Key, PList, Default) -> find(Key, PList, Default, first).
 %%   If more than property is found the one returned if determined by
 %%   the Placement as being the first or last.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec find(key(), plist(), default(), placement()) -> value() | default().
 %%--------------------------------------------------------------------
 find(_, [], Value, _) -> Value;
@@ -170,7 +170,7 @@ find(Key, [_ | T], Value, last) -> find(Key, T, Value, last).
 %% @doc
 %%   Finds the all values assosiated with the key.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec find_all(key(), plist()) -> [value()].
 %%--------------------------------------------------------------------
 find_all(Key, PList) -> find_all(Key, PList, []).
@@ -184,7 +184,7 @@ find_all(Key, [_ | T], Acc) -> find_all(Key, T, Acc).
 %% @doc
 %%   Returns all the keys.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec keys(plist()) -> [key()].
 %%--------------------------------------------------------------------
 keys(PList) -> lists:usort([Key || {Key, _} <- PList]).
@@ -194,7 +194,7 @@ keys(PList) -> lists:usort([Key || {Key, _} <- PList]).
 %% @doc
 %%   Returns all the values.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec values(plist()) -> [value()].
 %%--------------------------------------------------------------------
 values(PList) -> [Value || {_, Value} <- PList].
@@ -204,7 +204,7 @@ values(PList) -> [Value || {_, Value} <- PList].
 %% @doc
 %%   Returns wether the key is to be found in the PList.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec member(key(), plist()) -> boolean().
 %%--------------------------------------------------------------------
 member(Key, PList) -> lists:keymember(Key, 1, PList).
@@ -214,7 +214,7 @@ member(Key, PList) -> lists:keymember(Key, 1, PList).
 %% @doc
 %%   Replaces the first occurence in the PList, adding if it if not found.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec replace(key(), value(), plist()) -> plist().
 %%--------------------------------------------------------------------
 replace(Key, Value, PList) -> replace(Key, Value, PList, nocheck).
@@ -225,7 +225,7 @@ replace(Key, Value, PList) -> replace(Key, Value, PList, nocheck).
 %%   Replaces the first occurence in the PList, esuring that i does exist
 %%   if required.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec replace(key(), value(), plist(), flag()) -> plist().
 %%--------------------------------------------------------------------
 replace(Key, Value, [], nocheck) -> [{Key, Value}];
@@ -238,7 +238,7 @@ replace(Key, Value, [H | T], Check) -> [H | replace(Key, Value, T, Check)].
 %% @doc
 %%   Ensures one property per key, with the first given precedence.
 %% @end
-% --------------------------------------------------------------------
+%%--------------------------------------------------------------------
 -spec compact(plist()) -> plist().
 %%--------------------------------------------------------------------
 compact([]) ->[];
