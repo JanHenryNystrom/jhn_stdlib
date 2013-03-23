@@ -193,7 +193,92 @@ delete_3_test_() ->
         ?assertEqual(undefined, plist:find(2, plist:delete(2, ListB, check))))
      ].
 
+%%--------------------------------------------------------------------
+%% find/2
+%%--------------------------------------------------------------------
+find_2_test_() ->
+    ListA = plist:new([1], [a]),
+    ListB = plist:new([1, 2], [a, b]),
+    ListC = plist:new([1, 2, 3], [a, b, c]),
+    [?_test(?assertEqual(a, plist:find(1, ListA))),
+     ?_test(?assertEqual(a, plist:find(1, ListB))),
+     ?_test(?assertEqual(a, plist:find(1, ListC))),
+     ?_test(?assertEqual(b, plist:find(2, ListB))),
+     ?_test(?assertEqual(b, plist:find(2, ListC))),
+     ?_test(?assertEqual(c, plist:find(3, ListC))),
+     ?_test(?assertEqual(undefined, plist:find(4, []))),
+     ?_test(?assertEqual(undefined, plist:find(4, ListA))),
+     ?_test(?assertEqual(undefined, plist:find(4, ListB))),
+     ?_test(?assertEqual(undefined, plist:find(4, ListC)))
+    ].
 
+%%--------------------------------------------------------------------
+%% find/3
+%%--------------------------------------------------------------------
+find_3_test_() ->
+    ListA = plist:new([1], [a]),
+    ListB = plist:new([1, 2], [a, b]),
+    ListC = plist:new([1, 2, 3], [a, b, c]),
+    [?_test(?assertEqual(a, plist:find(1, ListA, test))),
+     ?_test(?assertEqual(a, plist:find(1, ListB, test))),
+     ?_test(?assertEqual(a, plist:find(1, ListC, test))),
+     ?_test(?assertEqual(b, plist:find(2, ListB, test))),
+     ?_test(?assertEqual(b, plist:find(2, ListC, test))),
+     ?_test(?assertEqual(c, plist:find(3, ListC, test))),
+     ?_test(?assertEqual(test, plist:find(4, [], test))),
+     ?_test(?assertEqual(test, plist:find(4, ListA, test))),
+     ?_test(?assertEqual(test, plist:find(4, ListB, test))),
+     ?_test(?assertEqual(test, plist:find(4, ListC, test)))
+    ].
+
+%%--------------------------------------------------------------------
+%% find/4
+%%--------------------------------------------------------------------
+find_4_test_() ->
+    ListA = plist:new([1], [a]),
+    ListB = plist:new([1, 2], [a, b]),
+    ListC = plist:new([1, 2, 3], [a, b, c]),
+    ListD = [{1, a}, {1, b}, {1, c}],
+    ListE = [{1, a}, {2, b}, {3, c}, {1, d}],
+    ListF = [{1, a}, {2, b}, {1, c}, {3, d}, {1, e}],
+    ListG = [{2, a}, {1, b}, {1, c}, {3, d}],
+    [?_test(?assertEqual(a, plist:find(1, ListA, test, first))),
+     ?_test(?assertEqual(a, plist:find(1, ListB, test, first))),
+     ?_test(?assertEqual(a, plist:find(1, ListC, test, first))),
+     ?_test(?assertEqual(b, plist:find(2, ListB, test, first))),
+     ?_test(?assertEqual(b, plist:find(2, ListC, test, first))),
+     ?_test(?assertEqual(c, plist:find(3, ListC, test, first))),
+     ?_test(?assertEqual(test, plist:find(4, [], test, first))),
+     ?_test(?assertEqual(test, plist:find(4, ListA, test, first))),
+     ?_test(?assertEqual(test, plist:find(4, ListB, test, first))),
+     ?_test(?assertEqual(test, plist:find(4, ListC, test, first))),
+     ?_test(?assertEqual(a, plist:find(1, ListD, test, first))),
+     ?_test(?assertEqual(a, plist:find(1, ListE, test, first))),
+     ?_test(?assertEqual(a, plist:find(1, ListF, test, first))),
+     ?_test(?assertEqual(b, plist:find(1, ListG, test, first))),
+     ?_test(?assertEqual(test, plist:find(4, ListD, test, first))),
+     ?_test(?assertEqual(test, plist:find(4, ListE, test, first))),
+     ?_test(?assertEqual(test, plist:find(4, ListF, test, first))),
+     ?_test(?assertEqual(test, plist:find(4, ListG, test, first))),
+     ?_test(?assertEqual(a, plist:find(1, ListA, test, last))),
+     ?_test(?assertEqual(a, plist:find(1, ListB, test, last))),
+     ?_test(?assertEqual(a, plist:find(1, ListC, test, last))),
+     ?_test(?assertEqual(b, plist:find(2, ListB, test, last))),
+     ?_test(?assertEqual(b, plist:find(2, ListC, test, last))),
+     ?_test(?assertEqual(c, plist:find(3, ListC, test, last))),
+     ?_test(?assertEqual(test, plist:find(4, [], test, last))),
+     ?_test(?assertEqual(test, plist:find(4, ListA, test, last))),
+     ?_test(?assertEqual(test, plist:find(4, ListB, test, last))),
+     ?_test(?assertEqual(test, plist:find(4, ListC, test, last))),
+     ?_test(?assertEqual(c, plist:find(1, ListD, test, last))),
+     ?_test(?assertEqual(d, plist:find(1, ListE, test, last))),
+     ?_test(?assertEqual(e, plist:find(1, ListF, test, last))),
+     ?_test(?assertEqual(c, plist:find(1, ListG, test, last))),
+     ?_test(?assertEqual(test, plist:find(4, ListD, test, last))),
+     ?_test(?assertEqual(test, plist:find(4, ListE, test, last))),
+     ?_test(?assertEqual(test, plist:find(4, ListF, test, last))),
+     ?_test(?assertEqual(test, plist:find(4, ListG, test, last)))
+    ].
 
 %% ===================================================================
 %% Internal functions.
