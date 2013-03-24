@@ -31,7 +31,7 @@
          delete/2, delete/3,
          find/2, find/3, find/4, find_all/2,
          keys/1, values/1,
-         member/2, replace/3,
+         member/2, replace/3, replace/4,
          compact/1
         ]).
 
