@@ -421,6 +421,75 @@ member_2_test_() ->
      ].
 
 %%--------------------------------------------------------------------
+%% replace/3
+%%--------------------------------------------------------------------
+replace_3_test_() ->
+    ListA = plist:new([1, 2], [a, b]),
+    ListB = plist:new([1, 2, 3], [a, b, c]),
+    ListC = plist:new([1, 2, 3], [a, b, x]),
+    [?_test(?assert(key_val_list_p(plist:replace(3, c, [])))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListA)))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListB)))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListC)))),
+     ?_test(?assert(key_val_list_p(plist:replace(1, a, ListB)))),
+     ?_test(?assert(key_val_list_p(plist:replace(1, c, ListC)))),
+     ?_test(?assert(key_val_list_p(plist:replace(2, b, ListB)))),
+     ?_test(?assert(key_val_list_p(plist:replace(2, c, ListC)))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, [])))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, ListA)))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, ListB)))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, ListC)))),
+     ?_test(?assertEqual(a, plist:find(1, plist:replace(1, a, ListB)))),
+     ?_test(?assertEqual(c, plist:find(1, plist:replace(1, c, ListC)))),
+     ?_test(?assertEqual(b, plist:find(2, plist:replace(2, b, ListB)))),
+     ?_test(?assertEqual(c, plist:find(2, plist:replace(2, c, ListC))))
+     ].
+
+%%--------------------------------------------------------------------
+%% replace/4
+%%--------------------------------------------------------------------
+replace_4_test_() ->
+    ListA = plist:new([1, 2], [a, b]),
+    ListB = plist:new([1, 2, 3], [a, b, c]),
+    ListC = plist:new([1, 2, 3], [a, b, x]),
+    [?_test(?assert(key_val_list_p(plist:replace(3, c, [], nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListA, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListB, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListC, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:replace(1, a, ListB, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:replace(1, c, ListC, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:replace(2, b, ListB, nocheck)))),
+     ?_test(?assert(key_val_list_p(plist:replace(2, c, ListC, nocheck)))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, [], nocheck)))),
+     ?_test(
+        ?assertEqual(c, plist:find(3, plist:replace(3, c, ListA, nocheck)))),
+     ?_test(
+        ?assertEqual(c, plist:find(3, plist:replace(3, c, ListB, nocheck)))),
+     ?_test(
+        ?assertEqual(c, plist:find(3, plist:replace(3, c, ListC, nocheck)))),
+     ?_test(?assertError(badarg, plist:replace(3, c, [], check))),
+     ?_test(?assertError(badarg, plist:replace(3, c, ListA, check))),
+     ?_test(?assertError(badarg, plist:replace(3, c, [], check))),
+     ?_test(?assertError(badarg, plist:replace(3, c, ListA, check))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListB, check)))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListC, check)))),
+     ?_test(?assert(key_val_list_p(plist:replace(1, a, ListB, check)))),
+     ?_test(?assert(key_val_list_p(plist:replace(1, c, ListC, check)))),
+     ?_test(?assert(key_val_list_p(plist:replace(2, b, ListB, check)))),
+     ?_test(?assert(key_val_list_p(plist:replace(2, c, ListC, check)))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListB, check)))),
+     ?_test(?assert(key_val_list_p(plist:replace(3, c, ListC, check)))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, ListB, check)))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, ListC, check)))),
+     ?_test(?assertEqual(a, plist:find(1, plist:replace(1, a, ListB, check)))),
+     ?_test(?assertEqual(c, plist:find(1, plist:replace(1, c, ListC, check)))),
+     ?_test(?assertEqual(b, plist:find(2, plist:replace(2, b, ListB, check)))),
+     ?_test(?assertEqual(c, plist:find(2, plist:replace(2, c, ListC, check)))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, ListB, check)))),
+     ?_test(?assertEqual(c, plist:find(3, plist:replace(3, c, ListC, check))))
+     ].
+
+%%--------------------------------------------------------------------
 %% compact/1
 %%--------------------------------------------------------------------
 compact_1_test_() ->
