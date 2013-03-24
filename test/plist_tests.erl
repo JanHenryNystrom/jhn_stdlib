@@ -235,9 +235,9 @@ find_3_test_() ->
 %% find/4
 %%--------------------------------------------------------------------
 find_4_test_() ->
-    ListA = plist:new([1], [a]),
-    ListB = plist:new([1, 2], [a, b]),
-    ListC = plist:new([1, 2, 3], [a, b, c]),
+    ListA = [{1, a}],
+    ListB = [{1, a}, {2, b}],
+    ListC = [{1, a}, {2, b}, {3, c}],
     ListD = [{1, a}, {1, b}, {1, c}],
     ListE = [{1, a}, {2, b}, {3, c}, {1, d}],
     ListF = [{1, a}, {2, b}, {1, c}, {3, d}, {1, e}],
@@ -279,6 +279,167 @@ find_4_test_() ->
      ?_test(?assertEqual(test, plist:find(4, ListF, test, last))),
      ?_test(?assertEqual(test, plist:find(4, ListG, test, last)))
     ].
+
+%%--------------------------------------------------------------------
+%% find_all/2
+%%--------------------------------------------------------------------
+find_all_2_test_() ->
+    ListA = [{1, a}],
+    ListB = [{1, a}, {2, b}],
+    ListC = [{1, a}, {2, b}, {3, c}],
+    ListD = [{1, a}, {1, b}, {1, c}],
+    ListE = [{1, a}, {2, b}, {3, c}, {1, d}],
+    ListF = [{1, a}, {2, b}, {1, c}, {3, d}, {1, e}],
+    ListG = [{2, a}, {1, b}, {1, c}, {3, d}],
+    [?_test(?assertEqual([a], plist:find_all(1, ListA))),
+     ?_test(?assertEqual([a], plist:find_all(1, ListB))),
+     ?_test(?assertEqual([a], plist:find_all(1, ListC))),
+     ?_test(?assertEqual([b], plist:find_all(2, ListB))),
+     ?_test(?assertEqual([b], plist:find_all(2, ListC))),
+     ?_test(?assertEqual([c], plist:find_all(3, ListC))),
+     ?_test(?assertEqual([], plist:find_all(4, []))),
+     ?_test(?assertEqual([], plist:find_all(4, ListA))),
+     ?_test(?assertEqual([], plist:find_all(4, ListB))),
+     ?_test(?assertEqual([], plist:find_all(4, ListC))),
+     ?_test(?assertEqual([a, b, c], plist:find_all(1, ListD))),
+     ?_test(?assertEqual([a, d], plist:find_all(1, ListE))),
+     ?_test(?assertEqual([a, c, e], plist:find_all(1, ListF))),
+     ?_test(?assertEqual([b, c], plist:find_all(1, ListG))),
+     ?_test(?assertEqual([], plist:find_all(4, ListD))),
+     ?_test(?assertEqual([], plist:find_all(4, ListE))),
+     ?_test(?assertEqual([], plist:find_all(4, ListF))),
+     ?_test(?assertEqual([], plist:find_all(4, ListG)))
+     ].
+
+%%--------------------------------------------------------------------
+%% keys/1
+%%--------------------------------------------------------------------
+keys_1_test_() ->
+    ListA = [{1, a}],
+    ListB = [{1, a}, {2, b}],
+    ListC = [{1, a}, {2, b}, {3, c}],
+    ListD = [{1, a}, {1, b}, {1, c}],
+    ListE = [{1, a}, {2, b}, {3, c}, {1, d}],
+    ListF = [{1, a}, {2, b}, {1, c}, {3, d}, {1, e}],
+    ListG = [{2, a}, {1, b}, {1, c}, {3, d}],
+    [?_test(?assertEqual([], plist:keys([]))),
+     ?_test(?assertEqual([1], plist:keys(ListA))),
+     ?_test(?assertEqual([1, 2], plist:keys(ListB))),
+     ?_test(?assertEqual([1, 2, 3], plist:keys(ListC))),
+     ?_test(?assertEqual([1], plist:keys(ListD))),
+     ?_test(?assertEqual([1, 2, 3], plist:keys(ListE))),
+     ?_test(?assertEqual([1, 2, 3], plist:keys(ListF))),
+     ?_test(?assertEqual([1, 2, 3], plist:keys(ListG)))
+     ].
+
+%%--------------------------------------------------------------------
+%% values/1
+%%--------------------------------------------------------------------
+values_1_test_() ->
+    ListA = [{1, a}],
+    ListB = [{1, a}, {2, b}],
+    ListC = [{1, a}, {2, b}, {3, c}],
+    ListD = [{1, a}, {1, b}, {1, c}],
+    ListE = [{1, a}, {2, b}, {3, c}, {1, d}],
+    ListF = [{1, a}, {2, b}, {1, c}, {3, d}, {1, e}],
+    ListG = [{2, a}, {1, b}, {1, c}, {3, d}],
+    [?_test(?assertEqual([], plist:values([]))),
+     ?_test(?assertEqual([a], plist:values(ListA))),
+     ?_test(?assertEqual([a, b], plist:values(ListB))),
+     ?_test(?assertEqual([a, b, c], plist:values(ListC))),
+     ?_test(?assertEqual([a, b, c], plist:values(ListD))),
+     ?_test(?assertEqual([a, b, c, d], plist:values(ListE))),
+     ?_test(?assertEqual([a, b, c, d, e], plist:values(ListF))),
+     ?_test(?assertEqual([a, b, c, d], plist:values(ListG)))
+     ].
+
+%%--------------------------------------------------------------------
+%% member/1
+%%--------------------------------------------------------------------
+member_2_test_() ->
+    ListA = [{1, a}],
+    ListB = [{1, a}, {2, b}],
+    ListC = [{1, a}, {2, b}, {3, c}],
+    ListD = [{1, a}, {1, b}, {1, c}],
+    ListE = [{1, a}, {2, b}, {3, c}, {1, d}],
+    ListF = [{1, a}, {2, b}, {1, c}, {3, d}, {1, e}],
+    ListG = [{2, a}, {1, b}, {1, c}, {3, d}],
+    [?_test(
+        ?assertEqual(false,
+                     lists:any(fun(X) -> plist:member(X, []) end, [1, 2, 3]))),
+     ?_test(
+        ?assertEqual(true,
+                     lists:all(fun(X) -> plist:member(X, ListA) end, [1]))),
+     ?_test(
+        ?assertEqual(false,
+                     lists:any(fun(X) -> plist:member(X, ListA) end, [2, 3]))),
+     ?_test(
+        ?assertEqual(true,
+                     lists:all(fun(X) -> plist:member(X, ListB) end, [1, 2]))),
+     ?_test(
+        ?assertEqual(false,
+                     lists:any(fun(X) -> plist:member(X, ListB) end, [3]))),
+     ?_test(
+        ?assertEqual(true,
+                     lists:all(fun(X) -> plist:member(X, ListC) end,
+                               [1, 2, 3]))),
+     ?_test(
+        ?assertEqual(false,
+                     lists:any(fun(X) -> plist:member(X, ListC) end, [4]))),
+     ?_test(
+        ?assertEqual(true,
+                     lists:all(fun(X) -> plist:member(X, ListD) end,
+                               [1]))),
+     ?_test(
+        ?assertEqual(false,
+                     lists:any(fun(X) -> plist:member(X, ListD) end, [2, 3]))),
+
+     ?_test(
+        ?assertEqual(true,
+                     lists:all(fun(X) -> plist:member(X, ListE) end,
+                               [1, 2, 3]))),
+     ?_test(
+        ?assertEqual(false,
+                     lists:any(fun(X) -> plist:member(X, ListE) end, [4]))),
+
+     ?_test(
+        ?assertEqual(true,
+                     lists:all(fun(X) -> plist:member(X, ListF) end,
+                               [1, 2, 3]))),
+     ?_test(
+        ?assertEqual(false,
+                     lists:any(fun(X) -> plist:member(X, ListF) end, [4]))),
+
+     ?_test(
+        ?assertEqual(true,
+                     lists:all(fun(X) -> plist:member(X, ListG) end,
+                               [1, 2, 3]))),
+     ?_test(
+        ?assertEqual(false,
+                     lists:any(fun(X) -> plist:member(X, ListG) end, [4])))
+
+     ].
+
+%%--------------------------------------------------------------------
+%% compact/1
+%%--------------------------------------------------------------------
+compact_1_test_() ->
+    ListA = [{1, a}],
+    ListB = [{1, a}, {2, b}],
+    ListC = [{1, a}, {2, b}, {3, c}],
+    ListD = [{1, a}, {1, b}, {1, c}],
+    ListE = [{1, a}, {2, b}, {3, c}, {1, d}],
+    ListF = [{1, a}, {2, b}, {1, c}, {3, d}, {1, e}],
+    ListG = [{2, a}, {1, b}, {1, c}, {3, d}],
+    [?_test(?assertEqual([], plist:compact([]))),
+     ?_test(?assertEqual(ListA, plist:compact(ListA))),
+     ?_test(?assertEqual(ListB, plist:compact(ListB))),
+     ?_test(?assertEqual(ListC, plist:compact(ListC))),
+     ?_test(?assertEqual(ListA, plist:compact(ListD))),
+     ?_test(?assertEqual(ListC, plist:compact(ListE))),
+     ?_test(?assertEqual([{1, a}, {2, b}, {3, d}], plist:compact(ListF))),
+     ?_test(?assertEqual([{1, b}, {2, a}, {3, d}], plist:compact(ListG)))
+     ].
 
 %% ===================================================================
 %% Internal functions.
