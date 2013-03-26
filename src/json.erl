@@ -16,8 +16,29 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%   JSON lib.
+%%%  A JSON to and from erlang terms library.
 %%%
+%%%  JSON is represented as follows:
+%%%
+%%%  text  : object | array
+%%%  object: {[{string, value}*]}
+%%%  array : [value*]
+%%%  string: atom | <<octet*>>
+%%%  number: integer | float
+%%%  true  : 'true'
+%%%  false : 'false'
+%%%  null  : 'null'
+%%%
+%%%  Strings can be represented by atoms when generating JSON, but will not
+%%%  not be generated when converting JSON to erlang. It can be specified
+%%%  what encoding is used for the strings with latin-1 being the default.
+%%%  All atoms are assumed to be in latin-1 and can not be specified.
+%%%
+%%%  The encoding of a JSON text is determined and can be specified when
+%%%  convering from Erlang terms with the deafult being UTF-8.
+%%%
+%%%  When converting Erlang terms to JSON iolists are generated but
+%%%  it can generate a binary if so instructed.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -32,7 +53,7 @@
 %% Types
 -type plain_format() :: latin1 | encoding().
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
--type arg()          :: {atom_strings, boolean()} | binary | iolist |
+-type opt()          :: {atom_strings, boolean()} | binary | iolist |
                         {plain_string, plain_format()} | {encoding, encoding()}.
 
 -type json()        :: json_text().
@@ -64,27 +85,21 @@
 -define(IS_WS(WS), WS == ?HT; WS == ?LF; WS == ?CR; WS == ?SPC).
 -define(ESCAPE(C), C =< 16#1F; C == 34; C == 47; C == 92).
 
+-define(ENCODINGS,
+        [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
 
--define(SUPPPORTED_PLAINFORMATS,
-        [latin1,
-         utf8,
-         {utf16, little}, {utf16, big},
-         {utf32, little}, {utf32, big}]).
-
--define(SUPPPORTED_ENCODINGS,
-        [utf8,
-         {utf16, little}, {utf16, big},
-         {utf32, little}, {utf32, big}]).
-
+-define(PLAINFORMATS,
+        [latin1 | ?ENCODINGS].
 
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: encode(Term) -> JSON.
 %% @doc
-%%   
+%%   Encodes the structured Erlang term as an iolist.
+%%   Equivalent of encode(Term, []) -> JSON.
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(json()) -> iolist().
@@ -92,12 +107,19 @@
 encode(Plain) -> encode(Plain, []).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: encode(Term, Options) -> JSON.
 %% @doc
-%%   
+%%   Encodes the structured Erlang term as an iolist or binary.
+%%   Encode will give an exception if the erlang term is not well formed.
+%%   Options are:
+%%     binary -> a binaryis returned
+%%     iolist -> a iolist is returned
+%%     {atom_strings, Bool} -> determines if atoms for strings are allowed
+%%     {plain_string, Format} -> what format the strings are encoded in
+%%     {encoding, Encoding} -> what encoding is used for the resulting JSON
 %% @end
 %%--------------------------------------------------------------------
--spec encode(json(), [arg()]) -> iolist() | binary().
+-spec encode(json(), [opt()]) -> iolist() | binary().
 %%--------------------------------------------------------------------
 encode(Plain, Opts) ->
     #opts{return_type = Return} = ParsedOpts = parse_opts(Opts),
@@ -109,7 +131,6 @@ encode(Plain, Opts) ->
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
-
 
 %% ===================================================================
 %% Encoding
@@ -153,8 +174,8 @@ encode_value(BinaryString, Opts) when is_binary(BinaryString) ->
     encode_string(BinaryString, Opts);
 encode_value(Integer, Opts) when is_integer(Integer) ->
     encode_chars(integer_to_list(Integer), Opts);
-%% TODO: the float to list generates horrible result, look at the mochinum stuff
-%%       but for now use io_lib:format, check perfomance!
+%% TODO: the float to list generates horrible result, look at the Burger and
+%%        Dybvig but for now use io_lib:format.
 encode_value(Float, Opts) when is_float(Float) ->
     [String] = io_lib:format("~p", [Float]),
     encode_chars(String, Opts).
@@ -247,18 +268,14 @@ parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt({atom_strings, Bool}, Opts) when is_boolean(Bool)->
     Opts#opts{atom_strings = Bool};
 parse_opt(Opt = {plain_string, PlainString}, Opts) ->
-    case lists:member(PlainString, ?SUPPPORTED_PLAINFORMATS) of
-        true ->
-            Opts#opts{plain_string = PlainString};
-        false ->
-            erlang:error(badarg, [Opt])
+    case lists:member(PlainString, ?PLAINFORMATS) of
+        true -> Opts#opts{plain_string = PlainString};
+        false -> erlang:error(badarg, [Opt])
     end;
 parse_opt(Opt = {encoding, Encoding} , Opts) ->
-    case lists:member(Encoding, ?SUPPPORTED_ENCODINGS) of
-        true ->
-            Opts#opts{encoding = Encoding};
-        false ->
-            erlang:error(badarg, [Opt])
+    case lists:member(Encoding, ?ENCODINGS) of
+        true -> Opts#opts{encoding = Encoding};
+        false -> erlang:error(badarg, [Opt])
     end;
 parse_opt(Opt, _) ->
     erlang:error(badarg, [Opt]).
