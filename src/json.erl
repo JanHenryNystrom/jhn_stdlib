@@ -39,6 +39,9 @@
 %%%
 %%%  When converting Erlang terms to JSON iolists are generated but
 %%%  it can generate a binary if so instructed.
+%%%
+%%%  latin1 is defined in ISO-8859-1.
+%%%  UTF formats are defined in Unicode 5.0 (ISBN 0-321-48091-0).
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
