@@ -16,7 +16,7 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%  A JSON to and from erlang terms library.
+%%%  A JSON to and from erlang terms library based on rfc4627.
 %%%
 %%%  JSON is represented as follows:
 %%%
