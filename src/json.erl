@@ -304,12 +304,6 @@ encode_chars(Chars, Opts) when is_list(Chars) ->
 encode_chars(Chars, Opts) when is_binary(Chars) ->
     << <<(encode_char(C, Opts))/binary>> || <<C>> <= Chars>>.
 
-encode_char(C, #opts{encoding = utf8}) -> <<C>>;
-encode_char(C, #opts{encoding = {utf16, little}}) -> <<C, 0>>;
-encode_char(C, #opts{encoding = {utf16, big}}) -> <<0, C>>;
-encode_char(C, #opts{encoding = {utf32, little}}) -> <<C, 0, 0, 0>>;
-encode_char(C, #opts{encoding = {utf32, big}}) -> <<0, 0, 0, C>>.
-
 %% ===================================================================
 %% float_to_binary/1 the implementation based on
 %% "Printing Floating-Point Numbers Quickly and Accurately"
@@ -634,6 +628,12 @@ parse_opt(Opt = {encoding, Encoding} , Opts) ->
     end;
 parse_opt(_, Rec) ->
     badarg(Rec).
+
+encode_char(C, #opts{encoding = utf8}) -> <<C>>;
+encode_char(C, #opts{encoding = {utf16, little}}) -> <<C, 0>>;
+encode_char(C, #opts{encoding = {utf16, big}}) -> <<0, C>>;
+encode_char(C, #opts{encoding = {utf32, little}}) -> <<C, 0, 0, 0>>;
+encode_char(C, #opts{encoding = {utf32, big}}) -> <<0, 0, 0, C>>.
 
 char_code(Text, Coding, Coding) -> Text;
 char_code(Text, From, To) -> unicode:characters_to_binary(Text, From, To).
