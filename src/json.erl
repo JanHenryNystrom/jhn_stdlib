@@ -51,7 +51,9 @@
 -compile({no_auto_import, [float_to_binary/1]}).
 
 %% Library functions
--export([encode/1, encode/2]).
+-export([encode/1, encode/2,
+         decode/1, decode/2
+        ]).
 
 %% Types
 -type plain_format() :: latin1 | encoding().
@@ -72,10 +74,13 @@
 -record(opts, {encoding = utf8 :: encoding(),
                plain_string = latin1 :: plain_format(),
                atom_strings = true :: boolean(),
-               return_type = iolist :: iolist | binary
+               return_type = iolist :: iolist | binary,
+               orig_call
               }).
 
 %% Defines
+
+%% Char macros
 -define(NULL, 0).
 -define(BEL, 7).
 -define(BS, 8).
@@ -88,9 +93,21 @@
 -define(IS_WS(WS), WS == ?HT; WS == ?LF; WS == ?CR; WS == ?SPC).
 -define(ESCAPE(C), C =< 16#1F; C == 34; C == 47; C == 92).
 
+%% Decode macros
+-define(IS_INT(C), C>=$0, C=<$9).
+-define(IS_POS_INT(C), C>=$1, C=<$9).
+-define(IS_SIGN(C), C == $-; C == $+).
+-define(IS_EXP(C), C==$E; C==$e).
+-define(ZERO_OR_POST(Stage), Stage == zero; Stage == post).
+-define(EXP_ZERO_OR_POST(C, Stage),
+        ((Stage == zero) orelse (Stage == post))
+        andalso ((C == $E) orelse (C == $e))).
+
+%% Supported encodings
 -define(ENCODINGS,
         [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
 
+%% Supported string formats
 -define(PLAINFORMATS,
         [latin1 | ?ENCODINGS]).
 
@@ -111,7 +128,7 @@
 %%--------------------------------------------------------------------
 -spec encode(json()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Plain) -> encode(Plain, []).
+encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 
 %%--------------------------------------------------------------------
 %% Function: encode(Term, Options) -> JSON.
@@ -119,7 +136,7 @@ encode(Plain) -> encode(Plain, []).
 %%   Encodes the structured Erlang term as an iolist or binary.
 %%   Encode will give an exception if the erlang term is not well formed.
 %%   Options are:
-%%     binary -> a binaryis returned
+%%     binary -> a binary is returned
 %%     iolist -> a iolist is returned
 %%     {atom_strings, Bool} -> determines if atoms for strings are allowed
 %%     {plain_string, Format} -> what format the strings are encoded in
@@ -128,12 +145,42 @@ encode(Plain) -> encode(Plain, []).
 %%--------------------------------------------------------------------
 -spec encode(json(), [opt()]) -> iolist() | binary().
 %%--------------------------------------------------------------------
-encode(Plain, Opts) ->
-    #opts{return_type = Return} = ParsedOpts = parse_opts(Opts),
+encode(Term, Opts) -> Line = ?LINE,
+    #opts{return_type = Return} = ParsedOpts =
+        parse_opts(Opts, #opts{orig_call = {encode, [Term, Opts], Line}}),
     case Return of
-        iolist -> encode_text(Plain, ParsedOpts);
-        binary -> iolist_to_binary(encode_text(Plain, ParsedOpts))
+        iolist -> encode_text(Term, ParsedOpts);
+        binary -> iolist_to_binary(encode_text(Term, ParsedOpts))
     end.
+
+%%--------------------------------------------------------------------
+%% Function: decode(JSON) -> Term.
+%% @doc
+%%   Decodes the binary into a structured Erlang term.
+%%   Equivalent of decode(JSON, []) -> Term.
+%% @end
+%%--------------------------------------------------------------------
+-spec decode(binary()) -> json().
+%%--------------------------------------------------------------------
+decode(Binary) -> decode(Binary, #opts{orig_call = {decode, [Binary], ?LINE}}).
+
+%%--------------------------------------------------------------------
+%% Function: decode(JSON, Options) -> Term.
+%% @doc
+%%   Decodes the binary into a structured Erlang.
+%%   Decode will give an exception if the binary is not well formed JSON.
+%%   Options are:
+%%     {plain_string, Format} -> what format the strings are encoded in
+%% @end
+%%--------------------------------------------------------------------
+-spec decode(binary(), [opt()]) -> json().
+%%--------------------------------------------------------------------
+decode(Binary, Opts = #opts{}) ->
+    decode_text(Binary, Opts#opts{encoding = encoding(Binary)});
+decode(Binary, Opts) -> Line = ?LINE,
+    OptsRec = parse_opts(Opts, #opts{orig_call = {decode, [Binary, Opts], Line},
+                                     encoding = encoding(Binary)}),
+    decode_text(Binary, OptsRec).
 
 %% ===================================================================
 %% Internal functions.
@@ -390,11 +437,183 @@ log2floor(0, N) -> N;
 log2floor(Int, N) -> log2floor(Int bsr 1, 1 + N).
 
 %% ===================================================================
+%% Decoding
+%% ===================================================================
+
+encoding(<<_, 0, 0, 0, _/binary>>) -> {utf32, little};
+encoding(<<0, 0, 0, _/binary>>) ->    {utf32, big};
+encoding(<<_, 0, _, 0, _/binary>>) -> {utf16, little};
+encoding(<<0, _, 0, _/binary>>) ->    {utf16, big};
+encoding(_) -> utf8.
+
+decode_text(Binary, Opts) ->
+    case next(Binary, Opts) of
+        {WS, T} when ?IS_WS(WS)-> decode_text(T, Opts);
+        {${, T} -> {Object, _} = decode_object(T, false, [], Opts), Object;
+        {$[, T}-> {Array, _} = decode_array(T, false, [], Opts), Array;
+        _ -> badarg(Opts)
+    end.
+
+decode_object(Binary, Expect, Acc, Opts) ->
+    case {next(Binary, Opts), Expect} of
+        {{WS, T}, _} when ?IS_WS(WS) -> decode_object(T, Expect, Acc, Opts);
+        {{$}, T}, _} -> {{lists:reverse(Acc)}, T};
+        {{$,, T}, true} -> decode_object(T, false, Acc, Opts);
+        {{$", T}, false} ->
+            {Name, T1} = decode_string(T, Opts),
+            {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
+            decode_object(T2, true, [{Name, Value} | Acc], Opts);
+        _ ->
+            badarg(Opts)
+    end.
+
+decode_array(Binary, Expect, Acc, Opts) ->
+    case {next(Binary, Opts), Expect} of
+        {{WS, T}, _} when ?IS_WS(WS) -> decode_array(T, Expect, Acc, Opts);
+        {{$,, T}, true} -> decode_array(T, false, Acc, Opts);
+        {{$], T}, _} -> {lists:reverse(Acc), T};
+        {_, false} ->
+            {Value, T} = decode_value(Binary, Opts),
+            decode_array(T, true, [Value | Acc], Opts);
+        _ ->
+            badarg(Opts)
+    end.
+
+decode_value(Binary, Opts) ->
+    case next(Binary, Opts) of
+        {WS, T} when ?IS_WS(WS) -> decode_value(T, Opts);
+        {$t, T} -> decode_base("rue", T, true, Opts);
+        {$f, T} -> decode_base("alse", T, false, Opts);
+        {$n, T} -> decode_base("ull", T, null, Opts);
+        {${, T} -> decode_object(T, false, [], Opts);
+        {$[, T} -> decode_array(T, false, [], Opts);
+        {$", T} -> decode_string(T, Opts);
+        {$-, T} -> decode_number(T, pre, bint, [$-], Opts);
+        {H, _} when H >= $0, H =< $9 ->
+            decode_number(Binary, pre, int, [], Opts);
+        _ ->
+            badarg(Opts)
+    end.
+
+decode_base("", T, Value, _) -> {Value, T};
+decode_base([H | T], Binary, Value, Opts) ->
+    case next(Binary, Opts) of
+        {H, Binary1} -> decode_base(T, Binary1, Value, Opts);
+        _ -> badarg(Opts)
+    end.
+
+decode_number(Binary, Stage, Phase, Acc, Opts) ->
+    case {next(Binary, Opts), Stage, Phase} of
+        {{$0, T}, pre, int} -> decode_number(T, zero, int, [$0 | Acc], Opts);
+        {{H, T}, pre, exp}  when ?IS_SIGN(H) ->
+            decode_number(T, sign, exp, [H | Acc], Opts);
+        {{H, T}, pre, float} when ?IS_INT(H) ->
+            decode_number(T, post, float, [H | Acc], Opts);
+        {{H, T}, pre, _} when ?IS_POS_INT(H) ->
+            decode_number(T, post, Phase, [H | Acc], Opts);
+        {{H, T}, sign, _} when ?IS_POS_INT(H) ->
+            decode_number(T, post, Phase, [H | Acc], Opts);
+        {{H, T}, post, _} when ?IS_INT(H) ->
+            decode_number(T, post, Phase, [H | Acc], Opts);
+        {{$., T}, _, int} when ?ZERO_OR_POST(Stage) ->
+            decode_number(T, pre, float, [$. | Acc], Opts);
+        {{E, T}, _, int} when ?EXP_ZERO_OR_POST(E, Stage) ->
+            decode_number(T, pre, exp, [E, $0, $. | Acc], Opts);
+        {{E, T}, post, float} when ?IS_EXP(E) ->
+            decode_number(T, pre, exp, [E | Acc], Opts);
+        {_, State, int} when ?ZERO_OR_POST(State) ->
+            {list_to_integer(lists:reverse(Acc)), Binary};
+        {_, post, _} ->
+            {list_to_float(lists:reverse(Acc)), Binary};
+        _ ->
+            badarg(Opts)
+    end.
+
+decode_string(Binary, Opts=#opts{encoding = Encoding, plain_string = Plain}) ->
+    {Unescaped, T} = unescape(Binary, [], Opts),
+    {char_code(Unescaped, Encoding, Plain), T}.
+
+unescape(Binary, Acc, Opts) ->
+    case next(Binary, Opts) of
+        {$\\, T} -> unescape_solid(T, Acc, Opts);
+        {$", T} -> {lists:reverse(Acc), T};
+        {H, T} -> unescape(T, [H | Acc], Opts)
+    end.
+
+unescape_solid(Binary, Acc, Opts) ->
+    case next(Binary, Opts) of
+        {$", T} -> unescape(T, [encode_char($", Opts) | Acc], Opts);
+        {$\\, T} -> unescape(T, [encode_char($\\, Opts) | Acc], Opts);
+        {$/, T} -> unescape(T, [encode_char($/, Opts) | Acc], Opts);
+        {$0, T} -> unescape(T, [encode_char(?NULL, Opts) | Acc], Opts);
+        {$a, T} -> unescape(T, [encode_char(?BEL, Opts) | Acc], Opts);
+        {$b, T} -> unescape(T, [encode_char(?BS, Opts) | Acc], Opts);
+        {$t, T} -> unescape(T, [encode_char(?HT, Opts) | Acc], Opts);
+        {$n, T} -> unescape(T, [encode_char(?LF, Opts) | Acc], Opts);
+        {$f, T} -> unescape(T, [encode_char(?FF, Opts) | Acc], Opts);
+        {$v, T} -> unescape(T, [encode_char(?VT, Opts) | Acc], Opts);
+        {$r, T} -> unescape(T, [encode_char(?CR, Opts) | Acc], Opts);
+        {$s, T} -> unescape(T, [encode_char(?SPC, Opts) | Acc], Opts);
+        {$u, T} -> unescape_hex(T, Acc, Opts);
+        {H, T} when is_integer(H) ->
+            unescape(T, [encode_char(H, Opts), encode_char($\\,Opts)|Acc],Opts);
+        {H, T} when is_binary(H) ->
+            unescape(T, [H, encode_char($\\, Opts) | Acc], Opts)
+    end.
+
+unescape_hex(<<A, B, C, D, T/binary>>, Acc, Opts = #opts{encoding = utf8}) ->
+    unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
+unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf16, little}}) ->
+    <<A, 0, B, 0, C, 0, D, 0, T/binary>> = Binary,
+    unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
+unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf16, big}}) ->
+    <<0, A, 0, B, 0, C, 0, D, T/binary>> = Binary,
+    unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
+unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf32, little}}) ->
+    <<A, 0, 0, 0, B, 0, 0, 0, C, 0, 0, 0, D, 0, 0, 0, T/binary>> = Binary,
+    unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
+unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf32, big}}) ->
+    <<0, 0, 0, A, 0, 0, 0, B, 0, 0, 0, C, 0, 0, 0, D, T/binary>> = Binary,
+    unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
+unescape_hex(_, _, Opts) ->
+    badarg(Opts).
+
+encode_hex(List, Opts) -> encode_char(list_to_integer(List, 16), Opts).
+
+skip(Binary, H, Opts) ->
+    case next(Binary, Opts) of
+        {H, T} -> T;
+        {WS, T} when ?IS_WS(WS) -> skip(T, H, Opts);
+        _ -> badarg(Opts)
+    end.
+
+next(<<H, T/binary>>, #opts{encoding = utf8}) ->
+    {H, T};
+next(<<H, 0, T/binary>>, #opts{encoding = {utf16, little}}) ->
+    {H, T};
+next(<<H1, H2, T/binary>>, #opts{encoding = {utf16, little}}) ->
+    {<<H1, H2>>, T};
+next(<<0, H, T/binary>>, #opts{encoding = {utf16, big}}) ->
+    {H, T};
+next(<<H1, H2, T/binary>>, #opts{encoding = {utf16, big}}) ->
+    {<<H1, H2>>, T};
+next(<<H, 0, 0, 0, T/binary>>, #opts{encoding = {utf132, little}}) ->
+    {H, T};
+next(<<H1, H2, H3, H4, T/binary>>, #opts{encoding = {utf32, little}}) ->
+    {<<H1, H2, H3, H4>>, T};
+next(<<0, 0, 0, H, T/binary>>, #opts{encoding = {utf32, big}}) ->
+    {H, T};
+next(<<H1, H2, H3, H4, T/binary>>, #opts{encoding = {utf32, big}}) ->
+    {<<H1, H2, H3, H4>>, T};
+next(_, Opts) ->
+    badarg(Opts).
+
+%% ===================================================================
 %% Common parts
 %% ===================================================================
 
-parse_opts([]) -> #opts{};
-parse_opts(Opts) -> lists:foldl(fun parse_opt/2, #opts{}, Opts).
+parse_opts([], Rec) -> Rec;
+parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
@@ -410,8 +629,14 @@ parse_opt(Opt = {encoding, Encoding} , Opts) ->
         true -> Opts#opts{encoding = Encoding};
         false -> erlang:error(badarg, [Opt])
     end;
-parse_opt(Opt, _) ->
-    erlang:error(badarg, [Opt]).
+parse_opt(_, Rec) ->
+    badarg(Rec).
 
 char_code(Text, Coding, Coding) -> Text;
 char_code(Text, From, To) -> unicode:characters_to_binary(Text, From, To).
+
+badarg(#opts{orig_call = {Funcion, Args, Line}}) ->
+    Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line}]} |
+             lists:dropwhile(fun(T) -> element(1, T) == ?MODULE end,
+                             erlang:get_stacktrace())],
+    exit({badarg, Trace}).
