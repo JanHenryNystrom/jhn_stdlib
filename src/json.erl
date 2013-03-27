@@ -196,7 +196,10 @@ decode(Binary, Opts) -> Line = ?LINE,
 encode_text({Object}, Opts) when is_list(Object) ->
     encode_object(Object, [], Opts);
 encode_text(Array, Opts) when is_list(Array) ->
-    [encode_char($[, Opts) | encode_array(Array, [], Opts)].
+    [encode_char($[, Opts) | encode_array(Array, [], Opts)];
+encode_text(_, Opts) ->
+    badarg(Opts).
+
 
 encode_object([], [], Opts) -> encode_chars(<<"{}">>, Opts);
 encode_object([{Name, Value}], Acc, Opts) ->
@@ -209,7 +212,9 @@ encode_object([{Name, Value} | T], Acc, Opts) ->
     Value1 = encode_value(Value, Opts),
     Name1 = encode_string(Name, Opts),
     Acc1 = [encode_char($,, Opts), Value1, encode_char($:, Opts), Name1 | Acc],
-    encode_object(T, Acc1, Opts).
+    encode_object(T, Acc1, Opts);
+encode_object(_, _, Opts) ->
+    badarg(Opts).
 
 encode_array([], Acc, Opts) -> lists:reverse([encode_char($],Opts) | Acc]);
 encode_array([H], Acc, Opts) ->
@@ -217,7 +222,9 @@ encode_array([H], Acc, Opts) ->
 encode_array([H | Array], Acc, Opts) ->
     encode_array(Array,
                  [encode_char($,, Opts), encode_value(H, Opts) | Acc],
-                 Opts).
+                 Opts);
+encode_array(_, _, Opts) ->
+    badarg(Opts).
 
 encode_value(true, Opts) -> encode_chars(<<"true">>, Opts);
 encode_value(false, Opts) -> encode_chars(<<"false">>, Opts);
@@ -241,7 +248,9 @@ encode_string(String, Opts) when is_binary(String) ->
     #opts{plain_string = Plain, encoding = Encoding} = Opts,
     [encode_char($", Opts),
      char_code(escape(String, Plain, Opts), Plain, Encoding),
-     encode_char($", Opts)].
+     encode_char($", Opts)];
+encode_string(_, Opts) ->
+    badarg(Opts).
 
 escape(String, Plain, Opts) ->
     case escapeable(String, Plain) of
