@@ -148,6 +148,8 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 %%--------------------------------------------------------------------
 -spec encode(json(), [opt()]) -> iolist() | binary().
 %%--------------------------------------------------------------------
+encode(Term, Opts = #opts{}) ->
+    encode_text(Term, Opts);
 encode(Term, Opts) -> Line = ?LINE,
     #opts{return_type = Return} = ParsedOpts =
         parse_opts(Opts, #opts{orig_call = {encode, [Term, Opts], Line}}),
