@@ -543,13 +543,19 @@ decode_number(Binary, Stage, Phase, Acc, Opts) ->
 
 decode_string(Binary, Opts=#opts{encoding = Encoding, plain_string = Plain}) ->
     {Unescaped, T} = unescape(Binary, [], Opts),
-    {char_code(Unescaped, Encoding, Plain), T}.
+    {iolist_to_binary(char_code(Unescaped, Encoding, Plain)), T}.
 
-unescape(Binary, Acc, Opts) ->
+unescape(Binary, Acc, Opts = #opts{encoding = Encoding}) ->
     case next(Binary, Opts) of
         {$\\, T} -> unescape_solid(T, Acc, Opts);
         {$", T} -> {lists:reverse(Acc), T};
-        {H, T} -> unescape(T, [H | Acc], Opts)
+        {H, T} when Encoding == utf8 -> unescape(T, [H | Acc], Opts);
+        _ when Encoding == {utf16, little}; Encoding == {utf16, big} ->
+            <<H:16, T/binary>> = Binary,
+            unescape(T, [<<H:16>> | Acc], Opts);
+        _ when Encoding == {utf32, little}; Encoding == {utf32, big} ->
+            <<H:32, T/binary>> = Binary,
+            unescape(T, [<<H:32>> | Acc], Opts)
     end.
 
 unescape_solid(Binary, Acc, Opts) ->

@@ -74,7 +74,8 @@
          0.1e1, 0.1e2, 0.1e3, 0.1e4, 0.1e5, 0.1e6, 0.1e7, 0.1e8,
          1.23456, 12.3456, 123.456, 1234.56, 12345.6, 123456.0,
          123456.0, 12345.6, 1234.56, 123.456, 12.3456,
-         12345678919393939393.0, 4503599627370496.0, 1.0e-308
+         12345678919393939393.0, 4503599627370496.0, 1.0e-308,
+         1/7
         ]).
 
 -define(FLOATS_PLUS,
@@ -159,7 +160,7 @@ encode_2_encodings_test_() ->
 
 
 %%--------------------------------------------------------------------
-%% encode/2 with encoding = utf8 different plain
+%% encode/2 with different encodings and  plains
 %%--------------------------------------------------------------------
 encode_2_encodings_plains_test_() ->
     [
@@ -202,6 +203,22 @@ decode_2_test_() ->
            json:decode(unicode:characters_to_binary(JSON, latin1, Encoding),
                        []))) ||
         {JSON, Term} <- ?REVERSIBLE,
+        Encoding <- ?ENCODINGS
+    ].
+
+%%--------------------------------------------------------------------
+%% decode/2 with different encodings and  plains
+%%--------------------------------------------------------------------
+decode_2_encodings_plains_test_() ->
+    [
+     ?_test(
+        ?assertEqual(
+           [unicode:characters_to_binary(String, latin1, Plain)],
+           json:decode(
+             unicode:characters_to_binary(JSON, latin1, Encoding),
+             [{plain_string, Plain}]))) ||
+        {JSON, [String]} <- ?STRING_ESCAPE,
+        Plain <- ?PLAIN_FORMATS,
         Encoding <- ?ENCODINGS
     ].
 
