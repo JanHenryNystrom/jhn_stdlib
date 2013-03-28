@@ -1,4 +1,4 @@
 jhn_stdlib
 ==========
 
-A few mind experiments solidified as code.
+A few thought experiments solidified as code.
