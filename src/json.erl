@@ -263,12 +263,12 @@ escape(String, Plain, Opts) ->
 escapeable(<<>>, _) -> false;
 escapeable(<<H, _/binary>>, latin1) when ?ESCAPE(H) -> true;
 escapeable(<<H, _/binary>>, utf8) when ?ESCAPE(H) -> true;
-escapeable(<<H, _/binary>>, {utf16, little}) when ?ESCAPE(H) -> true;
-escapeable(<<_, H, _/binary>>, {utf16, big}) when ?ESCAPE(H) -> true;
-escapeable(<<H, _/binary>>, {utf32, little}) when ?ESCAPE(H) -> true;
-escapeable(<<_, _, _, H, _/binary>>, {utf32, big}) when ?ESCAPE(H) -> true;
-escapeable(<<_, _, T/binary>>, Plain = {utf16, _}) -> escapeable(T, Plain);
-escapeable(<<_, _, _, _, T/binary>>, Plain = {utf32,_}) -> escapeable(T, Plain);
+escapeable(<<H, 0, _/binary>>, {utf16, little}) when ?ESCAPE(H) -> true;
+escapeable(<<0, H, _/binary>>, {utf16, big}) when ?ESCAPE(H) -> true;
+escapeable(<<H, 0:24, _/binary>>, {utf32, little}) when ?ESCAPE(H) -> true;
+escapeable(<<0:24, H, _/binary>>, {utf32, big}) when ?ESCAPE(H) -> true;
+escapeable(<<_:16, T/binary>>, Plain = {utf16, _}) -> escapeable(T, Plain);
+escapeable(<<_:32, T/binary>>, Plain = {utf32,_}) -> escapeable(T, Plain);
 escapeable(<<_, T/binary>>, Plain) -> escapeable(T, Plain).
 
 escape(<<>>, Acc, _, _) -> Acc;
@@ -276,21 +276,20 @@ escape(<<H, T/binary>>, Acc, latin1, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H))/binary>>, latin1, Opts);
 escape(<<H, T/binary>>, Acc, utf8, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H))/binary>>, utf8, Opts);
-escape(<<H, _, T/binary>>, Acc, Plain = {utf16, little},Opts) when ?ESCAPE(H) ->
+escape(<<H, 0, T/binary>>, Acc, Plain = {utf16, little},Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
-escape(<<_, H, T/binary>>, Acc, Plain = {utf16, big}, Opts) when ?ESCAPE(H) ->
+escape(<<0, H, T/binary>>, Acc, Plain = {utf16, big}, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
-escape(<<H, _, _, _,T/binary>>,Acc,Plain={utf32,little},Opts) when ?ESCAPE(H) ->
+escape(<<H, 0:24,T/binary>>,Acc,Plain={utf32, little},Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
-escape(<<_, _, _, H, T/binary>>, Acc, Plain={utf32,big},Opts) when ?ESCAPE(H) ->
+escape(<<0:24, H, T/binary>>, Acc, Plain={utf32, big},Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
-escape(<<H1, H2, T/binary>>, Acc, Plain = {utf16, _}, Opts) ->
-    escape(T, <<Acc/binary, H1, H2>>, Plain, Opts);
-escape(<<H1, H2, H3, H4, T/binary>>, Acc, Plain = {utf32,_}, Opts) ->
-    escape(T, <<Acc/binary, H1, H2, H3, H4>>, Plain, Opts);
+escape(<<H:16, T/binary>>, Acc, Plain = {utf16, _}, Opts) ->
+    escape(T, <<Acc/binary, H:16>>, Plain, Opts);
+escape(<<H:32, T/binary>>, Acc, Plain = {utf32,_}, Opts) ->
+    escape(T, <<Acc/binary, H:32>>, Plain, Opts);
 escape(<<H, T/binary>>, Acc, Plain, Opts) ->
     escape(T, <<Acc/binary, H>>, Plain, Opts).
-
 escape_char(C, #opts{plain_string = Plain}) ->
     encode_chars(escape_char(C), #opts{encoding = Plain}).
 
@@ -588,10 +587,10 @@ unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf16, big}}) ->
     <<0, A, 0, B, 0, C, 0, D, T/binary>> = Binary,
     unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
 unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf32, little}}) ->
-    <<A, 0, 0, 0, B, 0, 0, 0, C, 0, 0, 0, D, 0, 0, 0, T/binary>> = Binary,
+    <<A, 0:24, B, 0:24, C, 0:24, D, 0:24, T/binary>> = Binary,
     unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
 unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf32, big}}) ->
-    <<0, 0, 0, A, 0, 0, 0, B, 0, 0, 0, C, 0, 0, 0, D, T/binary>> = Binary,
+    <<0:24, A, 0:24, B, 0:24, C, 0:24, D, T/binary>> = Binary,
     unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
 unescape_hex(_, _, Opts) ->
     badarg(Opts).
@@ -605,26 +604,14 @@ skip(Binary, H, Opts) ->
         _ -> badarg(Opts)
     end.
 
-next(<<H, T/binary>>, #opts{encoding = utf8}) ->
-    {H, T};
-next(<<H, 0, T/binary>>, #opts{encoding = {utf16, little}}) ->
-    {H, T};
-next(<<H1, H2, T/binary>>, #opts{encoding = {utf16, little}}) ->
-    {<<H1, H2>>, T};
-next(<<0, H, T/binary>>, #opts{encoding = {utf16, big}}) ->
-    {H, T};
-next(<<H1, H2, T/binary>>, #opts{encoding = {utf16, big}}) ->
-    {<<H1, H2>>, T};
-next(<<H, 0, 0, 0, T/binary>>, #opts{encoding = {utf32, little}}) ->
-    {H, T};
-next(<<H1, H2, H3, H4, T/binary>>, #opts{encoding = {utf32, little}}) ->
-    {<<H1, H2, H3, H4>>, T};
-next(<<0, 0, 0, H, T/binary>>, #opts{encoding = {utf32, big}}) ->
-    {H, T};
-next(<<H1, H2, H3, H4, T/binary>>, #opts{encoding = {utf32, big}}) ->
-    {<<H1, H2, H3, H4>>, T};
-next(_, Opts) ->
-    badarg(Opts).
+next(<<H, T/binary>>, #opts{encoding = utf8}) -> {H, T};
+next(<<H, 0, T/binary>>, #opts{encoding = {utf16, little}}) -> {H, T};
+next(<<0, H, T/binary>>, #opts{encoding = {utf16, big}}) -> {H, T};
+next(<<H:16, T/binary>>, #opts{encoding = {utf16, _}}) -> {<<H:16>>, T};
+next(<<H, 0:24, T/binary>>, #opts{encoding = {utf32, little}}) -> {H, T};
+next(<<0:24, H, T/binary>>, #opts{encoding = {utf32, big}}) -> {H, T};
+next(<<H:32, T/binary>>, #opts{encoding = {utf32, _}}) -> {<<H:32>>, T};
+next(_, Opts) -> badarg(Opts).
 
 %% ===================================================================
 %% Common parts
@@ -653,8 +640,8 @@ parse_opt(_, Rec) ->
 encode_char(C, #opts{encoding = utf8}) -> <<C>>;
 encode_char(C, #opts{encoding = {utf16, little}}) -> <<C, 0>>;
 encode_char(C, #opts{encoding = {utf16, big}}) -> <<0, C>>;
-encode_char(C, #opts{encoding = {utf32, little}}) -> <<C, 0, 0, 0>>;
-encode_char(C, #opts{encoding = {utf32, big}}) -> <<0, 0, 0, C>>.
+encode_char(C, #opts{encoding = {utf32, little}}) -> <<C, 0:24>>;
+encode_char(C, #opts{encoding = {utf32, big}}) -> <<0:24, C>>.
 
 char_code(Text, Coding, Coding) -> Text;
 char_code(Text, From, To) -> unicode:characters_to_binary(Text, From, To).
