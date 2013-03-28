@@ -44,7 +44,8 @@
          {<<"{\"one\":null}">>, {[{<<"one">>, null}]}},
          {<<"{\"one\":true}">>, {[{<<"one">>, true}]}},
          {<<"{\"one\":false}">>, {[{<<"one">>, false}]}},
-         {<<"[null,true,false]">>, [null, true, false]}
+         {<<"[null,true,false]">>, [null, true, false]},
+         {<<"[1,-1,1.0,-1.0]">>, [1, -1, 1.0, -1.0]}
         ]).
 
 -define(ESCAPE,

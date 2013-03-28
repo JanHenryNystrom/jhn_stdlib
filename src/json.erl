@@ -497,7 +497,7 @@ decode_value(Binary, Opts) ->
         {${, T} -> decode_object(T, false, [], Opts);
         {$[, T} -> decode_array(T, false, [], Opts);
         {$", T} -> decode_string(T, Opts);
-        {$-, T} -> decode_number(T, pre, bint, [$-], Opts);
+        {$-, T} -> decode_number(T, pre, int, [$-], Opts);
         {H, _} when H >= $0, H =< $9 ->
             decode_number(Binary, pre, int, [], Opts);
         _ ->
