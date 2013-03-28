@@ -97,6 +97,11 @@
          {<<"[\" one two \"]">>, [<<" one two ">>]}
         ]).
 
+-define(STRING_UTF8,
+        %% UTF-8 JSON                  UTF-8 string
+        [{<<91,34,224,164,132,34,93>>, [<<224,164,132>>]}]).
+
+
 -define(STRING_ESCAPE, ?STRING ++ ?ESCAPE).
 
 %% decode(JSON) = Term, encode(TERM) = JSON

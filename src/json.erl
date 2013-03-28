@@ -31,8 +31,9 @@
 %%%
 %%%  Strings can be represented by atoms when generating JSON, but will not
 %%%  not be generated when converting JSON to erlang. It can be specified
-%%%  what encoding is used for the strings with latin-1 being the default.
-%%%  All atoms are assumed to be in latin-1 and can not be specified.
+%%%  what encoding is used for the strings with latin1 being the default
+%%%  when encoding but UTF-8 when decoding since otherwise it might fail.
+%%%  All atoms are assumed to be in latin1 and can not be specified.
 %%%
 %%%  The encoding of a JSON text is determined and can be specified when
 %%%  convering from Erlang terms with the deafult being UTF-8.
@@ -167,7 +168,9 @@ encode(Term, Opts) -> Line = ?LINE,
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> json().
 %%--------------------------------------------------------------------
-decode(Binary) -> decode(Binary, #opts{orig_call = {decode, [Binary], ?LINE}}).
+decode(Binary) -> Line = ?LINE,
+    decode(Binary, #opts{orig_call = {decode, [Binary], Line},
+                         plain_string = utf8}).
 
 %%--------------------------------------------------------------------
 %% Function: decode(JSON, Options) -> Term.
@@ -184,7 +187,8 @@ decode(Binary, Opts = #opts{}) ->
     decode_text(Binary, Opts#opts{encoding = encoding(Binary)});
 decode(Binary, Opts) -> Line = ?LINE,
     OptsRec = parse_opts(Opts, #opts{orig_call = {decode, [Binary, Opts], Line},
-                                     encoding = encoding(Binary)}),
+                                     encoding = encoding(Binary),
+                                     plain_string = utf8}),
     decode_text(Binary, OptsRec).
 
 %% ===================================================================
