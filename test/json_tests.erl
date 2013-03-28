@@ -28,8 +28,8 @@
 %% Includes
 -include_lib("eunit/include/eunit.hrl").
 
-%% Includes
--define(CONVERSIONS,
+%% Defines
+-define(BASE,
         [{<<"{}">>, {[]}},
          {<<"[]">>, []},
          {<<"{\"one\":1}">>, {[{<<"one">>, 1}]}},
@@ -43,8 +43,46 @@
          {<<"[null,true,false]">>, [null, true, false]}
         ]).
 
+-define(ESCAPE,
+        [{<<"[\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\"]">>,
+          [<<0, 1, 2, 3, 4, 5, 6>>]},
+         {<<"[\"\\u0007\\b\\t\\n\\u000B\\f\\r\"]">>,
+          [<<7, 8, 9, 10, 11, 12, 13>>]},
+         {<<"[\"\\u000E\\u000F\\u0010\\u0011\\u0012\\u0013\\u0014\"]">>,
+          [<<14, 15, 16, 17, 18, 19, 20>>]},
+         {<<"[\"\\u0015\\u0016\\u0017\\u0018\\u0019\\u001A\\u001B\"]">>,
+          [<<21, 22, 23, 24, 25, 26, 27>>]},
+         {<<"[\"\\u001C\\u001D\\u001E\\u001F\"]">>,
+          [<<28, 29, 30, 31>>]},
+         {<<"[\"\\\\\\/\\\"\"]">>,
+          [<<"\\/\"">>]}]).
+
+-define(STRING,
+        [{<<"[\"one\"]">>, [<<"one">>]},
+         {<<"[\"a\"]">>, [<<"a">>]},
+         {<<"[\"one two\"]">>, [<<"one two">>]},
+         {<<"[\" one\"]">>, [<<" one">>]},
+         {<<"[\"two \"]">>, [<<"two ">>]},
+         {<<"[\" one two \"]">>, [<<" one two ">>]}
+        ]).
+
+-define(STRING_ESCAPE, ?STRING ++ ?ESCAPE).
+-define(CONVERSIONS, ?BASE ++ ?STRING_ESCAPE).
+
+-define(PLAIN_FORMATS,
+        [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
+
+-define(ENCODINGS,
+        [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
+
+
+
 %% ===================================================================
 %% Tests.
+%% ===================================================================
+
+%% ===================================================================
+%% Encoding
 %% ===================================================================
 
 %%--------------------------------------------------------------------
@@ -77,58 +115,38 @@ encode_2_iolist_test_() ->
         {Result, Term} <- ?CONVERSIONS].
 
 %%--------------------------------------------------------------------
-%% encode/2 with utf8
+%% encode/2 with different encodings
 %%--------------------------------------------------------------------
-encode_2_utf8_test_() ->
-    [?_test(?assertEqual(Result,
+encode_2_encodings_test_() ->
+    [?_test(?assertEqual(unicode:characters_to_binary(Result, latin1, Encoding),
                          iolist_to_binary(
-                           json:encode(Term, [{encoding, utf8}])))) ||
-        {Result, Term} <- ?CONVERSIONS].
+                           json:encode(Term, [{encoding, Encoding}])))) ||
+        {Result, Term} <- ?CONVERSIONS,
+        Encoding <- ?ENCODINGS
+    ].
 
 
 %%--------------------------------------------------------------------
-%% encode/2 with utf16_little
+%% encode/2 with encoding = utf8 different plain
 %%--------------------------------------------------------------------
-encode_2_utf16_little_test_() ->
-    [?_test(
-        ?assertEqual(unicode:characters_to_binary(Result, latin1,
-                                                  {utf16, little}),
+encode_2_encodings_plains_test_() ->
+    [
+     ?_test(
+        ?assertEqual(unicode:characters_to_binary(Result, latin1, Encoding),
                      iolist_to_binary(
-                       json:encode(Term, [{encoding, {utf16, little}}])))) ||
-        {Result, Term} <- ?CONVERSIONS].
+                       json:encode([unicode:characters_to_binary(String,
+                                                                 latin1,
+                                                                 Plain)],
+                                   [{encoding, Encoding},
+                                    {plain_string, Plain}])))) ||
+        {Result, [String]} <- ?STRING_ESCAPE,
+        Plain <- ?PLAIN_FORMATS,
+        Encoding <- ?ENCODINGS
+    ].
 
-%%--------------------------------------------------------------------
-%% encode/2 with utf16_big
-%%--------------------------------------------------------------------
-encode_2_utf16_big_test_() ->
-    [?_test(
-        ?assertEqual(unicode:characters_to_binary(Result, latin1,
-                                                  {utf16, big}),
-                     iolist_to_binary(
-                       json:encode(Term, [{encoding, {utf16, big}}])))) ||
-        {Result, Term} <- ?CONVERSIONS].
-
-%%--------------------------------------------------------------------
-%% encode/2 with utf32_little
-%%--------------------------------------------------------------------
-encode_2_utf132_little_test_() ->
-    [?_test(
-        ?assertEqual(unicode:characters_to_binary(Result, latin1,
-                                                  {utf32, little}),
-                     iolist_to_binary(
-                       json:encode(Term, [{encoding, {utf32, little}}])))) ||
-        {Result, Term} <- ?CONVERSIONS].
-
-%%--------------------------------------------------------------------
-%% encode/2 with utf32_big
-%%--------------------------------------------------------------------
-encode_2_utf32_big_test_() ->
-    [?_test(
-        ?assertEqual(unicode:characters_to_binary(Result, latin1,
-                                                  {utf32, big}),
-                     iolist_to_binary(
-                       json:encode(Term, [{encoding, {utf32, big}}])))) ||
-        {Result, Term} <- ?CONVERSIONS].
+%% ===================================================================
+%% Decoding
+%% ===================================================================
 
 %%--------------------------------------------------------------------
 %% decode/1

@@ -283,7 +283,7 @@ escape(<<_, H, T/binary>>, Acc, Plain = {utf16, big}, Opts) when ?ESCAPE(H) ->
 escape(<<H, _, _, _,T/binary>>,Acc,Plain={utf32,little},Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
 escape(<<_, _, _, H, T/binary>>, Acc, Plain={utf32,big},Opts) when ?ESCAPE(H) ->
-    escape(T, <<Acc/binary, (escape_char(H, opts))/binary>>, Plain, Opts);
+    escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
 escape(<<H1, H2, T/binary>>, Acc, Plain = {utf16, _}, Opts) ->
     escape(T, <<Acc/binary, H1, H2>>, Plain, Opts);
 escape(<<H1, H2, H3, H4, T/binary>>, Acc, Plain = {utf32,_}, Opts) ->
@@ -291,7 +291,8 @@ escape(<<H1, H2, H3, H4, T/binary>>, Acc, Plain = {utf32,_}, Opts) ->
 escape(<<H, T/binary>>, Acc, Plain, Opts) ->
     escape(T, <<Acc/binary, H>>, Plain, Opts).
 
-escape_char(C, Opts) -> encode_chars(escape_char(C), Opts).
+escape_char(C, #opts{plain_string = Plain}) ->
+    encode_chars(escape_char(C), #opts{encoding = Plain}).
 
 escape_char($") -> <<$\\, $">>;
 escape_char($\\) -> <<$\\, $\\>>;
