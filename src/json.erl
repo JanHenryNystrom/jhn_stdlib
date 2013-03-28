@@ -388,7 +388,7 @@ generate(false, false, D, R, S, MPlus, MMinus, Ok, Acc) ->
     generate(R * 10, S, MPlus * 10, MMinus * 10, Ok, <<Acc/binary,D>>).
 
 insert_decimal(0, S, Sign) -> <<Sign/binary, "0.", S/binary>>;
-insert_decimal(Place, S = <<_>>, Sign) when Place < 0, Place >= -2 ->
+insert_decimal(Place, <<S>>, Sign) when Place < 0, Place > -4 ->
     <<Sign/binary, "0.", (binary:copy(<<$0>>, -Place))/binary, S>>;
 insert_decimal(Place, S = <<_>>, Sign) when Place < 0 ->
     insert_exp(S, integer_to_binary(Place - 1), Sign);
@@ -419,7 +419,7 @@ insert_decimal(Place, S, Sign) when Place >= byte_size(S) ->
     end;
 insert_decimal(Place, S, Sign) ->
     Int = binary_part(S, {0, Place}),
-    Frac = binary_part(S, {0, byte_size(S) - Place}),
+    Frac = binary_part(S, {Place, byte_size(S) - Place}),
     <<Sign/binary, Int/binary, ".", Frac/binary>>.
 
 insert_exp(<<C>>, ExpL, Sign) -> <<Sign/binary, C, ".0e", ExpL/binary>>;
