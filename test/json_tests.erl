@@ -74,7 +74,9 @@
         ]).
 
 -define(STRING_ESCAPE, ?STRING ++ ?ESCAPE).
--define(CONVERSIONS, ?BASE ++ ?STRING_ESCAPE).
+
+%% decode(JSON) = Term, encode(TERM) = JSON
+-define(REVERSIBLE, ?BASE ++ ?STRING_ESCAPE).
 
 -define(PLAIN_FORMATS,
         [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
@@ -97,21 +99,21 @@
 %%--------------------------------------------------------------------
 encode_1_test_() ->
     [?_test(?assertEqual(Result, iolist_to_binary(json:encode(Term)))) ||
-        {Result, Term} <- ?CONVERSIONS].
+        {Result, Term} <- ?REVERSIBLE].
 
 %%--------------------------------------------------------------------
 %% encode/2
 %%--------------------------------------------------------------------
 encode_2_test_() ->
     [?_test(?assertEqual(Result, iolist_to_binary(json:encode(Term, [])))) ||
-        {Result, Term} <- ?CONVERSIONS].
+        {Result, Term} <- ?REVERSIBLE].
 
 %%--------------------------------------------------------------------
 %% encode/2 with binary
 %%--------------------------------------------------------------------
 encode_2_binary_test_() ->
     [?_test(?assertEqual(Result, json:encode(Term, [binary]))) ||
-        {Result, Term} <- ?CONVERSIONS].
+        {Result, Term} <- ?REVERSIBLE].
 
 %%--------------------------------------------------------------------
 %% encode/2 with iolist
@@ -119,7 +121,7 @@ encode_2_binary_test_() ->
 encode_2_iolist_test_() ->
     [?_test(?assertEqual(Result,
                          iolist_to_binary(json:encode(Term, [iolist])))) ||
-        {Result, Term} <- ?CONVERSIONS].
+        {Result, Term} <- ?REVERSIBLE].
 
 %%--------------------------------------------------------------------
 %% encode/2 with different encodings
@@ -128,7 +130,7 @@ encode_2_encodings_test_() ->
     [?_test(?assertEqual(unicode:characters_to_binary(Result, latin1, Encoding),
                          iolist_to_binary(
                            json:encode(Term, [{encoding, Encoding}])))) ||
-        {Result, Term} <- ?CONVERSIONS,
+        {Result, Term} <- ?REVERSIBLE,
         Encoding <- ?ENCODINGS
     ].
 
@@ -159,8 +161,13 @@ encode_2_encodings_plains_test_() ->
 %% decode/1
 %%--------------------------------------------------------------------
 decode_1_test_() ->
-    [?_test(?assertEqual(Term, json:decode(JSON))) ||
-        {JSON, Term} <- ?CONVERSIONS].
+    [?_test(
+        ?assertEqual(
+           Term,
+           json:decode(unicode:characters_to_binary(JSON, latin1, Encoding))))||
+        {JSON, Term} <- ?REVERSIBLE,
+        Encoding <- ?ENCODINGS
+    ].
 
 %%--------------------------------------------------------------------
 %% decode/2
@@ -171,7 +178,7 @@ decode_2_test_() ->
            Term,
            json:decode(unicode:characters_to_binary(JSON, latin1, Encoding),
                        []))) ||
-        {JSON, Term} <- ?CONVERSIONS,
+        {JSON, Term} <- ?REVERSIBLE,
         Encoding <- ?ENCODINGS
     ].
 
