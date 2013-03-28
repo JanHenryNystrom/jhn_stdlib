@@ -395,8 +395,11 @@ insert_decimal(Place, S = <<_>>, Sign) when Place < 0 ->
 insert_decimal(Place, S, Sign) when Place < 0 ->
     ExpL = integer_to_binary(Place - 1),
     case  -Place =< byte_size(ExpL) of
-        true -> <<Sign/binary, "0.", (binary:copy(<<$0>>, -Place))/binary, S>>;
-        false -> insert_exp(S, ExpL, Sign)
+        true ->
+            Naughts = binary:copy(<<$0>>, -Place),
+            <<Sign/binary, "0.", Naughts/binary, S/binary>>;
+        false ->
+            insert_exp(S, ExpL, Sign)
     end;
 insert_decimal(Place, S = <<_>>, Sign) ->
     ExpL = integer_to_binary(Place - 1),
