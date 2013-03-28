@@ -606,7 +606,7 @@ next(<<0, H, T/binary>>, #opts{encoding = {utf16, big}}) ->
     {H, T};
 next(<<H1, H2, T/binary>>, #opts{encoding = {utf16, big}}) ->
     {<<H1, H2>>, T};
-next(<<H, 0, 0, 0, T/binary>>, #opts{encoding = {utf132, little}}) ->
+next(<<H, 0, 0, 0, T/binary>>, #opts{encoding = {utf32, little}}) ->
     {H, T};
 next(<<H1, H2, H3, H4, T/binary>>, #opts{encoding = {utf32, little}}) ->
     {<<H1, H2, H3, H4>>, T};

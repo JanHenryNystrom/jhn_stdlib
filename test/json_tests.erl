@@ -166,10 +166,14 @@ decode_1_test_() ->
 %% decode/2
 %%--------------------------------------------------------------------
 decode_2_test_() ->
-    [?_test(?assertEqual(Term, json:decode(JSON, []))) ||
-        {JSON, Term} <- ?CONVERSIONS].
-
-
+    [?_test(
+        ?assertEqual(
+           Term,
+           json:decode(unicode:characters_to_binary(JSON, latin1, Encoding),
+                       []))) ||
+        {JSON, Term} <- ?CONVERSIONS,
+        Encoding <- ?ENCODINGS
+    ].
 
 %% ===================================================================
 %% Internal functions.
