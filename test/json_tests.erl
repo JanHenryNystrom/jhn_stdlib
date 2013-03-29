@@ -101,6 +101,9 @@
         %% UTF-8 JSON                  UTF-8 string
         [{<<91,34,224,164,132,34,93>>, [<<224,164,132>>]}]).
 
+-define(ATOM_KEYS,
+        [{<<"[\"foo\"]">>, [foo]}]).
+
 
 -define(STRING_ESCAPE, ?STRING ++ ?ESCAPE).
 
@@ -160,6 +163,17 @@ encode_2_encodings_test_() ->
                          iolist_to_binary(
                            json:encode(Term, [{encoding, Encoding}])))) ||
         {Result, Term} <- ?REVERSIBLE,
+        Encoding <- ?ENCODINGS
+    ].
+
+%%--------------------------------------------------------------------
+%% encode/2 with atom_strings
+%%--------------------------------------------------------------------
+encode_2_atoms_test_() ->
+    [?_test(?assertEqual(unicode:characters_to_binary(Result, latin1, Encoding),
+                         iolist_to_binary(
+                           json:encode(Term, [{encoding, Encoding}])))) ||
+        {Result, Term} <- ?ATOM_KEYS,
         Encoding <- ?ENCODINGS
     ].
 
