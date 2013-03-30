@@ -97,11 +97,6 @@
          {<<"[\" one two \"]">>, [<<" one two ">>]}
         ]).
 
--define(STRING_UTF8,
-        %% UTF-8 JSON                  UTF-8 string
-        [{<<91,34,224,164,132,34,93>>, [<<224,164,132>>]}]).
-
-
 -define(STRING_ESCAPE, ?STRING ++ ?ESCAPE).
 
 %% decode(JSON) = Term, encode(TERM) = JSON
@@ -113,6 +108,18 @@
          {<<"[\"foo\\tbar\"]">>, ['foo\tbar']},
          {<<"[\"foo\\nbar\"]">>, ['foo\nbar']}
         ]).
+
+-define(NON_LATIN,
+        %% UTF-8 JSON                  UTF-8 string
+        [{<<91,34,224,164,132,34,93>>, [<<224,164,132>>]}]).
+
+-define(BAD_OPTS, [{atom_strings, null},
+                   {plain_string, utf99},
+                   {encoding, latin44},
+                   non_option
+                  ]).
+
+-define(IS_BADARG(X), ?assertMatch({'EXIT', {badarg, _}}, catch X)).
 
 -define(PLAIN_FORMATS,
         [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
@@ -169,7 +176,7 @@ encode_2_encodings_test_() ->
     ].
 
 %%--------------------------------------------------------------------
-%% encode/2 with atom_strings
+%% encode/2 with atom strings
 %%--------------------------------------------------------------------
 encode_2_atoms_test_() ->
     [?_test(?assertEqual(utf(Result, latin1, Encoding),
@@ -179,6 +186,18 @@ encode_2_atoms_test_() ->
         Encoding <- ?ENCODINGS
     ].
 
+%%--------------------------------------------------------------------
+%% encode/2 with atom strings and the flags set
+%%--------------------------------------------------------------------
+encode_2_atoms_strings_test_() ->
+    [?_test(?assertEqual(utf(Result, latin1, Encoding),
+                         iolist_to_binary(
+                           json:encode(Term, [{encoding, Encoding},
+                                              {atom_strings, true}
+                                             ])))) ||
+        {Result, Term} <- ?ATOM_KEYS,
+        Encoding <- ?ENCODINGS
+    ].
 
 %%--------------------------------------------------------------------
 %% encode/2 with different encodings and  plains
@@ -191,6 +210,21 @@ encode_2_encodings_plains_test_() ->
                                        [{encoding, Encoding},
                                         {plain_string, Plain}])))) ||
         {Result, [String]} <- ?STRING_ESCAPE,
+        Plain <- ?PLAIN_FORMATS,
+        Encoding <- ?ENCODINGS
+    ].
+
+%%--------------------------------------------------------------------
+%% encode/2 with different encodings and non latin plains
+%%--------------------------------------------------------------------
+encode_2_encodings_non_latin_plains_test_() ->
+    [
+     ?_test(?assertEqual(utf(Result, utf8, Encoding),
+                         iolist_to_binary(
+                           json:encode([utf(String, utf8, Plain)],
+                                       [{encoding, Encoding},
+                                        {plain_string, Plain}])))) ||
+        {Result, [String]} <- ?NON_LATIN,
         Plain <- ?PLAIN_FORMATS,
         Encoding <- ?ENCODINGS
     ].
@@ -230,9 +264,32 @@ decode_2_encodings_plains_test_() ->
         Encoding <- ?ENCODINGS
     ].
 
+%% Broken test or code, investigate which.
+%% %%--------------------------------------------------------------------
+%% %% decode/2 with different encodings and non latin plains
+%% %%--------------------------------------------------------------------
+%% decode_2_encodings_non_latin_plains_test_() ->
+%%     [
+%%      ?_test(?assertEqual([utf(String, utf8, Plain)],
+%%                          json:decode(utf(JSON, utf8, Encoding),
+%%                                      [{plain_string, Plain}]))) ||
+%%         {JSON, [String]} <- ?NON_LATIN,
+%%         Plain <- ?PLAIN_FORMATS,
+%%         Encoding <- ?ENCODINGS
+%%     ].
+
+%% ===================================================================
+%% Bad options
+%% ===================================================================
+bad_option_test_() ->
+    [?_test(?IS_BADARG(json:encode({}, [Option]))) || Option <- ?BAD_OPTS] ++
+        [?_test(?IS_BADARG(json:decode(<<"{}">>, [Option]))) ||
+            Option <- ?BAD_OPTS].
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
 
 utf(String, To, To) -> String;
 utf(String, From, To) -> unicode:characters_to_binary(String, From, To).
+

@@ -628,15 +628,15 @@ parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt({atom_strings, Bool}, Opts) when is_boolean(Bool)->
     Opts#opts{atom_strings = Bool};
-parse_opt(Opt = {plain_string, PlainString}, Opts) ->
+parse_opt({plain_string, PlainString}, Opts) ->
     case lists:member(PlainString, ?PLAINFORMATS) of
         true -> Opts#opts{plain_string = PlainString};
-        false -> erlang:error(badarg, [Opt])
+        false -> badarg(Opts)
     end;
-parse_opt(Opt = {encoding, Encoding} , Opts) ->
+parse_opt({encoding, Encoding} , Opts) ->
     case lists:member(Encoding, ?ENCODINGS) of
         true -> Opts#opts{encoding = Encoding};
-        false -> erlang:error(badarg, [Opt])
+        false -> badarg(Opts)
     end;
 parse_opt(_, Rec) ->
     badarg(Rec).
