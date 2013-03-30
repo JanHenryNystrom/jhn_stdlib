@@ -101,22 +101,24 @@
         %% UTF-8 JSON                  UTF-8 string
         [{<<91,34,224,164,132,34,93>>, [<<224,164,132>>]}]).
 
--define(ATOM_KEYS,
-        [{<<"[\"foo\"]">>, [foo]}]).
-
 
 -define(STRING_ESCAPE, ?STRING ++ ?ESCAPE).
 
 %% decode(JSON) = Term, encode(TERM) = JSON
 -define(REVERSIBLE, ?BASE ++ ?STRING_ESCAPE ++ ?FLOATS).
 
+-define(ATOM_KEYS,
+        [{<<"[\"foo\"]">>, [foo]},
+         {<<"[\"foo bar\"]">>, ['foo bar']},
+         {<<"[\"foo\\tbar\"]">>, ['foo\tbar']},
+         {<<"[\"foo\\nbar\"]">>, ['foo\nbar']}
+        ]).
+
 -define(PLAIN_FORMATS,
         [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
 
 -define(ENCODINGS,
         [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
-
-
 
 %% ===================================================================
 %% Tests.
@@ -159,7 +161,7 @@ encode_2_iolist_test_() ->
 %% encode/2 with different encodings
 %%--------------------------------------------------------------------
 encode_2_encodings_test_() ->
-    [?_test(?assertEqual(unicode:characters_to_binary(Result, latin1, Encoding),
+    [?_test(?assertEqual(utf(Result, latin1, Encoding),
                          iolist_to_binary(
                            json:encode(Term, [{encoding, Encoding}])))) ||
         {Result, Term} <- ?REVERSIBLE,
@@ -170,7 +172,7 @@ encode_2_encodings_test_() ->
 %% encode/2 with atom_strings
 %%--------------------------------------------------------------------
 encode_2_atoms_test_() ->
-    [?_test(?assertEqual(unicode:characters_to_binary(Result, latin1, Encoding),
+    [?_test(?assertEqual(utf(Result, latin1, Encoding),
                          iolist_to_binary(
                            json:encode(Term, [{encoding, Encoding}])))) ||
         {Result, Term} <- ?ATOM_KEYS,
@@ -183,14 +185,11 @@ encode_2_atoms_test_() ->
 %%--------------------------------------------------------------------
 encode_2_encodings_plains_test_() ->
     [
-     ?_test(
-        ?assertEqual(unicode:characters_to_binary(Result, latin1, Encoding),
-                     iolist_to_binary(
-                       json:encode([unicode:characters_to_binary(String,
-                                                                 latin1,
-                                                                 Plain)],
-                                   [{encoding, Encoding},
-                                    {plain_string, Plain}])))) ||
+     ?_test(?assertEqual(utf(Result, latin1, Encoding),
+                         iolist_to_binary(
+                           json:encode([utf(String, latin1, Plain)],
+                                       [{encoding, Encoding},
+                                        {plain_string, Plain}])))) ||
         {Result, [String]} <- ?STRING_ESCAPE,
         Plain <- ?PLAIN_FORMATS,
         Encoding <- ?ENCODINGS
@@ -204,10 +203,7 @@ encode_2_encodings_plains_test_() ->
 %% decode/1
 %%--------------------------------------------------------------------
 decode_1_test_() ->
-    [?_test(
-        ?assertEqual(
-           Term,
-           json:decode(unicode:characters_to_binary(JSON, latin1, Encoding))))||
+    [?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding)))) ||
         {JSON, Term} <- ?REVERSIBLE,
         Encoding <- ?ENCODINGS
     ].
@@ -216,11 +212,7 @@ decode_1_test_() ->
 %% decode/2
 %%--------------------------------------------------------------------
 decode_2_test_() ->
-    [?_test(
-        ?assertEqual(
-           Term,
-           json:decode(unicode:characters_to_binary(JSON, latin1, Encoding),
-                       []))) ||
+    [?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding), []))) ||
         {JSON, Term} <- ?REVERSIBLE,
         Encoding <- ?ENCODINGS
     ].
@@ -230,12 +222,9 @@ decode_2_test_() ->
 %%--------------------------------------------------------------------
 decode_2_encodings_plains_test_() ->
     [
-     ?_test(
-        ?assertEqual(
-           [unicode:characters_to_binary(String, latin1, Plain)],
-           json:decode(
-             unicode:characters_to_binary(JSON, latin1, Encoding),
-             [{plain_string, Plain}]))) ||
+     ?_test(?assertEqual([utf(String, latin1, Plain)],
+                         json:decode(utf(JSON, latin1, Encoding),
+                                     [{plain_string, Plain}]))) ||
         {JSON, [String]} <- ?STRING_ESCAPE,
         Plain <- ?PLAIN_FORMATS,
         Encoding <- ?ENCODINGS
@@ -244,3 +233,6 @@ decode_2_encodings_plains_test_() ->
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
+
+utf(String, To, To) -> String;
+utf(String, From, To) -> unicode:characters_to_binary(String, From, To).
