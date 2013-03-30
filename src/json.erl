@@ -245,7 +245,9 @@ encode_value(BinaryString, Opts) when is_binary(BinaryString) ->
 encode_value(Integer, Opts) when is_integer(Integer) ->
     encode_chars(integer_to_list(Integer), Opts);
 encode_value(Float, Opts) when is_float(Float) ->
-    encode_chars(float_to_binary(Float), Opts).
+    encode_chars(float_to_binary(Float), Opts);
+encode_value(_, Opts) ->
+    badarg(Opts).
 
 encode_string(Atom, Opts = #opts{atom_strings = true}) when is_atom(Atom) ->
     encode_string(list_to_binary(atom_to_list(Atom)),
