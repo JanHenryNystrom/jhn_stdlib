@@ -293,19 +293,19 @@ decode_2_encodings_plains_test_() ->
         Encoding <- ?ENCODINGS
     ].
 
-%% Broken test or code, investigate which.
-%% %%--------------------------------------------------------------------
-%% %% decode/2 with different encodings and non latin plains
-%% %%--------------------------------------------------------------------
-%% decode_2_encodings_non_latin_plains_test_() ->
-%%     [
-%%      ?_test(?assertEqual([utf(String, utf8, Plain)],
-%%                          json:decode(utf(JSON, utf8, Encoding),
-%%                                      [{plain_string, Plain}]))) ||
-%%         {JSON, [String]} <- ?NON_LATIN,
-%%         Plain <- ?PLAIN_FORMATS,
-%%         Encoding <- ?ENCODINGS
-%%     ].
+
+%%--------------------------------------------------------------------
+%% decode/2 with different encodings and non latin plains
+%%--------------------------------------------------------------------
+decode_2_encodings_non_latin_plains_test_() ->
+    [
+     ?_test(?assertEqual([utf(String, utf8, Plain)],
+                         json:decode(utf(JSON, utf8, Encoding),
+                                     [{plain_string, Plain}]))) ||
+        {JSON, [String]} <- ?NON_LATIN,
+        Plain <- ?PLAIN_FORMATS,
+        Encoding <- ?ENCODINGS
+    ].
 
 %%--------------------------------------------------------------------
 %% decode/1 with different encodings and white space

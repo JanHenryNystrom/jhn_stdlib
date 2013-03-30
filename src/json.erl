@@ -548,7 +548,7 @@ decode_number(Binary, Stage, Phase, Acc, Opts) ->
 
 decode_string(Binary, Opts=#opts{encoding = Encoding, plain_string = Plain}) ->
     {Unescaped, T} = unescape(Binary, [], Opts),
-    {iolist_to_binary(char_code(Unescaped, Encoding, Plain)), T}.
+    {char_code(iolist_to_binary(Unescaped), Encoding, Plain), T}.
 
 unescape(Binary, Acc, Opts = #opts{encoding = Encoding}) ->
     case next(Binary, Opts) of
