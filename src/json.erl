@@ -466,20 +466,20 @@ encoding(_) -> utf8.
 decode_text(Binary, Opts) ->
     case next(Binary, Opts) of
         {WS, T} when ?IS_WS(WS)-> decode_text(T, Opts);
-        {${, T} -> {Object, _} = decode_object(T, false, [], Opts), Object;
-        {$[, T}-> {Array, _} = decode_array(T, false, [], Opts), Array;
+        {${, T} -> {Object, _} = decode_object(T,{false,false},[],Opts), Object;
+        {$[, T}-> {Array, _} = decode_array(T, {false, false}, [], Opts), Array;
         _ -> badarg(Opts)
     end.
 
 decode_object(Binary, Expect, Acc, Opts) ->
     case {next(Binary, Opts), Expect} of
         {{WS, T}, _} when ?IS_WS(WS) -> decode_object(T, Expect, Acc, Opts);
-        {{$}, T}, _} -> {{lists:reverse(Acc)}, T};
-        {{$,, T}, true} -> decode_object(T, false, Acc, Opts);
-        {{$", T}, false} ->
+        {{$}, T}, {false, _}} -> {{lists:reverse(Acc)}, T};
+        {{$,, T}, {false, true}} -> decode_object(T, {true, false}, Acc, Opts);
+        {{$", T}, {_, false}} ->
             {Name, T1} = decode_string(T, Opts),
             {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
-            decode_object(T2, true, [{Name, Value} | Acc], Opts);
+            decode_object(T2, {false, true}, [{Name, Value} | Acc], Opts);
         _ ->
             badarg(Opts)
     end.
@@ -487,11 +487,11 @@ decode_object(Binary, Expect, Acc, Opts) ->
 decode_array(Binary, Expect, Acc, Opts) ->
     case {next(Binary, Opts), Expect} of
         {{WS, T}, _} when ?IS_WS(WS) -> decode_array(T, Expect, Acc, Opts);
-        {{$,, T}, true} -> decode_array(T, false, Acc, Opts);
-        {{$], T}, _} -> {lists:reverse(Acc), T};
-        {_, false} ->
+        {{$,, T}, {false, true}} -> decode_array(T, {true, false}, Acc, Opts);
+        {{$], T}, {false, _}} -> {lists:reverse(Acc), T};
+        {_, {_, false}} ->
             {Value, T} = decode_value(Binary, Opts),
-            decode_array(T, true, [Value | Acc], Opts);
+            decode_array(T, {false, true}, [Value | Acc], Opts);
         _ ->
             badarg(Opts)
     end.
@@ -502,8 +502,8 @@ decode_value(Binary, Opts) ->
         {$t, T} -> decode_base("rue", T, true, Opts);
         {$f, T} -> decode_base("alse", T, false, Opts);
         {$n, T} -> decode_base("ull", T, null, Opts);
-        {${, T} -> decode_object(T, false, [], Opts);
-        {$[, T} -> decode_array(T, false, [], Opts);
+        {${, T} -> decode_object(T, {false, false}, [], Opts);
+        {$[, T} -> decode_array(T, {false, false}, [], Opts);
         {$", T} -> decode_string(T, Opts);
         {$-, T} -> decode_number(T, pre, int, [$-], Opts);
         {H, _} when H >= $0, H =< $9 ->

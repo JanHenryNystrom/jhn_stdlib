@@ -136,9 +136,11 @@
 -define(BAD_BINARY, [<<"true">>, <<"false">>, <<"null">>, <<"1">>, <<"1.0">>,
                      <<"<true>">>, <<"{\"one\":1]">>, <<"{\"one\":1">>,
                      <<"{\"one\":1 \"two\":2}">>, <<"{\"one\":1,\"two\":2,}">>,
+                     <<"{,\"one\":1,\"two\":2}">>,
                      <<"{true:1}">>, <<"{\"one\" 1}">>,
                      <<"[true}">>, <<"[true">>, <<"[gnuba]">>, <<"[tru]">>,
-                     <<"[1.]">>, <<"[\"\u00\"]">>]).
+                     <<"[1,]">>, <<"[,]">>, <<"[,1]">>,
+                     <<"[1.]">>, <<"[\"\\u00\"]">>]).
 
 -define(IS_BADARG(X), ?assertMatch({'EXIT', {badarg, _}}, catch X)).
 
@@ -331,11 +333,11 @@ decode_2_ws_encodings_test_() ->
 %% Bad BINARY
 %% ===================================================================
 decode_1_binary_test_() ->
-    [?_test(?IS_BADARG(json:encode(utf(B, latin1, Encoding)))) ||
+    [?_test(?IS_BADARG(json:decode(utf(B, latin1, Encoding)))) ||
         B <- ?BAD_BINARY, Encoding <- ?ENCODINGS].
 
 decode_2_binary_test_() ->
-    [?_test(?IS_BADARG(json:encode(utf(B, latin1, Encoding), [binary]))) ||
+    [?_test(?IS_BADARG(json:decode(utf(B, latin1, Encoding), [binary]))) ||
         B <- ?BAD_BINARY, Encoding <- ?ENCODINGS].
 
 %% ===================================================================
@@ -352,4 +354,3 @@ bad_option_test_() ->
 
 utf(String, To, To) -> String;
 utf(String, From, To) -> unicode:characters_to_binary(String, From, To).
-
