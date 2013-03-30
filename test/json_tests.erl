@@ -119,6 +119,27 @@
                    non_option
                   ]).
 
+-define(BAD_JSON, [true, false, null, foo, 1, 1.0, <<"Foo">>,
+                   {[true]}, {[<<"Foo">>]}, {[{<<"one">>, 1} | true]},
+                   [1 | 1],
+                   {[{1, 1}]},
+                   [{foo, bar}]
+                  ]).
+
+-define(WS_JSON, [{<<" {}">>, {[]}}, {<<" { }">>, {[]}}, {<<" { } ">>, {[]}},
+                  {<<" { \"one\" : 1 } ">>, {[{<<"one">>, 1}]}},
+                  {<<" []">>, []}, {<<" [ ]">>, []}, {<<" [ ] ">>, []},
+                  {<<" [ 1e17 ] ">>, [1.0e17]},
+                  {<<"[\"\\0\\a\\v\\s\\q\"]">>, [<<0, 7, 11, 32, $\\, $q>>]}
+                 ]).
+
+-define(BAD_BINARY, [<<"true">>, <<"false">>, <<"null">>, <<"1">>, <<"1.0">>,
+                     <<"<true>">>, <<"{\"one\":1]">>, <<"{\"one\":1">>,
+                     <<"{\"one\":1 \"two\":2}">>, <<"{\"one\":1,\"two\":2,}">>,
+                     <<"{true:1}">>, <<"{\"one\" 1}">>,
+                     <<"[true}">>, <<"[true">>, <<"[gnuba]">>, <<"[tru]">>,
+                     <<"[1.]">>, <<"[\"\u00\"]">>]).
+
 -define(IS_BADARG(X), ?assertMatch({'EXIT', {badarg, _}}, catch X)).
 
 -define(PLAIN_FORMATS,
@@ -228,19 +249,14 @@ encode_2_encodings_non_latin_plains_test_() ->
         Plain <- ?PLAIN_FORMATS,
         Encoding <- ?ENCODINGS
     ].
-
--define(BAD_JSON, [true, false, null, foo, 1, 1.0, <<"Foo">>,
-                   {[true]}, {[<<"Foo">>]}, {[{<<"one">>, 1} | true]},
-                   [1 | 1],
-                   {[{1, 1}]},
-                   [{foo, bar}]
-                  ]).
-
 %% ===================================================================
 %% Bad json
 %% ===================================================================
 encode_1_bad_json_test_() ->
     [?_test(?IS_BADARG(json:encode(JSON))) || JSON <- ?BAD_JSON].
+
+encode_2_bad_json_test_() ->
+    [?_test(?IS_BADARG(json:encode(JSON, [binary]))) || JSON <- ?BAD_JSON].
 
 %% ===================================================================
 %% Decoding
@@ -290,6 +306,37 @@ decode_2_encodings_plains_test_() ->
 %%         Plain <- ?PLAIN_FORMATS,
 %%         Encoding <- ?ENCODINGS
 %%     ].
+
+%%--------------------------------------------------------------------
+%% decode/1 with different encodings and white space
+%%--------------------------------------------------------------------
+decode_1_ws_encodings_test_() ->
+    [
+     ?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding)))) ||
+        {JSON, Term} <- ?WS_JSON,
+        Encoding <- ?ENCODINGS
+    ].
+
+%%--------------------------------------------------------------------
+%% decode/2 with different encodings and white space
+%%--------------------------------------------------------------------
+decode_2_ws_encodings_test_() ->
+    [
+     ?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding), []))) ||
+        {JSON, Term} <- ?WS_JSON,
+        Encoding <- ?ENCODINGS
+    ].
+
+%% ===================================================================
+%% Bad BINARY
+%% ===================================================================
+decode_1_binary_test_() ->
+    [?_test(?IS_BADARG(json:encode(utf(B, latin1, Encoding)))) ||
+        B <- ?BAD_BINARY, Encoding <- ?ENCODINGS].
+
+decode_2_binary_test_() ->
+    [?_test(?IS_BADARG(json:encode(utf(B, latin1, Encoding), [binary]))) ||
+        B <- ?BAD_BINARY, Encoding <- ?ENCODINGS].
 
 %% ===================================================================
 %% Bad options
