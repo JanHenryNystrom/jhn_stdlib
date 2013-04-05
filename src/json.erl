@@ -43,6 +43,8 @@
 %%%
 %%%  latin1 is defined in ISO-8859-1.
 %%%  UTF formats are defined in Unicode 5.0 (ISBN 0-321-48091-0).
+%%%
+%%% Only supports R16 and later.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
