@@ -64,7 +64,8 @@
 %% Types
 -type plain_format() :: latin1 | encoding().
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
--type opt()          :: {atom_strings, boolean()} | binary | iolist |
+-type opt()          :: {atom_strings, boolean()} | {atom_keys, boolean()} |
+                        {existing_atom_keys, boolean()} | binary | iolist |
                         {plain_string, plain_format()} | {encoding, encoding()}.
 
 -type json()        :: json_text().
@@ -80,6 +81,8 @@
 -record(opts, {encoding = utf8 :: encoding(),
                plain_string = latin1 :: plain_format(),
                atom_strings = true :: boolean(),
+               atom_keys = false :: boolean(),
+               existing_atom_keys = false :: boolean(),
                return_type = iolist :: iolist | binary,
                orig_call
               }).
@@ -181,6 +184,13 @@ decode(Binary) -> Line = ?LINE,
 %%   Decode will give an exception if the binary is not well formed JSON.
 %%   Options are:
 %%     {plain_string, Format} -> what format the strings are encoded in
+%%     {atom_keys, Bool} -> if true all object keys are converted to atoms,
+%%                          default is false.
+%%     {existing_atom_keys, Bool} -> if true all object keys are converted
+%%                          to atoms, decoding fails if the atom does not
+%%                          already exist, default is false.
+%%     For both atom_keys and existing_atom_keys the string has to Unicode
+%%     characters up to 0xFF.
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary(), [opt()]) -> json().
@@ -478,6 +488,16 @@ decode_object(Binary, Expect, Acc, Opts) ->
         {{WS, T}, _} when ?IS_WS(WS) -> decode_object(T, Expect, Acc, Opts);
         {{$}, T}, {false, _}} -> {{lists:reverse(Acc)}, T};
         {{$,, T}, {false, true}} -> decode_object(T, {true, false}, Acc, Opts);
+        {{$", T}, {_, false}} when Opts#opts.atom_keys ->
+            {Name, T1} = decode_string(T, Opts#opts{plain_string = latin1}),
+            Name1 = binary_to_atom(Name, latin1),
+            {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
+            decode_object(T2, {false, true}, [{Name1, Value} | Acc], Opts);
+        {{$", T}, {_, false}} when Opts#opts.existing_atom_keys ->
+            {Name, T1} = decode_string(T, Opts#opts{plain_string = latin1}),
+            Name1 = binary_to_existing_atom(Name, latin1),
+            {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
+            decode_object(T2, {false, true}, [{Name1, Value} | Acc], Opts);
         {{$", T}, {_, false}} ->
             {Name, T1} = decode_string(T, Opts),
             {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
@@ -632,6 +652,10 @@ parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt({atom_strings, Bool}, Opts) when is_boolean(Bool)->
     Opts#opts{atom_strings = Bool};
+parse_opt({atom_keys, Bool}, Opts) when is_boolean(Bool)->
+    Opts#opts{atom_keys = Bool};
+parse_opt({existing_atom_keys, Bool}, Opts) when is_boolean(Bool)->
+    Opts#opts{existing_atom_keys = Bool};
 parse_opt({plain_string, PlainString}, Opts) ->
     case lists:member(PlainString, ?PLAINFORMATS) of
         true -> Opts#opts{plain_string = PlainString};
