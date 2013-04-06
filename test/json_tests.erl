@@ -102,7 +102,7 @@
 %% decode(JSON) = Term, encode(TERM) = JSON
 -define(REVERSIBLE, ?BASE ++ ?STRING_ESCAPE ++ ?FLOATS).
 
--define(ATOM_KEYS,
+-define(ATOM_STRINGS,
         [{<<"[\"foo\"]">>, [foo]},
          {<<"[\"foo bar\"]">>, ['foo bar']},
          {<<"[\"foo\\tbar\"]">>, ['foo\tbar']},
@@ -141,6 +141,14 @@
                      <<"[true}">>, <<"[true">>, <<"[gnuba]">>, <<"[tru]">>,
                      <<"[1,]">>, <<"[,]">>, <<"[,1]">>,
                      <<"[1.]">>, <<"[\"\\u00\"]">>, <<"[\"\\u00q\"]">>]).
+
+-define(ATOM_KEYS, [{<<"{}">>, {[]}},
+                    {<<"{\"one\":1}">>, {[{one, 1}]}}
+                   ]).
+
+-define(EXISTING_ATOM_KEYS, [{<<"{}">>, {[]}},
+                    {<<"{\"one\":1}">>, {[{one, 1}]}}
+                   ]).
 
 -define(IS_BADARG(X), ?assertMatch({'EXIT', {badarg, _}}, catch X)).
 
@@ -205,7 +213,7 @@ encode_2_atoms_test_() ->
     [?_test(?assertEqual(utf(Result, latin1, Encoding),
                          iolist_to_binary(
                            json:encode(Term, [{encoding, Encoding}])))) ||
-        {Result, Term} <- ?ATOM_KEYS,
+        {Result, Term} <- ?ATOM_STRINGS,
         Encoding <- ?ENCODINGS
     ].
 
@@ -218,7 +226,7 @@ encode_2_atoms_strings_test_() ->
                            json:encode(Term, [{encoding, Encoding},
                                               {atom_strings, true}
                                              ])))) ||
-        {Result, Term} <- ?ATOM_KEYS,
+        {Result, Term} <- ?ATOM_STRINGS,
         Encoding <- ?ENCODINGS
     ].
 
@@ -279,6 +287,29 @@ decode_1_test_() ->
 decode_2_test_() ->
     [?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding), []))) ||
         {JSON, Term} <- ?REVERSIBLE,
+        Encoding <- ?ENCODINGS
+    ].
+
+
+%%--------------------------------------------------------------------
+%% decode/2 with atom_keys
+%%--------------------------------------------------------------------
+decode_2_atom_keys_test_() ->
+    [?_test(?assertEqual(Term,
+                         json:decode(utf(JSON, latin1, Encoding),
+                                     [{atom_keys, true}]))) ||
+        {JSON, Term} <- ?ATOM_KEYS,
+        Encoding <- ?ENCODINGS
+    ].
+
+%%--------------------------------------------------------------------
+%% decode/2 with existing_atom_keys
+%%--------------------------------------------------------------------
+decode_2_existing_atom_keys_test_() ->
+    [?_test(?assertEqual(Term,
+                         json:decode(utf(JSON, latin1, Encoding),
+                                     [{existing_atom_keys, true}]))) ||
+        {JSON, Term} <- ?ATOM_KEYS,
         Encoding <- ?ENCODINGS
     ].
 
