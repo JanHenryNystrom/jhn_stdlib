@@ -207,6 +207,32 @@ encode_2_encodings_test_() ->
     ].
 
 %%--------------------------------------------------------------------
+%% encode/2 with different encodings and bom
+%%--------------------------------------------------------------------
+encode_2_encodings_bom_test_() ->
+    [?_test(?assertEqual(<<(unicode:encoding_to_bom(Encoding))/binary,
+                           (utf(Result, latin1, Encoding))/binary>>,
+                         iolist_to_binary(
+                           json:encode(Term, [bom, {encoding, Encoding}])))) ||
+        {Result, Term} <- ?REVERSIBLE,
+        Encoding <- ?ENCODINGS
+    ].
+
+%%--------------------------------------------------------------------
+%% encode/2 with different encodings and bom and binary
+%%--------------------------------------------------------------------
+encode_2_encodings_bom_binary_test_() ->
+    [?_test(?assertEqual(<<(unicode:encoding_to_bom(Encoding))/binary,
+                           (utf(Result, latin1, Encoding))/binary>>,
+                         json:encode(Term,
+                                     [bom,
+                                      binary,
+                                      {encoding, Encoding}]))) ||
+        {Result, Term} <- ?REVERSIBLE,
+        Encoding <- ?ENCODINGS
+    ].
+
+%%--------------------------------------------------------------------
 %% encode/2 with atom strings
 %%--------------------------------------------------------------------
 encode_2_atoms_test_() ->
@@ -290,6 +316,18 @@ decode_2_test_() ->
         Encoding <- ?ENCODINGS
     ].
 
+%%--------------------------------------------------------------------
+%% decode/2 with bom
+%%--------------------------------------------------------------------
+decode_2_bom_test_() ->
+    [?_test(
+        ?assertEqual(Term,
+                     json:decode(<<(unicode:encoding_to_bom(Encoding))/binary,
+                                   (utf(JSON, latin1, Encoding))/binary>>,
+                                 [bom]))) ||
+        {JSON, Term} <- ?REVERSIBLE,
+        Encoding <- ?ENCODINGS
+    ].
 
 %%--------------------------------------------------------------------
 %% decode/2 with atom_keys

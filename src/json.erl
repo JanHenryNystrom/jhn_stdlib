@@ -65,7 +65,8 @@
 -type plain_format() :: latin1 | encoding().
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
 -type opt()          :: {atom_strings, boolean()} | {atom_keys, boolean()} |
-                        {existing_atom_keys, boolean()} | binary | iolist |
+                        {existing_atom_keys, boolean()} |
+                        bom |binary | iolist |
                         {plain_string, plain_format()} | {encoding, encoding()}.
 
 -type json()        :: json_text().
@@ -83,6 +84,7 @@
                atom_strings = true :: boolean(),
                atom_keys = false :: boolean(),
                existing_atom_keys = false :: boolean(),
+               bom = false :: boolean(),
                return_type = iolist :: iolist | binary,
                orig_call
               }).
@@ -147,6 +149,7 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 %%   Options are:
 %%     binary -> a binary is returned
 %%     iolist -> a iolist is returned
+%%     bom -> a UTF byte order mark is added at the head of the encoding
 %%     {atom_strings, Bool} -> determines if atoms for strings are allowed
 %%     {plain_string, Format} -> what format the strings are encoded in
 %%     {encoding, Encoding} -> what encoding is used for the resulting JSON
@@ -157,11 +160,16 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 encode(Term, Opts = #opts{}) ->
     encode_text(Term, Opts);
 encode(Term, Opts) -> Line = ?LINE,
-    #opts{return_type = Return} = ParsedOpts =
+    #opts{return_type = Return, encoding = Encoding, bom = Bom} = ParsedOpts =
         parse_opts(Opts, #opts{orig_call = {encode, [Term, Opts], Line}}),
-    case Return of
-        iolist -> encode_text(Term, ParsedOpts);
-        binary -> iolist_to_binary(encode_text(Term, ParsedOpts))
+    case {Bom, Return} of
+        {false, iolist} -> encode_text(Term, ParsedOpts);
+        {false, binary} -> iolist_to_binary(encode_text(Term, ParsedOpts));
+        {true, iolist} ->
+            [unicode:encoding_to_bom(Encoding), encode_text(Term, ParsedOpts)];
+        {true, binary} ->
+            iolist_to_binary([unicode:encoding_to_bom(Encoding),
+                              encode_text(Term, ParsedOpts)])
     end.
 
 %%--------------------------------------------------------------------
@@ -183,6 +191,7 @@ decode(Binary) -> Line = ?LINE,
 %%   Decodes the binary into a structured Erlang.
 %%   Decode will give an exception if the binary is not well formed JSON.
 %%   Options are:
+%%     bom -> the binary to decode has a UTF byte order mark
 %%     {plain_string, Format} -> what format the strings are encoded in
 %%     {atom_keys, Bool} -> if true all object keys are converted to atoms,
 %%                          default is false.
@@ -196,12 +205,13 @@ decode(Binary) -> Line = ?LINE,
 -spec decode(binary(), [opt()]) -> json().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) ->
-    decode_text(Binary, Opts#opts{encoding = encoding(Binary)});
+    {Binary, Encoding} = encoding(Binary, Opts),
+    decode_text(Binary, Opts#opts{encoding = Encoding});
 decode(Binary, Opts) -> Line = ?LINE,
     OptsRec = parse_opts(Opts, #opts{orig_call = {decode, [Binary, Opts], Line},
-                                     encoding = encoding(Binary),
                                      plain_string = utf8}),
-    decode_text(Binary, OptsRec).
+    {Binary1, Encoding} = encoding(Binary, OptsRec),
+    decode_text(Binary1, OptsRec#opts{encoding = Encoding}).
 
 %% ===================================================================
 %% Internal functions.
@@ -469,11 +479,16 @@ log2floor(Int, N) -> log2floor(Int bsr 1, 1 + N).
 %% Decoding
 %% ===================================================================
 
-encoding(<<_, 0, 0, 0, _/binary>>) -> {utf32, little};
-encoding(<<0, 0, 0, _/binary>>) ->    {utf32, big};
-encoding(<<_, 0, _, 0, _/binary>>) -> {utf16, little};
-encoding(<<0, _, 0, _/binary>>) ->    {utf16, big};
-encoding(_) -> utf8.
+encoding(Binary, #opts{bom = true}) ->
+    {Encoding, Size} = unicode:bom_to_encoding(Binary),
+    BOM = (8 * Size),
+    <<_:BOM, Binary1/binary>> = Binary,
+    {Binary1, Encoding};
+encoding(B = <<_, 0, 0, 0, _/binary>>, _) -> {B, {utf32, little}};
+encoding(B = <<0, 0, 0, _/binary>>, _) -> {B, {utf32, big}};
+encoding(B = <<_, 0, _, 0, _/binary>>, _) -> {B, {utf16, little}};
+encoding(B = <<0, _, 0, _/binary>>, _) -> {B, {utf16, big}};
+encoding(B, _) -> {B, utf8}.
 
 decode_text(Binary, Opts) ->
     case next(Binary, Opts) of
@@ -650,6 +665,7 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt(bom, Opts) -> Opts#opts{bom = true};
 parse_opt({atom_strings, Bool}, Opts) when is_boolean(Bool)->
     Opts#opts{atom_strings = Bool};
 parse_opt({atom_keys, Bool}, Opts) when is_boolean(Bool)->
