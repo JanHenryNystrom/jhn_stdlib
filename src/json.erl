@@ -745,15 +745,17 @@ next(_, Opts) -> badarg(Opts).
 
 pointer_gen([], _, Acc) -> lists:reverse(Acc);
 pointer_gen([H | T], Opts, Acc) when is_binary(H) ->
-    #opts{plain_string = Plain, encoding = Encoding} = Opts,
-    H1 = [encode_char($/, Opts),
+    #opts{plain_string = Plain, pointer = Encoding} = Opts,
+    H1 = [encode_char($/, Opts#opts{encoding = Encoding}),
           char_code(pointer_escape(H, Plain), Plain, Encoding)],
     pointer_gen(T, Opts, [H1 | Acc]);
 pointer_gen(['-' | T], Opts = #opts{pointer = Encoding}, Acc) ->
     H1 = encode_chars([$/, $-], Opts#opts{encoding = Encoding}),
     pointer_gen(T, Opts, [H1 | Acc]);
-pointer_gen([H | T], Opts = #opts{atom_strings = true}, Acc) when is_atom(H) ->
-    pointer_gen([atom_to_binary(H, unicode) | T], Opts, Acc);
+pointer_gen([H | T], Opts, Acc) when is_atom(H) ->
+    #opts{atom_strings = true, plain_string = Plain} = Opts,
+    H1 = iolist_to_binary(char_code(atom_to_list(H), latin1, Plain)),
+    pointer_gen([H1 | T], Opts, Acc);
 pointer_gen([H | T], Opts, Acc) when is_integer(H), H >= 0 ->
     H1 = encode_chars([$/ | integer_to_list(H)],
                       Opts#opts{encoding = Opts#opts.pointer}),
@@ -818,8 +820,8 @@ pointer_escape(<<H, T/binary>>, Acc, Plain) ->
 pointer_escape_char(C, Plain) ->
     encode_chars(pointer_escape_char(C), #opts{encoding = Plain}).
 
-pointer_escape_char($~) -> <<$~, 0>>;
-pointer_escape_char($/) -> <<$~, 1>>.
+pointer_escape_char($~) -> <<$~, $0>>;
+pointer_escape_char($/) -> <<$~, $1>>.
 
 %% ===================================================================
 %% Selection

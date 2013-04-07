@@ -150,6 +150,22 @@
                     {<<"{\"one\":1}">>, {[{one, 1}]}}
                    ]).
 
+-define(POINTERS, [{<<"">>, []},
+                   {<<"/foo">>, [<<"foo">>]},
+                   {<<"/foo">>, [foo]},
+                   {<<"/foo/0">>, [foo, 0]},
+                   {<<"/">>, [<<"">>]},
+                   {<<"/a~1b">>, [<<"a/b">>]},
+                   {<<"/c%d">>, [<<"c%d">>]},
+                   {<<"/e^f">>, [<<"e^f">>]},
+                   {<<"/g|h">>, [<<"g|h">>]},
+                   {<<"/i\\\\j">>, [<<"i\\\\j">>]},
+                   {<<"/k\"l">>, [<<"k\"l">>]},
+                   {<<"/ ">>, [<<" ">>]},
+                   {<<"/m~0n">>, [<<"m~n">>]},
+                   {<<"/-">>, ['-']}
+                  ]).
+
 -define(IS_BADARG(X), ?assertMatch({'EXIT', {badarg, _}}, catch X)).
 
 -define(PLAIN_FORMATS,
@@ -398,6 +414,7 @@ decode_2_ws_encodings_test_() ->
         Encoding <- ?ENCODINGS
     ].
 
+
 %% ===================================================================
 %% Bad BINARY
 %% ===================================================================
@@ -408,6 +425,59 @@ decode_1_binary_test_() ->
 decode_2_binary_test_() ->
     [?_test(?IS_BADARG(json:decode(utf(B, latin1, Encoding), [binary]))) ||
         B <- ?BAD_BINARY, Encoding <- ?ENCODINGS].
+
+%% ===================================================================
+%% Pointer encoding
+%% ===================================================================
+
+%%--------------------------------------------------------------------
+%% pointer/1
+%%--------------------------------------------------------------------
+pointer_1_test_() ->
+    [
+     ?_test(?assertEqual(Pointer, iolist_to_binary(json:pointer(Term)))) ||
+        {Pointer, Term} <- ?POINTERS
+     ].
+%%--------------------------------------------------------------------
+%% pointer/2
+%%--------------------------------------------------------------------
+pointer_2_test_() ->
+    [
+     ?_test(?assertEqual(Pointer, iolist_to_binary(json:pointer(Term, [])))) ||
+        {Pointer, Term} <- ?POINTERS
+     ].
+
+%%--------------------------------------------------------------------
+%% pointer/2 with binary
+%%--------------------------------------------------------------------
+pointer_2_binary_test_() ->
+    [
+     ?_test(
+        ?assertEqual(Pointer,
+                     iolist_to_binary(json:pointer(Term, [binary])))) ||
+        {Pointer, Term} <- ?POINTERS
+     ].
+
+%%--------------------------------------------------------------------
+%% pointer/2 with different plain and encoding
+%%--------------------------------------------------------------------
+pointer_2_encodings_plains_test_() ->
+    [
+     ?_test(?assertEqual(utf(Pointer, latin1, Encoding),
+                         iolist_to_binary(
+                           json:pointer(pointer_term_to_encoding(Term, Plain),
+                                        [{pointer, Encoding},
+                                         {plain_string, Plain}])))) ||
+        {Pointer, Term} <- ?POINTERS,
+        Plain <- ?PLAIN_FORMATS,
+        Encoding <- ?ENCODINGS
+    ].
+
+pointer_term_to_encoding([], _) -> [];
+pointer_term_to_encoding([H | T], Plain) when is_binary(H) ->
+    [utf(H, latin1, Plain) | pointer_term_to_encoding(T, Plain)];
+pointer_term_to_encoding([H | T], Plain) ->
+    [H | pointer_term_to_encoding(T, Plain)].
 
 %% ===================================================================
 %% Bad options
