@@ -58,7 +58,9 @@
 
 %% Library functions
 -export([encode/1, encode/2,
-         decode/1, decode/2
+         decode/1, decode/2,
+         pointer/1, pointer/2,
+         select/2, select/3
         ]).
 
 %% Types
@@ -66,7 +68,8 @@
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
 -type opt()          :: {atom_strings, boolean()} | {atom_keys, boolean()} |
                         {existing_atom_keys, boolean()} |
-                        bom |binary | iolist |
+                        bom |binary | iolist | decode |
+                        {pointer, plain_format()} |
                         {plain_string, plain_format()} | {encoding, encoding()}.
 
 -type json()        :: json_text().
@@ -78,6 +81,8 @@
                        json_object() | json_array().
 -type json_string() :: atom() | string().
 
+-type json_pointer() :: [binary() | atom() | '-' | pos_integer()].
+
 %% Records
 -record(opts, {encoding = utf8 :: encoding(),
                plain_string = latin1 :: plain_format(),
@@ -86,6 +91,8 @@
                existing_atom_keys = false :: boolean(),
                bom = false :: boolean(),
                return_type = iolist :: iolist | binary,
+               decode = true :: boolean(),
+               pointer = utf8 :: plain_format(),
                orig_call
               }).
 
@@ -103,6 +110,7 @@
 -define(SPC, 32).
 -define(IS_WS(WS), WS == ?HT; WS == ?LF; WS == ?CR; WS == ?SPC).
 -define(ESCAPE(C), C =< 16#1F; C == 34; C == 47; C == 92).
+-define(POINTER_ESCAPE(C), C == $~; C == $/).
 
 %% Decode macros
 -define(IS_INT(C), C>=$0, C=<$9).
@@ -212,6 +220,87 @@ decode(Binary, Opts) -> Line = ?LINE,
                                      plain_string = utf8}),
     {Binary1, Encoding} = encoding(Binary, OptsRec),
     decode_text(Binary1, OptsRec#opts{encoding = Encoding}).
+
+%%--------------------------------------------------------------------
+%% Function: pointer(Term) -> Pointer Pointer.
+%% @doc
+%%   Encodes a term as a JSON pointer.
+%%   Equivalent of pointer(Term, []) -> Pointer.
+%% @end
+%%--------------------------------------------------------------------
+-spec pointer(json_pointer()) -> binary().
+%%--------------------------------------------------------------------
+pointer(Term) -> Line = ?LINE,
+    pointer(Term, #opts{orig_call = {pointer, [Term], Line}}).
+
+%%--------------------------------------------------------------------
+%% Function: pointer(Term, Options) -> Json Pointer
+%% @doc
+%%   Encodes a term as a JSON pointer.
+%%   Pointer will give an exception if the Term is malformed.
+%%   the pointer not well formed json_string.
+%%   Options are:
+%%     binary -> a binary is returned
+%%     iolist -> a iolist is returned
+%%     {pointer, Format} -> The UTF encoding of the pointer, default UTF-8
+%%     {plain_string, Format} -> what format the strings are encoded in
+%%     {atom_strings, Bool}
+%% @end
+%%--------------------------------------------------------------------
+-spec pointer(json_pointer(), [opt()]) -> binary().
+%%--------------------------------------------------------------------
+pointer(Term, Opts = #opts{}) -> pointer_gen(Term, Opts, []);
+pointer(Term, Opts) -> Line = ?LINE,
+    OptsRec = #opts{return_type = Return} =
+        parse_opts(Opts,
+                   #opts{orig_call = {pointer, [Term, Opts], Line}}),
+    case Return of
+        iolist -> pointer_gen(Term, OptsRec, []);
+        binary -> iolist_to_binary(pointer_gen(Term, OptsRec, []))
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: select(JSONPointer, JSON) -> Term.
+%% @doc
+%%   Selects and decodes a Fragment of a JSON document based on the Pointer.
+%%   Equivalent of select(JSONPointer, JSON, []) -> Term.
+%% @end
+%%--------------------------------------------------------------------
+-spec select(binary(), binary()) -> json_value() | binary() | {error, _}.
+%%--------------------------------------------------------------------
+select(Pointer, Binary) -> Line = ?LINE,
+    decode(Binary, #opts{orig_call = {select, [Pointer, Binary], Line}}).
+
+%%--------------------------------------------------------------------
+%% Function: select(JSONPointer, JSON, Options) -> Term or Fragment or error.
+%% @doc
+%%   Selects and optionally decodes a Fragment of a JSON document based on
+%%%  the Pointer.
+%%   Select will give an exception if the binary is not well formed JSON,
+%%   the pointer not well formed json_string.
+%%   Options are:
+%%     {decode, Bool} -> the fragment of the JSON selected(value) is decoded,
+%%                       default true.
+%%     bom -> the binary to decode has a UTF byte order mark
+%%     {pointer, Format} -> The UTF encoding of the pointer
+%%   Options passed to decoding if enabled:
+%%     {plain_string, Format}
+%%     {atom_keys, Bool}
+%%     {existing_atom_keys, Bool}
+%% @end
+%%--------------------------------------------------------------------
+-spec select(binary(), binary(), [opt()]) ->
+          json_value() | binary() | {error, _}.
+%%--------------------------------------------------------------------
+select(Pointer, Binary, Opts = #opts{}) ->
+    {Binary, Encoding} = encoding(Binary, Opts),
+    select_text(Pointer, Binary, Opts#opts{encoding = Encoding});
+select(Pointer, Binary, Opts) -> Line = ?LINE,
+    OptsRec = parse_opts(Opts, #opts{orig_call = {select, [Binary, Opts], Line},
+                                     plain_string = utf8}),
+    {Binary1, Encoding} = encoding(Binary, OptsRec),
+    select_text(Pointer, Binary1, OptsRec#opts{encoding = Encoding}).
+
 
 %% ===================================================================
 %% Internal functions.
@@ -336,12 +425,6 @@ solidus_escape(Code) ->
         [D] -> <<$\\, $u, $0, $0, $0, D>>;
         [D1, D2] -> <<$\\, $u, $0, $0, D1, D2>>
     end.
-
-encode_chars(Chars, #opts{encoding = utf8}) -> Chars;
-encode_chars(Chars, Opts) when is_list(Chars) ->
-    << <<(encode_char(C, Opts))/binary>> || C <- Chars>>;
-encode_chars(Chars, Opts) when is_binary(Chars) ->
-    << <<(encode_char(C, Opts))/binary>> || <<C>> <= Chars>>.
 
 %% ===================================================================
 %% float_to_binary/1 the implementation based on
@@ -657,6 +740,95 @@ next(<<H:32, T/binary>>, #opts{encoding = {utf32, _}}) -> {<<H:32>>, T};
 next(_, Opts) -> badarg(Opts).
 
 %% ===================================================================
+%% Pointer encoding
+%% ===================================================================
+
+pointer_gen([], _, Acc) -> lists:reverse(Acc);
+pointer_gen([H | T], Opts, Acc) when is_binary(H) ->
+    #opts{plain_string = Plain, encoding = Encoding} = Opts,
+    H1 = [encode_char($/, Opts),
+          char_code(pointer_escape(H, Plain), Plain, Encoding)],
+    pointer_gen(T, Opts, [H1 | Acc]);
+pointer_gen(['-' | T], Opts = #opts{pointer = Encoding}, Acc) ->
+    H1 = encode_chars([$/, $-], Opts#opts{encoding = Encoding}),
+    pointer_gen(T, Opts, [H1 | Acc]);
+pointer_gen([H | T], Opts = #opts{atom_strings = true}, Acc) when is_atom(H) ->
+    pointer_gen([atom_to_binary(H, unicode) | T], Opts, Acc);
+pointer_gen([H | T], Opts, Acc) when is_integer(H), H >= 0 ->
+    H1 = encode_chars([$/ | integer_to_list(H)],
+                      Opts#opts{encoding = Opts#opts.pointer}),
+    pointer_gen(T, Opts, [H1 | Acc]);
+pointer_gen(_, Opts, _) ->
+    badarg(Opts).
+
+pointer_escape(String, Plain) ->
+    case pointer_escapeable(String, Plain) of
+        true -> pointer_escape(String, <<>>, Plain);
+        false -> String
+    end.
+
+pointer_escapeable(<<>>, _) -> false;
+pointer_escapeable(<<H, _/binary>>, latin1) when ?POINTER_ESCAPE(H) -> true;
+pointer_escapeable(<<H, _/binary>>, utf8) when ?POINTER_ESCAPE(H) -> true;
+pointer_escapeable(<<H, 0, _/binary>>, {utf16, little})
+  when ?POINTER_ESCAPE(H) -> true;
+pointer_escapeable(<<0, H, _/binary>>, {utf16, big})
+  when ?POINTER_ESCAPE(H) -> true;
+pointer_escapeable(<<H, 0:24, _/binary>>, {utf32, little})
+  when ?POINTER_ESCAPE(H) -> true;
+pointer_escapeable(<<0:24, H, _/binary>>, {utf32, big})
+  when ?POINTER_ESCAPE(H) -> true;
+pointer_escapeable(<<_:16, T/binary>>, Plain = {utf16, _}) ->
+    pointer_escapeable(T, Plain);
+pointer_escapeable(<<_:32, T/binary>>, Plain = {utf32, _}) ->
+    pointer_escapeable(T, Plain);
+pointer_escapeable(<<_, T/binary>>, Plain) ->
+    pointer_escapeable(T, Plain).
+
+pointer_escape(<<>>, Acc, _) -> Acc;
+pointer_escape(<<H, T/binary>>, Acc, latin1)
+  when ?POINTER_ESCAPE(H) ->
+    pointer_escape(T, <<Acc/binary, (pointer_escape_char(H))/binary>>, latin1);
+pointer_escape(<<H, T/binary>>, Acc, utf8)
+  when ?POINTER_ESCAPE(H) ->
+    pointer_escape(T, <<Acc/binary, (pointer_escape_char(H))/binary>>, utf8);
+pointer_escape(<<H, 0, T/binary>>, Acc, Plain = {utf16, little})
+  when ?POINTER_ESCAPE(H) ->
+    Acc1 = <<Acc/binary, (pointer_escape_char(H, Plain))/binary>>,
+    pointer_escape(T, Acc1, Plain);
+pointer_escape(<<0, H, T/binary>>, Acc, Plain = {utf16, big})
+  when ?POINTER_ESCAPE(H) ->
+    Acc1 = <<Acc/binary, (pointer_escape_char(H, Plain))/binary>>,
+    pointer_escape(T, Acc1, Plain);
+pointer_escape(<<H, 0:24,T/binary>>,Acc,Plain = {utf32, little})
+  when ?POINTER_ESCAPE(H) ->
+    Acc1 = <<Acc/binary, (pointer_escape_char(H, Plain))/binary>>,
+    pointer_escape(T, Acc1, Plain);
+pointer_escape(<<0:24, H, T/binary>>, Acc, Plain = {utf32, big})
+  when ?POINTER_ESCAPE(H) ->
+    Acc1 = <<Acc/binary, (pointer_escape_char(H, Plain))/binary>>,
+    pointer_escape(T, Acc1, Plain);
+pointer_escape(<<H:16, T/binary>>, Acc, Plain = {utf16, _}) ->
+    pointer_escape(T, <<Acc/binary, H:16>>, Plain);
+pointer_escape(<<H:32, T/binary>>, Acc, Plain = {utf32, _}) ->
+    pointer_escape(T, <<Acc/binary, H:32>>, Plain);
+pointer_escape(<<H, T/binary>>, Acc, Plain) ->
+    pointer_escape(T, <<Acc/binary, H>>, Plain).
+
+pointer_escape_char(C, Plain) ->
+    encode_chars(pointer_escape_char(C), #opts{encoding = Plain}).
+
+pointer_escape_char($~) -> <<$~, 0>>;
+pointer_escape_char($/) -> <<$~, 1>>.
+
+%% ===================================================================
+%% Selection
+%% ===================================================================
+
+select_text(<<"">>, Bin, Opts) when is_binary(Bin) -> decode(Bin, Opts);
+select_text(_, _, _) -> nyi.
+
+%% ===================================================================
 %% Common parts
 %% ===================================================================
 
@@ -666,6 +838,7 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(bom, Opts) -> Opts#opts{bom = true};
+parse_opt(decode, Opts) -> Opts#opts{decode = false};
 parse_opt({atom_strings, Bool}, Opts) when is_boolean(Bool)->
     Opts#opts{atom_strings = Bool};
 parse_opt({atom_keys, Bool}, Opts) when is_boolean(Bool)->
@@ -682,8 +855,19 @@ parse_opt({encoding, Encoding} , Opts) ->
         true -> Opts#opts{encoding = Encoding};
         false -> badarg(Opts)
     end;
+parse_opt({pointer, Encoding} , Opts) ->
+    case lists:member(Encoding, ?PLAINFORMATS) of
+        true -> Opts#opts{pointer = Encoding};
+        false -> badarg(Opts)
+    end;
 parse_opt(_, Rec) ->
     badarg(Rec).
+
+encode_chars(Chars, #opts{encoding = utf8}) -> Chars;
+encode_chars(Chars, Opts) when is_list(Chars) ->
+    << <<(encode_char(C, Opts))/binary>> || C <- Chars>>;
+encode_chars(Chars, Opts) when is_binary(Chars) ->
+    << <<(encode_char(C, Opts))/binary>> || <<C>> <= Chars>>.
 
 encode_char(C, #opts{encoding = utf8}) -> <<C>>;
 encode_char(C, #opts{encoding = {utf16, little}}) -> <<C, 0>>;
