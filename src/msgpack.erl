@@ -50,14 +50,7 @@
 -type opt()          :: {atom_strings, boolean()} | binary | iolist.
 
 
--type json()        :: json_text().
--type json_text()   :: json_object() | json_array().
--type json_object() :: {[{json_string(), json_value()}]}.
--type json_array()  :: [json_value()].
--type json_value()  :: false | true | null |
-                       number() | json_string() |
-                       json_object() | json_array().
--type json_string() :: atom() | string().
+-type msgpack()     :: any().
 
 %% Records
 -record(opts, {return_type = iolist :: iolist | binary,
@@ -95,6 +88,7 @@
 -define(INT16, 16#d1).
 -define(INT32, 16#d2).
 -define(INT64, 16#d3).
+-define(FIX_RAW, 5:3).
 -define(RAW16, 16#da).
 -define(RAW32, 16#db).
 -define(ARRAY16, 16#dc).
@@ -112,7 +106,7 @@
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec encode(json()) -> iolist().
+-spec encode(msgpack()) -> iolist().
 %%--------------------------------------------------------------------
 encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 
@@ -122,7 +116,7 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec encode(json(), [opt()]) -> iolist() | binary().
+-spec encode(msgpack(), [opt()]) -> iolist() | binary().
 %%--------------------------------------------------------------------
 encode(Term, Opts = #opts{}) ->
     encode_msgpack(Term, Opts);
@@ -140,7 +134,7 @@ encode(Term, Opts) -> Line = ?LINE,
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary()) -> json().
+-spec decode(binary()) -> msgpack().
 %%--------------------------------------------------------------------
 decode(Binary) -> Line = ?LINE,
     decode(Binary, #opts{orig_call = {decode, [Binary], Line}}).
@@ -151,7 +145,7 @@ decode(Binary) -> Line = ?LINE,
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), [opt()]) -> json().
+-spec decode(binary(), [opt()]) -> msgpack().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> decode_msgpack(Binary, Opts);
 decode(Binary, Opts) -> Line = ?LINE,
@@ -172,9 +166,10 @@ encode_msgpack([], _) -> nyi;
 encode_msgpack(Integer, Opts) when is_integer(Integer) ->
     encode_integer(Integer, Opts);
 encode_msgpack(Float, _) when is_float(Float)-> nyi;
-encode_msgpack(nil, _) -> nyi;
-encode_msgpack(Bool, _) when is_boolean(Bool) -> nyi;
-encode_msgpack(Raw, _) when is_binary(Raw) -> nyi.
+encode_msgpack(nil, _) -> <<?NIL>>;
+encode_msgpack(true, _) -> <<?TRUE>>;
+encode_msgpack(false, _) -> <<?FALSE>>;
+encode_msgpack(Raw, _) when is_binary(Raw) -> encode_raw(Raw).
 
 encode_integer(I, _) when I >= ?POS_FIXNUM_MIN, I =< ?POS_FIXNUM_MAX ->
     <<?POS_FIXNUM, I:7>>;
@@ -195,7 +190,20 @@ encode_integer(I, _) when I < ?INT8_MIN, I >= ?INT16_MIN ->
 encode_integer(I, _) when I < ?INT16_MIN, I >= ?INT32_MIN ->
     <<?INT32, I/signed>>;
 encode_integer(I, _) when I < ?INT32_MIN, I >= ?INT64_MIN ->
-    <<?INT64, I/signed>>.
+    <<?INT64, I/signed>>;
+encode_integer({pos_fixnum, I}, _)
+  when I >= ?POS_FIXNUM_MIN, I =< ?POS_FIXNUM_MAX ->
+    <<?POS_FIXNUM, I:7>>;
+encode_integer({neg_fixnum, I}, _)
+  when I >= ?NEG_FIXNUM_MIN , I =< ?NEG_FIXNUM_MAX ->
+    <<?NEG_FIXNUM, I:5>>.
+
+encode_raw(Raw) ->
+    case byte_size(Raw) of
+        Size when Size < 32 -> [<<?FIX_RAW, Size:5>>, Raw];
+        Size when Size =< ?UINT16_MAX -> [<<?RAW16, Size:16>>, Raw];
+        Size when Size =< ?UINT32_MAX -> [<<?RAW32, Size:32>>, Raw]
+    end.
 
 %% ===================================================================
 %% Decoding
