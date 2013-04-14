@@ -365,7 +365,10 @@ decode_msgpack(<<?FIX_MAP, L:4, T/binary>>, Opts) ->
 decode_msgpack(<<?MAP16, L:16, T/binary>>, Opts) ->
     decode_map(L, T, [], Opts);
 decode_msgpack(<<?MAP32, L:32, T/binary>>, Opts) ->
-    decode_map(L, T, [], Opts).
+    decode_map(L, T, [], Opts);
+decode_msgpack(_, Opts) ->
+    badarg(Opts).
+
 
 decode_array(0, T, Acc, _) -> {lists:reverse(Acc), T};
 decode_array(N, Binary, Acc, Opts) ->
