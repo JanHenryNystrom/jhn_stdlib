@@ -63,7 +63,8 @@
 
 %% Records
 -record(opts, {return_type = iolist :: iolist | binary,
-               orig_call
+               orig_call,
+               number_types = false :: boolean()
               }).
 
 %% Defines
@@ -122,9 +123,10 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: encode() -> .
+%% Function: encode(Term) -> MSGPACK.
 %% @doc
-%%   
+%%   Encodes the structured Erlang term as an iolist.
+%%   Equivalent of encode(Term, []) -> MSGPACK.
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(msgpack()) -> iolist().
@@ -132,9 +134,13 @@
 encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 
 %%--------------------------------------------------------------------
-%% Function: encode(, ) -> .
+%% Function: encode(Term, Options) -> MSGPACK.
 %% @doc
-%%   
+%%   Encodes the structured Erlang term as an iolist or binary.
+%%   Encode will give an exception if the erlang term is not well formed.
+%%   Options are:
+%%     binary -> a binary is returned
+%%     iolist -> a iolist is returned
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(msgpack(), [opt()]) -> iolist() | binary().
@@ -150,9 +156,10 @@ encode(Term, Opts) -> Line = ?LINE,
     end.
 
 %%--------------------------------------------------------------------
-%% Function: decode() -> .
+%% Function: decode(MSGPACK) -> Term.
 %% @doc
-%%   
+%%   Decodes the binary into a structured Erlang term.
+%%   Equivalent of decode(MSGPACK, []) -> Term.
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> msgpack().
@@ -161,9 +168,12 @@ decode(Binary) -> Line = ?LINE,
     decode(Binary, #opts{orig_call = {decode, [Binary], Line}}).
 
 %%--------------------------------------------------------------------
-%% Function: decode(, ) -> .
+%% Function: decode(MSGPACK, Options) -> Term.
 %% @doc
-%%   
+%%   Decodes the binary into a structured Erlang.
+%%   Decode will give an exception if the binary is not well formed MSGPACK.
+%%   Options are:
+%%     number_types -> decode into {Type, Value} for number types.
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary(), [opt()]) -> msgpack().
@@ -187,83 +197,88 @@ decode(Binary, Opts) -> Line = ?LINE,
 
 encode_msgpack({Map}, Opts) when is_list(Map) -> encode_map(Map, Opts);
 encode_msgpack(Array, Opts) when is_list(Array) -> encode_array(Array, Opts);
-encode_msgpack(Integer, _) when is_integer(Integer) ->
-    encode_integer(Integer);
-encode_msgpack(Float, _) when is_float(Float)-> encode_float(Float);
+encode_msgpack(Integer, Opts) when is_integer(Integer) ->
+    encode_integer(Integer, Opts);
+encode_msgpack(Float, Opts) when is_float(Float)-> encode_float(Float, Opts);
 encode_msgpack(nil, _) -> <<?NIL>>;
 encode_msgpack(true, _) -> <<?TRUE>>;
 encode_msgpack(false, _) -> <<?FALSE>>;
-encode_msgpack(Raw, _) when is_binary(Raw) -> encode_raw(Raw);
+encode_msgpack(Raw, Opts) when is_binary(Raw) -> encode_raw(Raw, Opts);
 encode_msgpack(X = {Type, _}, Opts) when is_atom(Type) ->
     case lists:member(Type, ?FLOAT_TYPES) of
-        true -> encode_float(X);
+        true -> encode_float(X, Opts);
         false ->
             case lists:member(Type, ?INTEGER_TYPES) of
-                true -> encode_integer(X);
+                true -> encode_integer(X, Opts);
                 false -> badarg(Opts)
             end
-    end.
+    end;
+encode_msgpack(_, Opts) ->
+    badarg(Opts).
 
-encode_integer({pos_fixnum, I})
+encode_integer({pos_fixnum, I}, _)
   when I >= ?POS_FIXNUM_MIN, I =< ?POS_FIXNUM_MAX ->
     <<?POS_FIXNUM, I:7>>;
-encode_integer({neg_fixnum, I})
+encode_integer({neg_fixnum, I}, _)
   when I >= ?NEG_FIXNUM_MIN , I =< ?NEG_FIXNUM_MAX ->
     <<?NEG_FIXNUM, I:5>>;
-encode_integer({uint8, I}) when I >= 0, I =< ?UINT8_MAX ->
+encode_integer({uint8, I}, _) when I >= 0, I =< ?UINT8_MAX ->
     <<?UINT8, I>>;
-encode_integer({uint16, I}) when I >= 0, I =< ?UINT16_MAX ->
-    <<?UINT16, I>>;
-encode_integer({uint32, I}) when I >= 0, I =< ?UINT32_MAX ->
-    <<?UINT32, I>>;
-encode_integer({uint64, I}) when I >= 0, I =< ?UINT64_MAX ->
-    <<?UINT64, I>>;
-encode_integer({int8, I}) when I >= ?INT8_MIN, I =< ?INT8_MAX ->
-    <<?UINT8, I/signed>>;
-encode_integer({int16, I}) when I >= ?INT8_MIN, I =< ?INT16_MAX ->
-    <<?UINT16, I:16/signed>>;
-encode_integer({int32, I}) when I >= ?INT8_MIN, I =< ?INT32_MAX ->
-    <<?UINT32, I:32/signed>>;
-encode_integer({int64, I}) when I >= ?INT8_MIN, I =< ?INT64_MAX ->
-    <<?UINT64, I:64/signed>>;
-encode_integer(I) when I >= ?POS_FIXNUM_MIN, I =< ?POS_FIXNUM_MAX ->
-    <<?POS_FIXNUM, I:7>>;
-encode_integer(I) when I >= ?NEG_FIXNUM_MIN , I =< ?NEG_FIXNUM_MAX ->
-    <<?NEG_FIXNUM, I:5>>;
-encode_integer(I) when I > ?POS_FIXNUM_MAX, I =< ?UINT8_MAX ->
-    <<?UINT8, I>>;
-encode_integer(I) when I > ?UINT8_MAX, I =< ?UINT16_MAX ->
+encode_integer({uint16, I}, _) when I >= 0, I =< ?UINT16_MAX ->
     <<?UINT16, I:16>>;
-encode_integer(I) when I > ?UINT16_MAX, I =< ?UINT32_MAX ->
+encode_integer({uint32, I}, _) when I >= 0, I =< ?UINT32_MAX ->
     <<?UINT32, I:32>>;
-encode_integer(I) when I > ?UINT32_MAX, I =< ?UINT64_MAX ->
+encode_integer({uint64, I}, _) when I >= 0, I =< ?UINT64_MAX ->
     <<?UINT64, I:64>>;
-encode_integer(I) when I < ?NEG_FIXNUM_MIN, I >= ?INT8_MIN ->
+encode_integer({int8, I}, _) when I >= ?INT8_MIN, I =< ?INT8_MAX ->
     <<?INT8, I/signed>>;
-encode_integer(I) when I < ?INT8_MIN, I >= ?INT16_MIN ->
+encode_integer({int16, I}, _) when I >= ?INT16_MIN, I =< ?INT16_MAX ->
     <<?INT16, I:16/signed>>;
-encode_integer(I) when I < ?INT16_MIN, I >= ?INT32_MIN ->
+encode_integer({int32, I}, _) when I >= ?INT32_MIN, I =< ?INT32_MAX ->
     <<?INT32, I:32/signed>>;
-encode_integer(I) when I < ?INT32_MIN, I >= ?INT64_MIN ->
-    <<?INT64, I:64/signed>>.
+encode_integer({int64, I}, _) when I >= ?INT64_MIN, I =< ?INT64_MAX ->
+    <<?INT64, I:64/signed>>;
+encode_integer(I, _) when I >= ?POS_FIXNUM_MIN, I =< ?POS_FIXNUM_MAX ->
+    <<?POS_FIXNUM, I:7>>;
+encode_integer(I, _) when I >= ?NEG_FIXNUM_MIN , I =< ?NEG_FIXNUM_MAX ->
+    <<?NEG_FIXNUM, I:5>>;
+encode_integer(I, _) when I > ?POS_FIXNUM_MAX, I =< ?UINT8_MAX ->
+    <<?UINT8, I>>;
+encode_integer(I, _) when I > ?UINT8_MAX, I =< ?UINT16_MAX ->
+    <<?UINT16, I:16>>;
+encode_integer(I, _) when I > ?UINT16_MAX, I =< ?UINT32_MAX ->
+    <<?UINT32, I:32>>;
+encode_integer(I, _) when I > ?UINT32_MAX, I =< ?UINT64_MAX ->
+    <<?UINT64, I:64>>;
+encode_integer(I, _) when I < ?NEG_FIXNUM_MIN, I >= ?INT8_MIN ->
+    <<?INT8, I/signed>>;
+encode_integer(I, _) when I < ?INT8_MIN, I >= ?INT16_MIN ->
+    <<?INT16, I:16/signed>>;
+encode_integer(I, _) when I < ?INT16_MIN, I >= ?INT32_MIN ->
+    <<?INT32, I:32/signed>>;
+encode_integer(I, _) when I < ?INT32_MIN, I >= ?INT64_MIN ->
+    <<?INT64, I:64/signed>>;
+encode_integer(_, Opts) ->
+    badarg(Opts).
 
+encode_float({float, Float}, _) -> <<?FLOAT, Float:32/float>>;
+encode_float({double, Float}, _) -> <<?DOUBLE, Float:64/float>>;
+encode_float(Float, _) -> <<?DOUBLE, Float:64/float>>.
 
-encode_float({float, Float}) -> <<?FLOAT, Float:32/float>>;
-encode_float({double, Float}) -> <<?DOUBLE, Float:64/float>>;
-encode_float(Float) -> <<?DOUBLE, Float:64/float>>.
-
-encode_raw(Raw) ->
+encode_raw(Raw, Opts) ->
     case byte_size(Raw) of
         Size when Size < 32 -> [<<?FIX_RAW, Size:5>>, Raw];
         Size when Size =< ?UINT16_MAX -> [<<?RAW16, Size:16>>, Raw];
-        Size when Size =< ?UINT32_MAX -> [<<?RAW32, Size:32>>, Raw]
+        Size when Size =< ?UINT32_MAX -> [<<?RAW32, Size:32>>, Raw];
+        _ -> badarg(Opts)
     end.
 
 encode_array(Array, Opts) ->
     Tag = case length(Array) of
               L  when L < 16 -> <<?FIX_ARRAY, L:4>>;
               L when L =< ?UINT16_MAX -> <<?ARRAY16, L:16>>;
-              L when L =< ?UINT32_MAX -> <<?ARRAY32, L:32>>
+              L when L =< ?UINT32_MAX -> <<?ARRAY32, L:32>>;
+              _ -> badarg(Opts)
           end,
     [Tag | [encode_msgpack(Elt, Opts) || Elt <- Array]].
 
@@ -271,7 +286,8 @@ encode_map(Map, Opts) ->
     Tag = case length(Map) of
               L  when L < 16 -> <<?FIX_MAP, L:4>>;
               L when L =< ?UINT16_MAX -> <<?MAP16, L:16>>;
-              L when L =< ?UINT32_MAX -> <<?MAP32, L:32>>
+              L when L =< ?UINT32_MAX -> <<?MAP32, L:32>>;
+              _ -> badarg(Opts)
           end,
     [Tag |
      [[encode_msgpack(Key, Opts), encode_msgpack(Value, Opts)] ||
@@ -281,18 +297,54 @@ encode_map(Map, Opts) ->
 %% Decoding
 %% ===================================================================
 
-decode_msgpack(<<?POS_FIXNUM, I:7, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?NEG_FIXNUM, I:5, T/binary>>, _) -> {I + ?NEG_FIXNUM_MIN, T};
-decode_msgpack(<<?UINT8, I, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?UINT16, I:16, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?UINT32, I:32, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?UINT64, I:64, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?INT8, I/signed, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?INT16, I:16/signed, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?INT32, I:32/signed, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?INT64, I:64/signed, T/binary>>, _) -> {I, T};
-decode_msgpack(<<?FLOAT, F:32/float, T/binary>>, _) -> {F, T};
-decode_msgpack(<<?DOUBLE, F:64/float, T/binary>>, _) -> {F, T};
+decode_msgpack(<<?POS_FIXNUM, I:7, T/binary>>, #opts{number_types = true}) ->
+    {{pos_fixnum, I}, T};
+decode_msgpack(<<?POS_FIXNUM, I:7, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?NEG_FIXNUM, I:5, T/binary>>, #opts{number_types = true}) ->
+    {{neg_fixnum, I + ?NEG_FIXNUM_MIN}, T};
+decode_msgpack(<<?NEG_FIXNUM, I:5, T/binary>>, _) ->
+    {I + ?NEG_FIXNUM_MIN, T};
+decode_msgpack(<<?UINT8, I, T/binary>>, #opts{number_types = true}) ->
+    {{uint8, I}, T};
+decode_msgpack(<<?UINT8, I, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?UINT16, I:16, T/binary>>, #opts{number_types = true}) ->
+    {{uint16, I}, T};
+decode_msgpack(<<?UINT16, I:16, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?UINT32, I:32, T/binary>>, #opts{number_types = true}) ->
+    {{uint32, I}, T};
+decode_msgpack(<<?UINT32, I:32, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?UINT64, I:64, T/binary>>, #opts{number_types = true}) ->
+    {{uint64, I}, T};
+decode_msgpack(<<?UINT64, I:64, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?INT8, I/signed, T/binary>>, #opts{number_types = true}) ->
+    {{int8, I}, T};
+decode_msgpack(<<?INT8, I/signed, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?INT16, I:16/signed, T/binary>>, #opts{number_types = true}) ->
+    {{int16, I}, T};
+decode_msgpack(<<?INT16, I:16/signed, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?INT32, I:32/signed, T/binary>>, #opts{number_types = true}) ->
+    {{int32, I}, T};
+decode_msgpack(<<?INT32, I:32/signed, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?INT64, I:64/signed, T/binary>>, #opts{number_types = true}) ->
+    {{int64, I}, T};
+decode_msgpack(<<?INT64, I:64/signed, T/binary>>, _) ->
+    {I, T};
+decode_msgpack(<<?FLOAT, F:32/float, T/binary>>, #opts{number_types = true}) ->
+    {{float, F}, T};
+decode_msgpack(<<?FLOAT, F:32/float, T/binary>>, _) ->
+    {F, T};
+decode_msgpack(<<?DOUBLE, F:64/float, T/binary>>, #opts{number_types = true}) ->
+    {{double, F}, T};
+decode_msgpack(<<?DOUBLE, F:64/float, T/binary>>, _) ->
+    {F, T};
 decode_msgpack(<<?NIL, T/binary>>, _) -> {nil, T};
 decode_msgpack(<<?TRUE, T/binary>>, _) -> {true, T};
 decode_msgpack(<<?FALSE, T/binary>>, _) -> {false, T};
@@ -336,6 +388,7 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt(number_types, Opts) -> Opts#opts{number_types = true};
 parse_opt(_, Rec) -> badarg(Rec).
 
 badarg(#opts{orig_call = {Funcion, Args, Line}}) ->

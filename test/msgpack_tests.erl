@@ -51,6 +51,22 @@
 -define(REVERSIBLE_TERM,
         ?SIMPLE ++ ?INTEGER ++ ?FLOAT ++ ?MAP ++ ?ARRAY ++ ?RAW).
 
+-define(INTEGER_TYPE,
+        [{pos_fixnum, [0, 1, 10, 127]},
+         {neg_fixnum, [-1, -10, -32]},
+         {uint8,  [0, 10, 255]},
+         {uint16, [0, 10, 255, 65535]},
+         {uint32, [0, 10, 255, 65535, 4294967295]},
+         {uint64, [0, 10, 255, 65535, 4294967295, 18446744073709551615]},
+         {int8,  [-128, -10, 0, 10, 127]},
+         {int16, [-32768, -128, -10, 0, 10, 127, 32767]},
+         {int32, [-2147483648, -32768, -128, -10, 0, 10, 127, 2147483647]},
+         {int64, [-9223372036854775808, -2147483648, -32768, -128, -10, 0,
+                  10, 127, 9223372036854775807]},
+         {double, [1.23e-12, -100.0, 0.0, 100.0, 14.5e10]},
+         {float, [-100.0, 0.0, 100.0]}
+        ]).
+
 %% ===================================================================
 %% Tests.
 %% ===================================================================
@@ -98,4 +114,22 @@ encode_2_decode_2_test_() ->
                            msgpack:encode(Term, [binary]),
                            []))) ||
         Term <- ?REVERSIBLE_TERM].
+
+%%--------------------------------------------------------------------
+%% encode/2 <-> /decode/2 integer_type
+%%--------------------------------------------------------------------
+encode_2_decode_2_integer_type_test_() ->
+    [begin
+         ?_test(
+            ?assertEqual(Value,
+                         msgpack:decode(msgpack:encode({Type, Value},
+                                                       [binary])))),
+         ?_test(
+            ?assertEqual({Type, Value},
+                         msgpack:decode(msgpack:encode({Type, Value}, [binary]),
+                                        [number_types])))
+     end ||
+        {Type, Values} <- ?INTEGER_TYPE,
+        Value <- Values
+    ].
 
