@@ -25,7 +25,7 @@
 %%%   copies are more suitable apply binary/copy/1 on the result.
 %%%
 %%%   All functions in the stblib lists that would operate on tuples
-%%    operate on equally sized octet blogs binaries.
+%%    operate on equally sized octet blobs binaries.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
