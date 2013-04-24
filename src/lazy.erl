@@ -166,9 +166,9 @@ list_to_data(List) ->
 %%--------------------------------------------------------------------
 iolist_to_data(List) ->
     Promise = fun(_, []) -> eol;
-                 (_, [H | T]) when is_binary(H) -> {H, iolist_to_data(T)};
-%% TODO should have deep traversal
-                 (_, [H | T]) -> {iolist_to_binary(H), iolist_to_data(T)}
+                 (_, H) when is_binary(H) -> {H, []};
+                 (_, [H | T]) when is_binary(H) -> {H, T};
+                 (_, [H | T]) -> {iolist_to_binary(H), T}
               end,
     create(Promise, List).
 
@@ -235,16 +235,16 @@ tcp_to_data(HostName, Port, Timeout, OptionsIn) ->
 %%--------------------------------------------------------------------
 -spec tcp_socket_to_data(inet:socket()) -> data(binary()).
 %%--------------------------------------------------------------------
-tcp_socket_to_data(TCPSocket) ->
-    Promise = fun(Timeout, Socket) ->
+tcp_socket_to_data(Socket) ->
+    Promise = fun(Timeout) ->
                       case gen_tcp:recv(Socket, 0, Timeout) of
-                          {ok, Packet} -> {Packet, Socket};
-                          {error, timeout} -> {<<>>, Socket};
+                          {ok, Packet} -> Packet;
+                          {error, timeout} -> <<>>;
                           {error, closed} -> eol;
                           {error, _} -> tcp:close(Socket), eol
                       end
               end,
-    create(Promise, TCPSocket).
+    create(Promise).
 
 %%--------------------------------------------------------------------
 %% Function: file_to_data(Mode, FileName) -> LazyBinary
@@ -254,14 +254,14 @@ tcp_socket_to_data(TCPSocket) ->
 %%   On errors reading from the stream results in the closure
 %%   and eol is returned.
 %%   The mode determines if the data is read linewise or in chunks of
-%%   Mode octets.
+%%   Mode characters.
 %% @end
 %%--------------------------------------------------------------------
 -spec file_to_data(line | integer(), file:filename()) ->
           data(binary()) | {error, file:posix() | badarg | system_limit}.
 %%--------------------------------------------------------------------
 file_to_data(Type, Name) ->
-    case file:open(Name, [read, raw, read_ahead]) of
+    case file:open(Name, [read, binary, raw, read_ahead]) of
         {ok, Device} -> file_stream_to_data(Type, Device);
         Error = {error, _} -> Error
     end.
@@ -274,29 +274,29 @@ file_to_data(Type, Name) ->
 %%   On errors reading from the stream results in the closure
 %%   and eol is returned.
 %%   The mode determines if the data is read linewise or in chunks of
-%%   Mode octets.
+%%   Mode characters.
 %% @end
 %%--------------------------------------------------------------------
 -spec file_stream_to_data(line | integer(), file:io_device()) -> data(binary()).
 %%--------------------------------------------------------------------
-file_stream_to_data(line, FileStream) ->
-    Promise = fun(_, Stream) ->
+file_stream_to_data(line, Stream) ->
+    Promise = fun(_) ->
                       case file:read_line(Stream) of
-                          {ok, Data} -> {Data, Stream};
+                          {ok, Data} -> Data;
                           {error, _} -> file:close(Stream), eol;
                           eof -> file:close(Stream), eol
                       end
               end,
-    create(Promise, FileStream);
-file_stream_to_data(ChunkSize, FileStream) ->
-    Promise = fun(_, Stream) ->
+    create(Promise);
+file_stream_to_data(ChunkSize, Stream) ->
+    Promise = fun(_) ->
                       case file:read(Stream, ChunkSize) of
-                          {ok, Data} -> {Data, Stream};
+                          {ok, Data} -> Data;
                           {error, _} -> file:close(Stream), eol;
                           eof -> file:close(Stream), eol
                       end
               end,
-    create(Promise, FileStream).
+    create(Promise).
 
 
 %% ===================================================================
