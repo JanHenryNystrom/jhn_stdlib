@@ -48,6 +48,8 @@
 -define(FILES,
         ["lazy_file.txt"]).
 
+-define(PORT, 8888).
+
 %% ===================================================================
 %% Tests.
 %% ===================================================================
@@ -101,17 +103,35 @@ file_to_data_1_line_test_() ->
         File <- ?FILES].
 
 %%--------------------------------------------------------------------
-%% tcp_to_data/3
+%% tcp_to_data/2
 %%--------------------------------------------------------------------
-tcp_to_data_3_test_() ->
+tcp_to_data_2_test_() ->
     {setup,
-     fun() -> spawn_source(?IOLISTS) end,
+     fun() -> spawn_source(?IOLISTS, 0) end,
      fun(Pid) -> unlink(Pid), exit(Pid, shutdown) end,
      [{timeout, 120,
       ?_test(
          ?assertEqual(iolist_to_binary(?IOLISTS),
                       iolist_to_binary(
-                        exhaust(lazy:tcp_to_data("127.0.0.1", 8888), []))))}
+                        exhaust(lazy:tcp_to_data("127.0.0.1", ?PORT), []))))}
+     ]
+    }.
+
+%%--------------------------------------------------------------------
+%% tcp_reconnect_to_data/3
+%%--------------------------------------------------------------------
+tcp_reconnect_to_data_3_test_() ->
+    {setup,
+     fun() -> spawn_source(?IOLISTS, 1) end,
+     fun(Pid) -> unlink(Pid), exit(Pid, shutdown) end,
+     [{timeout, 120,
+      ?_test(
+         ?assertEqual(iolist_to_binary(?IOLISTS ++ ?IOLISTS),
+                      iolist_to_binary(
+                        exhaust(lazy:tcp_reconnect_to_data("127.0.0.1",
+                                                           ?PORT,
+                                                           100),
+                                []))))}
      ]
     }.
 
@@ -132,7 +152,7 @@ file_to_data_1_chunk_test_() ->
 %% ===================================================================
 
 exhaust(Lazy, Acc) ->
-    case Lazy(1000) of
+    case Lazy(100) of
         eol -> lists:reverse(Acc);
         {Data, Lazy1} -> exhaust(Lazy1, [Data | Acc])
     end.
@@ -140,22 +160,28 @@ exhaust(Lazy, Acc) ->
 abs_name(File) ->
     filename:join([code:lib_dir(jhn_stdlib), "test", File]).
 
-spawn_source(Data) ->
+spawn_source(Data, N) ->
     Me = self(),
-    Pid = spawn_link(fun() -> source(Me, Data) end),
+    Pid = spawn_link(fun() -> source(Me, Data, N) end),
     receive setup -> Pid after 10000 -> exit(source_timeout) end.
 
-source(Parent, Data) when is_pid(Parent) ->
-    {ok, LSock} = gen_tcp:listen(8888, [binary, {packet, 0}, {reuseaddr, true}]),
+source(Parent, Template, N) when is_pid(Parent) ->
+    {ok, LSock} =
+        gen_tcp:listen(?PORT, [binary, {packet, 0}, {reuseaddr, true}]),
     Parent ! setup,
     {ok, Sock} = gen_tcp:accept(LSock),
-    source(Data, Sock);
-source([], Sock) ->
+    source(Template, N, Sock, LSock, Template).
+
+source([], 0, Sock, _, _) ->
     gen_tcp:close(Sock);
-source([H | T], Sock) ->
+source([], N, Sock, LSock, Template) ->
+    gen_tcp:close(Sock),
+    {ok, Sock1} = gen_tcp:accept(LSock),
+    source(Template, N - 1, Sock1, LSock, Template);
+source([H | T], N, Sock, LSock, Template) ->
     timer:sleep(100),
     gen_tcp:send(Sock, H),
-    source(T, Sock).
+    source(T, N,  Sock, LSock, Template).
 
 
 
