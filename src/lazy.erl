@@ -36,14 +36,21 @@
 %%% applied to a timeout to generate a tuple of data and new lazy data
 %%% {Data, Lazy} or eol.
 %%%
+%%% Several utility functions are provided to construct new LazyData.
+%%%
+%%% One function is provided that creates an "empty" LazyData empty/0.
+%%%
 %%% Two functions to add a data to existing lazy data are provided:
 %%% prepend/2 and append/2 that adds the data before or after the lazy data
 %%% respectively.
+%%%
+%%% One function that combines lazy data is provided: concat/2.
 %%%
 %%% A number of utility funtions are provided, functioning both as simple
 %%% examples as well as convenience for basic uses:
 %%%   list_to_data/1, iolist_to_data/1
 %%%   tcp_to_data/2, tcp_to_data/3,tcp_to_data/4, tcp_socket_to_data/1
+%%%   tcp_reconnect_to_data/3
 %%%   file_to_data/2, file_stream_to_data/2
 %%%
 %%% N.B. This library relies heavily on the construction of lambda functions
@@ -61,10 +68,11 @@
 %% Library functions
 -export([create/1, create/2]).
 
--export([prepend/2, append/2]).
+-export([empty/0, prepend/2, append/2, concat/2]).
 
 -export([list_to_data/1, iolist_to_data/1,
          tcp_to_data/2, tcp_to_data/3,tcp_to_data/4, tcp_socket_to_data/1,
+         tcp_reconnect_to_data/3,
          file_to_data/2, file_stream_to_data/2
         ]).
 
@@ -115,6 +123,16 @@ create(F, State) ->
     end.
 
 %%--------------------------------------------------------------------
+%% Function: empty() -> LazyData.
+%% @doc
+%%   Creates an empty LazyData that just returns eol.
+%% @end
+%%--------------------------------------------------------------------
+-spec empty() -> data(_).
+%%--------------------------------------------------------------------
+empty() -> fun(_) -> eol end.
+
+%%--------------------------------------------------------------------
 %% Function: prepend(Data, LazyData) -> LazyData.
 %% @doc
 %%   Lazy data is constructed from data and lazy data where when cosumed
@@ -137,8 +155,24 @@ prepend(Data, Lazy) -> fun(_) -> {Data, Lazy} end.
 append(Data, Lazy) ->
     fun(Timeout) ->
             case Lazy(Timeout) of
-                eol -> {Data, fun(_) -> eol end};
+                eol -> {Data, empty()};
                 {Data1, Lazy1} -> {Data1, append(Data, Lazy1)}
+            end
+    end.
+%%--------------------------------------------------------------------
+%% Function: concat(LazyData1, LazyData2) -> LazyData.
+%% @doc
+%%   Lazy data is constructed from lazy data and lazy data where when cosumed
+%%   the LazyData1 comes before all the data of of the LazyData2.
+%% @end
+%%--------------------------------------------------------------------
+-spec concat(data(Type), data(Type)) -> data(Type).
+%%--------------------------------------------------------------------
+concat(Lazy1, Lazy2) ->
+    fun(Timeout) ->
+            case Lazy1(Timeout) of
+                eol -> Lazy2(Timeout);
+                {Data1, Lazy11} -> {Data1, concat(Lazy11, Lazy2)}
             end
     end.
 
@@ -173,7 +207,7 @@ iolist_to_data(List) ->
     create(Promise, List).
 
 %%--------------------------------------------------------------------
-%% Function: tcp_to_data(Host, Port) -> LazyBinary
+%% Function: tcp_to_data(Host, Port) -> LazyBinary | Error
 %% @doc
 %%   A Lazy binary is constructed from the socket that opening a tcp connetion
 %%   to the host in binary mode with packet size 0. If an error occurs during
@@ -187,7 +221,7 @@ iolist_to_data(List) ->
 tcp_to_data(HostName, Port) -> tcp_to_data(HostName, Port, infinity).
 
 %%--------------------------------------------------------------------
-%% Function: tcp_to_data(Host, Port, Timeout) -> LazyBinary
+%% Function: tcp_to_data(Host, Port, Timeout) -> LazyBinary | Error
 %% @doc
 %%   A Lazy binary is constructed from the socket that opening a tcp connetion
 %%   to the host in binary mode with packet size 0. If an error or timeout
@@ -202,7 +236,7 @@ tcp_to_data(HostName, Port) -> tcp_to_data(HostName, Port, infinity).
 tcp_to_data(HostName, Port, Timeout) -> tcp_to_data(HostName, Port, Timeout,[]).
 
 %%--------------------------------------------------------------------
-%% Function: tcp_to_data(Host, Port, Timeout, TCPOptions) -> LazyBinary
+%% Function: tcp_to_data(Host, Port, Timeout, TCPOptions) -> LazyBinary | Error
 %% @doc
 %%   A Lazy binary is constructed from the socket that opening a tcp connetion
 %%   to the host in binary mode with packet size 0. If an error or timeout
@@ -245,6 +279,32 @@ tcp_socket_to_data(Socket) ->
                       end
               end,
     create(Promise).
+
+%%--------------------------------------------------------------------
+%% Function: tcp_reconnect_to_data(Host, Port, Timeout) -> LazyBinary
+%% @doc
+%%   A Lazy binary is constructed from the socket that opening a tcp connetion
+%%   to the host in binary mode with packet size 0. If an error occurs during
+%%   connection an error is returned. If the connection is closed it is
+%%   reconnected.
+%% @end
+%%--------------------------------------------------------------------
+-spec tcp_reconnect_to_data(HostName, Port, timeout()) -> data(binary())  when
+      HostName:: inet:ip_address() | inet:hostname(),
+      Port ::inet:port_number().
+%%--------------------------------------------------------------------
+tcp_reconnect_to_data(HostName, Port, Timeout) ->
+    case tcp_to_data(HostName, Port, Timeout) of
+        Lazy when is_function(Lazy, 1) ->
+            concat(Lazy,
+                   fun(CallTimeout) ->
+                           Lazy1 =
+                               tcp_reconnect_to_data(HostName, Port, Timeout),
+                           Lazy1(CallTimeout)
+                   end);
+        _ ->
+            empty()
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: file_to_data(Mode, FileName) -> LazyBinary
