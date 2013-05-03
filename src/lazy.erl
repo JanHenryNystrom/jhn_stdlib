@@ -77,10 +77,11 @@
         ]).
 
 %% Types
--type data(Type) :: fun(([timeout()]) -> {Type, data(Type)}) | eol.
+-type data(Type) :: fun(([timeout() | eol]) -> {Type, data(Type)}) | eol.
 
--type promise(Type) :: fun(([timeout()]) -> Type | eol).
--type promise(Type, State) :: fun(([timeout()], State) -> {Type, State} | eol).
+-type promise(Type) :: fun(([timeout() | eol]) -> Type | eol).
+-type promise(Type, State) ::
+        fun(([timeout() | eol], State) -> {Type, State} | eol).
 
 %% Exported Types
 -export_type([data/1, promise/1, promise/2]).
@@ -199,7 +200,8 @@ list_to_data(List) ->
 -spec iolist_to_data(iolist()) -> data(binary()).
 %%--------------------------------------------------------------------
 iolist_to_data(List) ->
-    Promise = fun(_, []) -> eol;
+    Promise = fun(eol, _) -> eol;
+                 (_, []) -> eol;
                  (_, H) when is_binary(H) -> {H, []};
                  (_, [H | T]) when is_binary(H) -> {H, T};
                  (_, [H | T]) -> {iolist_to_binary(H), T}
@@ -270,7 +272,8 @@ tcp_to_data(HostName, Port, Timeout, OptionsIn) ->
 -spec tcp_socket_to_data(inet:socket()) -> data(binary()).
 %%--------------------------------------------------------------------
 tcp_socket_to_data(Socket) ->
-    Promise = fun(Timeout) ->
+    Promise = fun(eol) -> tcp:close(Socket), eol;
+                 (Timeout) ->
                       case gen_tcp:recv(Socket, 0, Timeout) of
                           {ok, Packet} -> Packet;
                           {error, timeout} -> <<>>;
@@ -340,7 +343,8 @@ file_to_data(Type, Name) ->
 -spec file_stream_to_data(line | integer(), file:io_device()) -> data(binary()).
 %%--------------------------------------------------------------------
 file_stream_to_data(line, Stream) ->
-    Promise = fun(_) ->
+    Promise = fun(eol) -> file:close(Stream), eol;
+                 (_) ->
                       case file:read_line(Stream) of
                           {ok, Data} -> Data;
                           {error, _} -> file:close(Stream), eol;
@@ -349,7 +353,8 @@ file_stream_to_data(line, Stream) ->
               end,
     create(Promise);
 file_stream_to_data(ChunkSize, Stream) ->
-    Promise = fun(_) ->
+    Promise = fun(eol) -> file:close(Stream), eol;
+                 (_) ->
                       case file:read(Stream, ChunkSize) of
                           {ok, Data} -> Data;
                           {error, _} -> file:close(Stream), eol;
