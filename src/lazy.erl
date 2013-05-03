@@ -30,6 +30,8 @@
 %%% the timespan given by the timeout. A promise can also have a state
 %%% in which case the initial state has to be provided with the function.
 %%% The stateful promise function must retun a tuple of {Data, NewState}.
+%%% If the timeout is eol is given the promise should return eol and any
+%%% resources, such as streams and sockets, should be deallocated.
 %%%
 %%% The library provides the functions create/1 and create/2 to create
 %%% lazy data structures given a promise. The structure can then be
