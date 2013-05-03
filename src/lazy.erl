@@ -186,7 +186,8 @@ concat(Lazy1, Lazy2) ->
 -spec list_to_data([Type]) -> data(Type).
 %%--------------------------------------------------------------------
 list_to_data(List) ->
-    Promise = fun(_, []) -> eol;
+    Promise = fun(eol, _) -> eol;
+                 (_, []) -> eol;
                  (_, [H | T]) -> {H, T}
               end,
     create(Promise, List).
