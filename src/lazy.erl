@@ -142,7 +142,7 @@ empty() -> fun(_) -> eol end.
 %%--------------------------------------------------------------------
 -spec prepend(Type, data(Type)) -> data(Type).
 %%--------------------------------------------------------------------
-prepend(Data, Lazy) -> fun(_) -> {Data, Lazy} end.
+prepend(Data, Lazy) -> fun(eol) -> Lazy(eol); (_) -> {Data, Lazy} end.
 
 %%--------------------------------------------------------------------
 %% Function: append(Data, LazyData) -> LazyData.
@@ -154,7 +154,8 @@ prepend(Data, Lazy) -> fun(_) -> {Data, Lazy} end.
 -spec append(Type, data(Type)) -> data(Type).
 %%--------------------------------------------------------------------
 append(Data, Lazy) ->
-    fun(Timeout) ->
+    fun(eol) -> Lazy(eol);
+       (Timeout) ->
             case Lazy(Timeout) of
                 eol -> {Data, empty()};
                 {Data1, Lazy1} -> {Data1, append(Data, Lazy1)}
@@ -170,7 +171,8 @@ append(Data, Lazy) ->
 -spec concat(data(Type), data(Type)) -> data(Type).
 %%--------------------------------------------------------------------
 concat(Lazy1, Lazy2) ->
-    fun(Timeout) ->
+    fun(eol) -> Lazy1(eol), Lazy2(eol);
+       (Timeout) ->
             case Lazy1(Timeout) of
                 eol -> Lazy2(Timeout);
                 {Data1, Lazy11} -> {Data1, concat(Lazy11, Lazy2)}
@@ -301,7 +303,8 @@ tcp_reconnect_to_data(HostName, Port, Timeout) ->
     case tcp_to_data(HostName, Port, Timeout) of
         Lazy when is_function(Lazy, 1) ->
             concat(Lazy,
-                   fun(CallTimeout) ->
+                   fun(eol) -> eol;
+                      (CallTimeout) ->
                            Lazy1 =
                                tcp_reconnect_to_data(HostName, Port, Timeout),
                            Lazy1(CallTimeout)
