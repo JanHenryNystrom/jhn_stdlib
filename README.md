@@ -1,5 +1,4 @@
-
-jhn_stdlib [![Build Status](https://secure.travis-ci.org/JanHenryNystrom/jhn_stdlib.png)](http://travis-ci.org/JanHenryNystrom/jhn_stdlib)
+jhn_stdlib [(γ)][5] [![Build Status](https://secure.travis-ci.org/JanHenryNystrom/jhn_stdlib.png)](http://travis-ci.org/JanHenryNystrom/jhn_stdlib)
 ==========
 
 A few thought experiments solidified as code.
@@ -101,3 +100,5 @@ I know I really should.
        "thanks"
   [4]: http://github.com/erlang/otp/wiki/Writing-good-commit-messages
        "Erlang/OTP commit messages"
+  [5]: http://en.wikipedia.org/wiki/Software_release_life_cycle
+       "Software release life cycle"
