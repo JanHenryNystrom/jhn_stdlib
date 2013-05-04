@@ -88,7 +88,7 @@ feedback please [create an issue here on GitHub.] [2]
 
 Patches are greatly appreciated, but since these libraries reflect my
 learning process and I have rather peculiar notions of code hygiene
-I may do extensive rewrites that does not in any diminish the
+I may do extensive rewrites that does not in any way diminish the
 appreciation I feel or indeed [express.] [3]
 
 For a much nicer history, please [write good commit messages][4].
