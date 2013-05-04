@@ -97,7 +97,7 @@ I know I really should.
   [1]: http://github.com/rebar/rebar
        "Rebar - A build tool for Erlang"
   [2]: http://github.com/JanHenryNystrom/jhn_stdlib/issues
-       "meck issues"
+       "jhn_stdlib issues"
   [3]: http://github.com/JanHenryNystrom/jhn_stdlib/blob/master/THANKS
        "thanks"
   [4]: http://github.com/erlang/otp/wiki/Writing-good-commit-messages
