@@ -277,13 +277,13 @@ tcp_to_data(HostName, Port, Timeout, OptionsIn) ->
 -spec tcp_socket_to_data(inet:socket()) -> data(binary()).
 %%--------------------------------------------------------------------
 tcp_socket_to_data(Socket) ->
-    Promise = fun(eol) -> tcp:close(Socket), eol;
+    Promise = fun(eol) -> gen_tcp:close(Socket), eol;
                  (Timeout) ->
                       case gen_tcp:recv(Socket, 0, Timeout) of
                           {ok, Packet} -> Packet;
                           {error, timeout} -> <<>>;
                           {error, closed} -> eol;
-                          {error, _} -> tcp:close(Socket), eol
+                          {error, _} -> gen_tcp:close(Socket), eol
                       end
               end,
     create(Promise).
