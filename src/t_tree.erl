@@ -79,7 +79,7 @@
 %%--------------------------------------------------------------------
 %% Function: new() -> Tree.
 %% @doc
-%%   Creates an empty T-tree.
+%%   Creates an empty T-tree. The call new() is equivalent to new([]).
 %% @end
 %%--------------------------------------------------------------------
 -spec new() -> t_tree().
@@ -100,9 +100,9 @@ new(Opts) ->
     #t_tree{min = Min, max = Max}.
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: is_t_tree(X) -> Boolean().
 %% @doc
-%%   
+%%   Returns true if X is a t_tree, false otherwise.
 %% @end
 %%--------------------------------------------------------------------
 -spec is_t_tree(_) -> boolean().
@@ -111,9 +111,9 @@ is_t_tree(#t_tree{}) -> true;
 is_t_tree(_) -> false.
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: is_empty(Tree) -> Boolean.
 %% @doc
-%%   
+%%   Returns true if the Tree is empty, false otherwise.
 %% @end
 %%--------------------------------------------------------------------
 -spec is_empty(_) -> boolean().
@@ -122,9 +122,11 @@ is_empty(#t_tree{root = nil}) -> true;
 is_empty(_) -> false.
 
 %%--------------------------------------------------------------------
-%% Function: add(Index, Values, Tree) -> Tree.
+%% Function: add(Index, Value, Tree) -> Tree.
 %% @doc
-%%   
+%%   The Value is saved under the Index in the Tree, if that index is
+%%   present the value associated with the index is replaced by Value.
+%%   add(Index, Value, Tree) is equivalent to add(Index, Value, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec add(index(), value(), t_tree()) -> t_tree().
@@ -134,7 +136,10 @@ add(Index, Value, Tree) -> add(Index, Value, Tree, nocheck).
 %%--------------------------------------------------------------------
 %% Function: add(Index, Values, Tree, Flag) -> Tree.
 %% @doc
-%%   
+%%   The Value is saved under the Index in the Tree, the Flag determines
+%%   what should happen if that index already has a value associated with
+%%   in the Tree. If the flag is check an exception is generated and
+%%   if nocheck the value is replaced.
 %% @end
 %%--------------------------------------------------------------------
 -spec add(index(), value(), t_tree(), flag()) -> t_tree().
@@ -183,9 +188,11 @@ add(Index, Value, Node=#node{size = Size, occupants = Os}, Tree, Flag) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: add(Index, Values, Tree) -> Tree.
+%% Function: adds(Pairs, Tree) -> Tree.
 %% @doc
-%%   
+%%   For each {Index, Value} pair in Pairs the value is stored under the
+%%   index in the Tree. The adds(Pairs, Tree) call is equivalent to
+%%   adds(Pairs, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec adds([{index(), value()}], t_tree()) -> t_tree().
@@ -193,9 +200,13 @@ add(Index, Value, Node=#node{size = Size, occupants = Os}, Tree, Flag) ->
 adds(Pairs, Tree) -> adds(Pairs, Tree, nocheck).
 
 %%--------------------------------------------------------------------
-%% Function: add(Index, Values, Tree, Flag) -> Tree.
+%% Function: adds(Pairs, Tree, Flag) -> Tree.
 %% @doc
-%%   
+%%   For each {Index, Value} pair in Pairs the value is stored under the
+%%   index in the Tree. If an index already has a value associated with
+%%   in the Tree the flag determines what happens. If the flag is check
+%%   an exception is generated if a index has a value associated with it,
+%%   if the flag is nocheck the values will be replaced.
 %% @end
 %%--------------------------------------------------------------------
 -spec adds([{index(), value()}], t_tree(), flag()) -> t_tree().
@@ -211,7 +222,9 @@ adds(Pairs, Tree, Flag) ->
 %%--------------------------------------------------------------------
 %% Function: delete(Index, Tree) -> Tree.
 %% @doc
-%%   
+%%   If a value is associated the Index the Tree returned has that
+%%   association removed. The call delete(Index, Tree) is equivalent
+%%   to delete(Index, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec delete(index(), t_tree()) -> t_tree().
@@ -221,7 +234,11 @@ delete(Index, Tree) -> delete(Index, Tree, nocheck).
 %%--------------------------------------------------------------------
 %% Function: delete(Index, Tree, Flag) -> Tree.
 %% @doc
-%%   
+%%   If a value is associated the Index the Tree returned has that
+%%   association removed. If there is no value associated with the Index
+%%   in the Tree the flag determines what happens. If the flag is check
+%%   an exception is generated if no association exists, if the flag
+%%   is nocheck the unchanged tree is returned.
 %% @end
 %%--------------------------------------------------------------------
 -spec delete(index(), t_tree(), flag()) -> t_tree().
@@ -267,9 +284,11 @@ delete1(Index, Node, Tree = #t_tree{min = Min}, Flag) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: delete(Index, Tree) -> Tree.
+%% Function: deletes(Indces, Tree) -> Tree.
 %% @doc
-%%   
+%%  A tree that has all the associations for the indices removed.
+%%  The call deletes(Indces, Tree) is equivalent to
+%%  deletes(Indces, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec deletes([index()], t_tree()) -> t_tree().
@@ -279,7 +298,11 @@ deletes(Indices, Tree) -> deletes(Indices, Tree, nocheck).
 %%--------------------------------------------------------------------
 %% Function: delete(Index, Tree, Flag) -> Tree.
 %% @doc
-%%   
+%%   A tree that has all the associations for the indices removed.
+%%   If there is no value associated with any of the Indices
+%%   in the Tree, the flag determines what happens. If the flag is check
+%%   an exception is generated if, if the flag is nocheck a tree
+%%   is returned with the other associations removed.
 %% @end
 %%--------------------------------------------------------------------
 -spec deletes([index()], t_tree(), flag()) -> t_tree().
@@ -293,9 +316,10 @@ deletes(Indices, Tree = #t_tree{root = Root}, Flag) ->
                                      Indices)}).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: member(Index, Tree) -> Boolean.
 %% @doc
-%%   
+%%   Returns true if there is a value associated with Index in the tree,
+%%   otherwise false.
 %% @end
 %%--------------------------------------------------------------------
 -spec member(index(), t_tree()) -> boolean().
@@ -311,9 +335,11 @@ member1(Index, #node{occupants = Occupants}) ->
     inner_member(Index, Occupants).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: find(Index, Tree) -> Value.
 %% @doc
-%%   
+%%   Returns the value associated with Index in the Tree or undefined
+%%   if no such association exists. The call find(Index, Tree) is
+%%   equivalent to find(Index, Tree, undefined).
 %% @end
 %%--------------------------------------------------------------------
 -spec find(index(), t_tree()) -> value() | undefined.
@@ -321,9 +347,10 @@ member1(Index, #node{occupants = Occupants}) ->
 find(Index, Tree) -> find(Index, Tree, undefined).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: find(Index, Tree, Default) -> Value.
 %% @doc
-%%   
+%%   Returns the value associated with Index in the Tree or Default
+%%   if no such association exists. 
 %% @end
 %%--------------------------------------------------------------------
 -spec find(index(), t_tree(), default()) -> value() | default().
@@ -342,9 +369,12 @@ find1(Index, #node{occupants = Occupants}, Default) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: least_upper_bound(Index, Tree) -> Value.
 %% @doc
-%%   
+%%   Returns the value of the smallest index that is greater or equal to
+%%   to Index that has a value associated with it, or undefined if no
+%%   such index exists. The call least_upper_bound(Index, Tree) is
+%%   equivalent to least_upper_bound(Index, Tree, undefined).
 %% @end
 %%--------------------------------------------------------------------
 -spec least_upper_bound(index(), t_tree()) -> value() | undefined.
@@ -353,9 +383,11 @@ least_upper_bound(Index, Tree) ->
     least_upper_bound(Index, Tree, undefined).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: least_upper_bound(Index, Tree, Default) -> Value.
 %% @doc
-%%   
+%%   Returns the value of the smallest index that is greater or equal to
+%%   to Index that has a value associated with it, or Default if no
+%%   such index exists.
 %% @end
 %%--------------------------------------------------------------------
 -spec least_upper_bound(index(), t_tree(), default()) -> value() | default().
@@ -384,9 +416,12 @@ least_upper_bound1(Index, #node{occupants = Occupants}, Default) ->
 
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: greatest_lower_bound(Index, Tree) -> Value.
 %% @doc
-%%   
+%%   Returns the value of the largest index that is less or equal to
+%%   to Index that has a value associated with it, or undefined if no
+%%   such index exists. The call greatest_lower_bound(Index, Tree) is
+%%   equivalent to greatest_lower_bound(Index, Tree, undefined).
 %% @end
 %%--------------------------------------------------------------------
 -spec greatest_lower_bound(index(), t_tree()) -> value() | undefined.
@@ -395,9 +430,11 @@ greatest_lower_bound(Index, Tree) ->
     greatest_lower_bound(Index, Tree, undefined).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: greatest_lower_bound(Index, Tree, Default) -> Value.
 %% @doc
-%%   
+%%   Returns the value of the largest index that is less or equal to
+%%   to Index that has a value associated with it, or Default if no
+%%   such index exists.
 %% @end
 %%--------------------------------------------------------------------
 -spec greatest_lower_bound(index(), t_tree(), default()) -> value() | default().
@@ -426,9 +463,11 @@ greatest_lower_bound1(Index, #node{occupants = Occupants}, Default) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: first(Tree) -> Value.
 %% @doc
-%%   
+%%   Returns the value of the smallest index in the Tree or undefined
+%%   if the tree is empty. The call first(Tree) if equivalent to
+%%   first(Tree, undefined).
 %% @end
 %%--------------------------------------------------------------------
 -spec first(t_tree()) -> value() | undefined.
@@ -436,9 +475,10 @@ greatest_lower_bound1(Index, #node{occupants = Occupants}, Default) ->
 first(Tree) -> first(Tree, undefined).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: first(Tree, Default) -> Value.
 %% @doc
-%%   
+%%   Returns the value of the smallest index in the Tree or Default
+%%   if the tree is empty.
 %% @end
 %%--------------------------------------------------------------------
 -spec first(t_tree(), default()) -> value() | default().
@@ -450,9 +490,11 @@ first1(#node{left = nil, occupants = [{_, Value} | _]}) -> Value;
 first1(#node{left = Left}) -> first1(Left).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: last(Tree) -> Value.
 %% @doc
-%%   
+%%   Returns the value of the largest index in the Tree or undefined
+%%   if the tree is empty. The call last(Tree) if equivalent to
+%%   last(Tree, undefined).
 %% @end
 %%--------------------------------------------------------------------
 -spec last(t_tree()) -> value() | undefined.
@@ -460,9 +502,10 @@ first1(#node{left = Left}) -> first1(Left).
 last(Tree) -> last(Tree, undefined).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: last(Tree, Default) -> Value.
 %% @doc
-%%   
+%%   Returns the value of the largest index in the Tree or Default
+%%   if the tree is empty.
 %% @end
 %%--------------------------------------------------------------------
 -spec last(t_tree(), default()) -> value() | default().
@@ -479,7 +522,7 @@ last1(#node{right = Right}) ->
 %%--------------------------------------------------------------------
 %% Function: indices(Tree) -> Indices.
 %% @doc
-%%   Returns all the indices.
+%%   Returns all the indices in ascending order.
 %% @end
 %%--------------------------------------------------------------------
 -spec indices(t_tree()) -> [index()].
@@ -496,7 +539,7 @@ indices(#node{left = Left, right = Right, occupants = Os}, Acc) ->
 %%--------------------------------------------------------------------
 %% Function: values(Tree) -> Values.
 %% @doc
-%%   Returns all the values.
+%%   Returns all the values in ascending order of their indeces.
 %% @end
 %%--------------------------------------------------------------------
 -spec values(t_tree()) -> [index()].
@@ -511,9 +554,12 @@ values(#node{left = Left, right = Right, occupants = Os}, Acc) ->
                        Os)).
 
 %%--------------------------------------------------------------------
-%% Function: replace(Index, Values, Tree) -> Tree.
+%% Function: replace(Index, Value, Tree) -> Tree.
 %% @doc
-%%   
+%%   Replaces any existing value associated with Index in the tree,
+%%   otherwise adds a association for the value with the Index.
+%%   The call replace(Index, Value, Tree) is equivalent to
+%%   replace(Index, Value, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec replace(index(), value(), t_tree()) -> t_tree().
@@ -523,7 +569,9 @@ replace(Index, Value, Tree) -> replace(Index, Value, Tree, nocheck).
 %%--------------------------------------------------------------------
 %% Function: replace(Index, Values, Tree, Flag) -> Tree.
 %% @doc
-%%   
+%%   Replaces any existing value associated with Index in the tree,
+%%   otherwise the flag determines what happens. If the flag is check
+%%   an exception is generated, otherwise the value is added.
 %% @end
 %%--------------------------------------------------------------------
 -spec replace(index(), value(), t_tree(), flag()) -> t_tree().
