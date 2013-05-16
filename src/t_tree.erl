@@ -257,7 +257,7 @@ delete1(Index, Node=#node{lub=LUB, right=Right}, Tree,Flag) when Index > LUB ->
 delete1(Index, Node, Tree = #t_tree{min = Min}, Flag) ->
     #node{size = Size, occupants = Os, left = Left, right = Right} = Node,
     case {inner_member(Index, Os), Flag, Min} of
-        {false, true, _} -> erlang:error(badarg, [Index]);
+        {false, check, _} -> erlang:error(badarg, [Index]);
         {false, _, _} -> Node;
         {_, _, Size} when Left /= nil->
             {H = {Index1, _}, Left1} = steal(lub, Left, Tree),
@@ -350,7 +350,7 @@ find(Index, Tree) -> find(Index, Tree, undefined).
 %% Function: find(Index, Tree, Default) -> Value.
 %% @doc
 %%   Returns the value associated with Index in the Tree or Default
-%%   if no such association exists. 
+%%   if no such association exists.
 %% @end
 %%--------------------------------------------------------------------
 -spec find(index(), t_tree(), default()) -> value() | default().
@@ -408,12 +408,8 @@ least_upper_bound1(Index, Node = #node{glb = GLB, left = Left}, _)
 least_upper_bound1(Index, #node{lub = LUB, right = Right}, Default)
   when Index > LUB ->
     least_upper_bound1(Index, Right, Default);
-least_upper_bound1(Index, #node{occupants = Occupants}, Default) ->
-    case inner_least_upper_bound(Index, Occupants) of
-        false -> Default;
-        {_, Value} -> Value
-    end.
-
+least_upper_bound1(Index, #node{occupants = Occupants}, _) ->
+    inner_least_upper_bound(Index, Occupants).
 
 %%--------------------------------------------------------------------
 %% Function: greatest_lower_bound(Index, Tree) -> Value.
@@ -456,11 +452,8 @@ greatest_lower_bound1(Index, Node = #node{lub = LUB, right = Right}, _)
         Value ->
             Value
     end;
-greatest_lower_bound1(Index, #node{occupants = Occupants}, Default) ->
-    case inner_greatest_lower_bound(Index, Occupants) of
-        false -> Default;
-        {_, Value} -> Value
-    end.
+greatest_lower_bound1(Index, #node{occupants = Occupants}, _) ->
+    inner_greatest_lower_bound(Index, Occupants).
 
 %%--------------------------------------------------------------------
 %% Function: first(Tree) -> Value.
@@ -624,7 +617,7 @@ inner_least_upper_bound(Index, [{Index1, _} | T]) when Index > Index1 ->
 inner_least_upper_bound(_, [{_, Value} | _]) ->
     Value.
 
-inner_greatest_lower_bound(Index, [_, H = {Index1, _}|T]) when Index > Index1 ->
+inner_greatest_lower_bound(Index, [_, H = {Index1,_}|T]) when Index >= Index1 ->
     inner_greatest_lower_bound(Index, [H | T]);
 inner_greatest_lower_bound(_, [{_, Value} | _]) ->
     Value.
