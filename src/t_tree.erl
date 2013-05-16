@@ -31,15 +31,15 @@
 %% Library functions
 -export([new/0, new/1,
          is_t_tree/1, is_empty/1,
-         add/3, add/4,
-         delete/2, delete/3,
-         find/2, find/3,
+         add/3, add/4, adds/2, adds/3,
+         delete/2, delete/3, deletes/2, deletes/3,
+         member/2, find/2, find/3,
          least_upper_bound/2, least_upper_bound/3,
          greatest_lower_bound/2, greatest_lower_bound/3,
          first/1, first/2,
          last/1, last/2,
          indices/1, values/1,
-         member/2, replace/3, replace/4
+         replace/3, replace/4
         ]).
 
 %% Records
@@ -51,9 +51,12 @@
                right     = nil :: t_node(),
                occupants = []  :: [{index(), value()}]}).
 
--record(t_tree, {min  = 5   :: pos_integer(),
-               max  = 8   :: pos_integer(),
-               root = nil :: t_node()}).
+-record(t_tree, {min        :: pos_integer(),
+                 max        :: pos_integer(),
+                 root = nil :: t_node()}).
+
+-record(opts, {min = 5 :: pos_integer(),
+               max = 8 :: pos_integer()}).
 
 %% Types
 -opaque t_tree()   :: #t_tree{}.
@@ -62,7 +65,7 @@
 -type   value()    :: _.
 -type   default()  :: _.
 -type   flag()     :: check | nocheck.
--type   opt()      :: flag() | _.
+-type   opt()      :: {min, pos_integer()} | {max, pos_integer()}.
 
 %% Exported Types
 -export_type([t_tree/0]).
@@ -74,9 +77,9 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: new() -> Tree.
 %% @doc
-%%   
+%%   Creates an empty T-tree.
 %% @end
 %%--------------------------------------------------------------------
 -spec new() -> t_tree().
@@ -84,14 +87,17 @@
 new() -> new([]).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: new(Options) -> Tree.
 %% @doc
-%%   
+%%   Creates an empty T-tree with min and max internal size according
+%%   to the options.
 %% @end
 %%--------------------------------------------------------------------
 -spec new([opt()]) -> t_tree().
 %%--------------------------------------------------------------------
-new(Opts) -> #t_tree{}.
+new(Opts) ->
+    #opts{min = Min, max = Max} = parse_opts(Opts, #opts{}),
+    #t_tree{min = Min, max = Max}.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -177,6 +183,32 @@ add(Index, Value, Node=#node{size = Size, occupants = Os}, Tree, Flag) ->
     end.
 
 %%--------------------------------------------------------------------
+%% Function: add(Index, Values, Tree) -> Tree.
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec adds([{index(), value()}], t_tree()) -> t_tree().
+%%--------------------------------------------------------------------
+adds(Pairs, Tree) -> adds(Pairs, Tree, nocheck).
+
+%%--------------------------------------------------------------------
+%% Function: add(Index, Values, Tree, Flag) -> Tree.
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec adds([{index(), value()}], t_tree(), flag()) -> t_tree().
+%%--------------------------------------------------------------------
+adds(Pairs, Tree, Flag) ->
+    balance(
+      lists:foldr(fun({Index, Value}, Acc = #t_tree{root = Root}) ->
+                          Acc#t_tree{root = add(Index, Value, Root, Acc, Flag)}
+                  end,
+                  Tree,
+                  Pairs)).
+
+%%--------------------------------------------------------------------
 %% Function: delete(Index, Tree) -> Tree.
 %% @doc
 %%   
@@ -233,6 +265,50 @@ delete1(Index, Node, Tree = #t_tree{min = Min}, Flag) ->
                             Node#node{size = Size - 1,
                                       occupants = inner_delete(Index, Os)})
     end.
+
+%%--------------------------------------------------------------------
+%% Function: delete(Index, Tree) -> Tree.
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec deletes([index()], t_tree()) -> t_tree().
+%%--------------------------------------------------------------------
+deletes(Indices, Tree) -> deletes(Indices, Tree, nocheck).
+
+%%--------------------------------------------------------------------
+%% Function: delete(Index, Tree, Flag) -> Tree.
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec deletes([index()], t_tree(), flag()) -> t_tree().
+%%--------------------------------------------------------------------
+deletes(Indices, Tree = #t_tree{root = Root}, Flag) ->
+    balance(
+      Tree#t_tree{root = lists:foldr(fun(Index, Node) ->
+                                             delete1(Index, Node, Tree, Flag)
+                                     end,
+                                     Root,
+                                     Indices)}).
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec member(index(), t_tree()) -> boolean().
+%%--------------------------------------------------------------------
+member(Index, #t_tree{root = Root}) -> member1(Index, Root).
+
+member1(_, nil) -> false;
+member1(Index, #node{glb = GLB, left = Left}) when Index < GLB ->
+    member1(Index, Left);
+member1(Index, #node{lub = LUB, right = Right}) when Index > LUB ->
+    member1(Index, Right);
+member1(Index, #node{occupants = Occupants}) ->
+    inner_member(Index, Occupants).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -435,24 +511,6 @@ values(#node{left = Left, right = Right, occupants = Os}, Acc) ->
                        Os)).
 
 %%--------------------------------------------------------------------
-%% Function: 
-%% @doc
-%%   
-%% @end
-%%--------------------------------------------------------------------
--spec member(index(), t_tree()) -> boolean().
-%%--------------------------------------------------------------------
-member(Index, #t_tree{root = Root}) -> member1(Index, Root).
-
-member1(_, nil) -> false;
-member1(Index, #node{glb = GLB, left = Left}) when Index < GLB ->
-    member1(Index, Left);
-member1(Index, #node{lub = LUB, right = Right}) when Index > LUB ->
-    member1(Index, Right);
-member1(Index, #node{occupants = Occupants}) ->
-    inner_member(Index, Occupants).
-
-%%--------------------------------------------------------------------
 %% Function: replace(Index, Values, Tree) -> Tree.
 %% @doc
 %%   
@@ -488,6 +546,17 @@ replace1(Index, Value, Node = #node{occupants = Os}) ->
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
+
+parse_opts(Opts, Rec) ->
+    case lists:foldl(fun parse_opt/2, Rec, Opts) of
+        Rec1 = #opts{min = Min, max = Max} when Min < Max ->
+            Rec1;
+        _ ->
+            erlang:error(badarg, [Opts])
+    end.
+
+parse_opt({min, Min}, Opts) -> Opts#opts{min = Min};
+parse_opt({max, Max}, Opts) -> Opts#opts{max = Max}.
 
 inner_member(Index, Occupants) -> lists:keymember(Index, 1, Occupants).
 

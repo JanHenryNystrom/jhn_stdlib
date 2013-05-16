@@ -49,8 +49,44 @@
 %% new/0
 %%--------------------------------------------------------------------
 new_0_test_() ->
-    [?_test(t_tree:is_t_tree(t_tree:new()))
+    [{"Create", [?_test(?assert(t_tree:is_t_tree(t_tree:new())))]}
     ].
+
+%%--------------------------------------------------------------------
+%% new/1
+%%--------------------------------------------------------------------
+new_1_test_() ->
+    [{"Empty", [?_test(?assert(t_tree:is_t_tree(t_tree:new([]))))]},
+     {"Min", [?_test(?assert(t_tree:is_t_tree(t_tree:new([{min, 6}]))))]},
+     {"Max", [?_test(?assert(t_tree:is_t_tree(t_tree:new([{max, 12}]))))]},
+     {"Min Max",
+      [?_test(?assert(t_tree:is_t_tree(t_tree:new([{min, 10}, {max, 11}]))))]},
+     {"Broken",
+      [?_test(?assertError(badarg, t_tree:new([{min, 5}, {max, 5}]))),
+       ?_test(?assertError(badarg, t_tree:new([{max, 5}]))),
+       ?_test(?assertError(badarg, t_tree:new([{min, 12}])))
+      ]}
+    ].
+
+%%--------------------------------------------------------------------
+%% is_t_tree/1
+%%--------------------------------------------------------------------
+is_t_tree_1_test_() ->
+    [{"Empty", [?_test(?assertEqual(true, t_tree:is_t_tree(t_tree:new([]))))]},
+     {"Not", [?_test(?assertEqual(false, t_tree:is_t_tree({foo, bar})))]}
+    ].
+
+%%--------------------------------------------------------------------
+%% is_empty/1
+%%--------------------------------------------------------------------
+is_empty_1_test_() ->
+    [{"Empty", [?_test(?assertEqual(true, t_tree:is_empty(t_tree:new([]))))]},
+     {"Not",
+      [?_test(
+          ?assertEqual(false,
+                       t_tree:is_empty(t_tree:add(1, 1, t_tree:new([])))))]}
+    ].
+
 
 %%--------------------------------------------------------------------
 %% add/3
@@ -58,20 +94,13 @@ new_0_test_() ->
 add_3_test_() ->
     [{"Add",
       [?_test(
-          t_tree:is_t_tree(
-            lists:foldl(fun(X, Acc) ->
-                                t_tree:add(X, integer_to_list(X), Acc)
-                       end,
-                        t_tree:new(),
-                        Seq))) || Seq <- ?SEUQENCES]},
-     {"dummy",
-      [?_test(begin
-                  dbg:tracer(),
-                  dbg:p(all, c),
-                  dbg:tpl(t_tree, is_t_tree, []),
-                  true
-              end)]
-      },
+          ?assert(
+             t_tree:is_t_tree(
+               lists:foldl(fun(X, Acc) ->
+                                   t_tree:add(X, integer_to_list(X), Acc)
+                           end,
+                           t_tree:new(),
+                           Seq)))) || Seq <- ?SEUQENCES]},
      {"Add/Delete",
       [?_test(
           ?assert(
@@ -96,6 +125,34 @@ add_3_test_() ->
                            end,
                            t_tree:new(),
                            Seq)))) || Seq <- ?SEUQENCES]}
+    ].
+
+%%--------------------------------------------------------------------
+%% add/4
+%%--------------------------------------------------------------------
+add_4_test_() ->
+    [{"Add Check success",
+      [?_test(
+          ?assert(
+             t_tree:is_t_tree(
+               lists:foldl(fun(X, Acc) ->
+                                   t_tree:add(X, integer_to_list(X), Acc, check)
+                           end,
+                           t_tree:new(),
+                           Seq)))) || Seq <- ?SEUQENCES]},
+     {"Add Check fail",
+      [?_test(
+          begin
+              Tree = lists:foldl(fun(X, Acc) ->
+                                         t_tree:add(X,
+                                                    integer_to_list(X),
+                                                    Acc,
+                                                    check)
+                                 end,
+                                 t_tree:new(),
+                                 Seq),
+              [?assertError(badarg, t_tree:add(X, 1, Tree, check)) || X <- Seq]
+          end) || Seq <- ?SEUQENCES]}
     ].
 
 %% ===================================================================
