@@ -546,6 +546,78 @@ last_2_test_() ->
       [?_test(?assertEqual(none, t_tree:last(t_tree:new(), none)))]}
     ].
 
+%%--------------------------------------------------------------------
+%% replace/3
+%%--------------------------------------------------------------------
+replace_3_test_() ->
+    [{"Replace existing",
+      [?_test([?assertEqual(
+                  X + 1,
+                  t_tree:find(X,
+                              t_tree:replace(
+                                X,
+                                X + 1,
+                                t_tree:adds([{Y, integer_to_list(Y)}
+                                             || Y <- Seq],
+                                            t_tree:new()))))
+               || X <- Seq])
+       || Seq <- ?SEUQENCES]},
+     {"Replace not existing",
+      [?_test([?assertEqual(
+                  X,
+                  t_tree:find(X + 1000,
+                              t_tree:replace(
+                                X + 1000,
+                                X,
+                                t_tree:adds([{Y, integer_to_list(Y)}
+                                             || Y <- Seq],
+                                            t_tree:new()))))
+               || X <- Seq])
+       || Seq <- ?SEUQENCES]}
+    ].
+
+%%--------------------------------------------------------------------
+%% replace/4
+%%--------------------------------------------------------------------
+replace_4_test_() ->
+    [{"Replace existing sucess",
+      [?_test([?assertEqual(
+                  X + 1,
+                  t_tree:find(X,
+                              t_tree:replace(
+                                X,
+                                X + 1,
+                                t_tree:adds([{Y, integer_to_list(Y)}
+                                             || Y <- Seq],
+                                            t_tree:new()),
+                                check)))
+               || X <- Seq])
+       || Seq <- ?SEUQENCES]},
+     {"Replace not existing fail",
+      [?_test([?assertError(badarg,
+                              t_tree:replace(
+                                X + 1000,
+                                X,
+                                t_tree:adds([{Y, integer_to_list(Y)}
+                                             || Y <- Seq],
+                                            t_tree:new()),
+                                check))
+               || X <- Seq])
+       || Seq <- ?SEUQENCES]},
+     {"Replace not existing fail inner",
+      [?_test([?assertError(badarg,
+                              t_tree:replace(
+                                X,
+                                X,
+                                t_tree:adds([{Y, integer_to_list(Y)}
+                                             || Y <- lists:delete(X, Seq)],
+                                            t_tree:new()),
+                                check))
+               || X <- Seq])
+       || Seq <- ?SEUQENCES]}
+     ].
+
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================

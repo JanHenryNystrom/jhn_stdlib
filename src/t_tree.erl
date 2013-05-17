@@ -575,9 +575,9 @@ replace(Index, Value, Tree = #t_tree{root = Root}, _) ->
 
 replace1(Index, _, nil) -> erlang:error(badarg, [Index]);
 replace1(Index, Value, Node = #node{glb = GLB, left = Left}) when Index < GLB ->
-    Node = #node{left = replace1(Index, Value, Left)};
+    Node#node{left = replace1(Index, Value, Left)};
 replace1(Index, Value, Node = #node{lub = LUB, right=Right}) when Index > LUB ->
-    Node = #node{right = replace1(Index, Value, Right)};
+    Node#node{right = replace1(Index, Value, Right)};
 replace1(Index, Value, Node = #node{occupants = Os}) ->
     case inner_member(Index, Os) of
         false -> erlang:error(badarg, [Index]);
@@ -590,10 +590,8 @@ replace1(Index, Value, Node = #node{occupants = Os}) ->
 
 parse_opts(Opts, Rec) ->
     case lists:foldl(fun parse_opt/2, Rec, Opts) of
-        Rec1 = #opts{min = Min, max = Max} when Min < Max ->
-            Rec1;
-        _ ->
-            erlang:error(badarg, [Opts])
+        Rec1 = #opts{min = Min, max = Max} when Min < Max -> Rec1;
+        _ -> erlang:error(badarg, [Opts])
     end.
 
 parse_opt({min, Min}, Opts) -> Opts#opts{min = Min};
@@ -608,7 +606,7 @@ inner_add(Index, Value, T) ->
     [{Index, Value} | T].
 
 inner_replace(Index, Value, Occupants) ->
-    lists:keyreplace(Index, 1, Occupants, {Index, Value}).
+    lists:keystore(Index, 1, Occupants, {Index, Value}).
 
 inner_delete(Index, Occupants) -> lists:keydelete(Index, 1, Occupants).
 
