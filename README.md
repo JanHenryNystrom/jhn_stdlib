@@ -29,7 +29,7 @@ Features/Modules
     * blist -- drop in replacement for the lists module in stdlib
     * bstring -- drop in replacement for the string module in stdlib
   * Encoding/decoding JSON/Erlang
-    * json -- based on rfc4627
+    * json -- based on [rfc4627][6]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
   * Encoding/decoding MessagePack/Erlang
@@ -102,3 +102,5 @@ I know I really should.
        "Erlang/OTP commit messages"
   [5]: http://en.wikipedia.org/wiki/Software_release_life_cycle
        "Software release life cycle"
+  [6]: http://www.ietf.org/rfc/rfc4627.txt
+       "The application/json Media Type for JavaScript Object Notation (JSON)"
