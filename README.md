@@ -32,7 +32,7 @@ Features/Modules
     * json -- based on [rfc4627][6]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
-  * Encoding/decoding MessagePack/Erlang
+  * Encoding/decoding [MessagePack][7]/Erlang
     * msgpack
   * Property lists
     * plist
@@ -104,3 +104,5 @@ I know I really should.
        "Software release life cycle"
   [6]: http://www.ietf.org/rfc/rfc4627.txt
        "The application/json Media Type for JavaScript Object Notation (JSON)"
+  [7]: http://msgpack.org/
+       "An efficient binary serialization format"
