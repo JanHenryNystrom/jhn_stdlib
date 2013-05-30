@@ -28,14 +28,13 @@ Features/Modules
   * String Processing Functions for binary encoded strings
     * blist -- drop in replacement for the lists module in stdlib
     * bstring -- drop in replacement for the string module in stdlib
-  * Encoding/decoding JSON/Erlang
-    * json -- based on [rfc4627][6]
+  * Protocols
+    * Encoding/decoding JSON/Erlang  -- json [rfc4627][6]
+    * MessagePack -- msgpack [MessagePack][7]/Erlang
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
-  * Encoding/decoding [MessagePack][7]/Erlang
-    * msgpack
-  * Property lists
-    * plist
+  * Data structures
+    * Property lists -- plist
 
 <a name='build'>
 
