@@ -28,12 +28,8 @@ rebar:
 compile: rebar
 	@$(REBAR) -j compile
 
-xref: rebar
+xref: compile
 	@$(REBAR) -jk skip_deps=true xref
-
-check: rebar
-	@$(REBAR) -j check-plt
-	@$(REBAR) -j dialyze
 
 test: all
 	@rm -rf .eunit
