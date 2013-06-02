@@ -15,9 +15,12 @@
 #==============================================================================
 
 REBAR="./rebar"
-.PHONY: all compile check test doc clean get-deps update-deps real-clean
+.PHONY: default build xref compile test doc clean dist-clean real-clean \
+        get-deps update-deps
 
-all: get-deps compile
+default: build
+
+build: get-deps compile
 
 rebar:
 	mkdir -p deps
@@ -31,7 +34,7 @@ compile: rebar
 xref: compile
 	@$(REBAR) -jk skip_deps=true xref
 
-test: all
+test: build
 	@rm -rf .eunit
 	@$(REBAR) -jk eunit skip_deps=true
 
@@ -56,6 +59,6 @@ update-deps: rebar
 	@$(REBAR) -j update-deps
 	@$(REBAR) -j get-deps
 
-update-rebar: all
-	(cd deps/rebar && ./bootstrap)
+update-rebar: rebar
+	(cd deps/rebar && git pull && ./bootstrap)
 	cp deps/rebar/rebar ${REBAR}
