@@ -51,6 +51,8 @@ dist-clean: clean
 real-clean: dist-clean
 	rm -f rebar
 	rm -fr deps
+	rm -fr ebin
+
 get-deps: rebar
 	@$(REBAR) -j get-deps
 
