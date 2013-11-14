@@ -624,20 +624,18 @@ to_integer(Binary) when is_binary(Binary) -> to_integer(Binary, "");
 to_integer(_) -> {error, not_a_binary}.
 
 to_integer(<<>>, Acc) ->
-    case catch list_to_integer(lists:reverse(Acc)) of
-        Integer when is_integer(Integer) ->
-            {Integer, <<>>};
-        _ ->
-            {error, no_integer}
+    try list_to_integer(lists:reverse(Acc)) of
+        Integer when is_integer(Integer) -> {Integer, <<>>};
+        _ -> {error, no_integer}
+    catch _:_ -> {error, no_integer}
     end;
 to_integer(<<H, T/binary>>, Acc) when ?IS_DIGIT(H) ->
     to_integer(T, [H | Acc]);
 to_integer(Binary, Acc) ->
-    case catch list_to_integer(lists:reverse(Acc)) of
-        Integer when is_integer(Integer) ->
-            {Integer, Binary};
-        _ ->
-            {error, no_integer}
+    try list_to_integer(lists:reverse(Acc)) of
+        Integer when is_integer(Integer) -> {Integer, Binary};
+        _ -> {error, no_integer}
+    catch _:_ -> {error, no_integer}
     end.
 
 %%--------------------------------------------------------------------
