@@ -61,6 +61,9 @@
          decode/1, decode/2
         ]).
 
+%% Exported types
+-export_type([json/0]).
+
 %% Types
 -type plain_format() :: latin1 | encoding().
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
