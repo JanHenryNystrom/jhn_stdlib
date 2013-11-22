@@ -23,3 +23,24 @@ ifeq (${BASE},)
 endif
 
 include deps/makefiles/erlang.mk
+
+.PHONY: dialyzer clean-plt
+
+DIALYZER_OPTIONS = -Werror_handling -Wrace_conditions
+
+PLTS_DIR = ./.plts
+
+OTP_PLT = $(PLTS_DIR)/otp.plt
+
+OTP_DEPS = crypto compiler
+
+$(OTP_PLT):
+	$(VERBOSE) mkdir -p $(PLTS_DIR)
+	dialyzer --build_plt --apps erts kernel stdlib $(OTP_DEPS) \
+                 --output_plt $(OTP_PLT)
+
+dialyzer: compile $(OTP_PLT)
+	dialyzer $(DIALYZER_OPTIONS) ebin/*.beam --plt $(OTP_PLT)
+
+clean-plt:
+	-rm -fr $(PLTS_DIR)

@@ -625,17 +625,17 @@ to_integer(_) -> {error, not_a_binary}.
 
 to_integer(<<>>, Acc) ->
     try list_to_integer(lists:reverse(Acc)) of
-        Integer when is_integer(Integer) -> {Integer, <<>>};
-        _ -> {error, no_integer}
-    catch _:_ -> {error, no_integer}
+        Integer -> {Integer, <<>>}
+    catch
+        _:_ -> {error, no_integer}
     end;
 to_integer(<<H, T/binary>>, Acc) when ?IS_DIGIT(H) ->
     to_integer(T, [H | Acc]);
 to_integer(Binary, Acc) ->
     try list_to_integer(lists:reverse(Acc)) of
-        Integer when is_integer(Integer) -> {Integer, Binary};
-        _ -> {error, no_integer}
-    catch _:_ -> {error, no_integer}
+        Integer  -> {Integer, Binary}
+    catch
+        _:_ -> {error, no_integer}
     end.
 
 %%--------------------------------------------------------------------
