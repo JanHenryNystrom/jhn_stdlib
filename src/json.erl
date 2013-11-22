@@ -158,7 +158,7 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 %%     {encoding, Encoding} -> what encoding is used for the resulting JSON
 %% @end
 %%--------------------------------------------------------------------
--spec encode(json(), [opt()]) -> iolist() | binary().
+-spec encode(json(), [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
 encode(Term, Opts = #opts{}) ->
     encode_text(Term, Opts);
@@ -205,7 +205,7 @@ decode(Binary) -> Line = ?LINE,
 %%     characters up to 0xFF.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), [opt()]) -> json().
+-spec decode(binary(), [opt()] | #opts{}) -> json().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) ->
     {Binary, Encoding} = encoding(Binary, Opts),
@@ -697,6 +697,9 @@ encode_char(C, #opts{encoding = {utf32, big}}) -> <<0:24, C>>.
 char_code(Text, Coding, Coding) -> Text;
 char_code(Text, From, To) -> unicode:characters_to_binary(Text, From, To).
 
+%%--------------------------------------------------------------------
+-spec badarg(#opts{}) -> no_return().
+%%--------------------------------------------------------------------
 badarg(#opts{orig_call = {Funcion, Args, Line}}) ->
     Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line}]} |
              lists:dropwhile(fun(T) -> element(1, T) == ?MODULE end,
