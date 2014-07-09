@@ -143,7 +143,7 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 %%     iolist -> a iolist is returned
 %% @end
 %%--------------------------------------------------------------------
--spec encode(msgpack(), [opt()]) -> iolist() | binary().
+-spec encode(msgpack(), [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
 encode(Term, Opts = #opts{}) ->
     encode_msgpack(Term, Opts);
@@ -176,7 +176,7 @@ decode(Binary) -> Line = ?LINE,
 %%     number_types -> decode into {Type, Value} for number types.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), [opt()]) -> msgpack().
+-spec decode(binary(), [opt()] | #opts{}) -> msgpack().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) ->
     {Decoded, _Rest} = decode_msgpack(Binary, Opts),
@@ -394,6 +394,9 @@ parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(number_types, Opts) -> Opts#opts{number_types = true};
 parse_opt(_, Rec) -> badarg(Rec).
 
+%%--------------------------------------------------------------------
+-spec badarg(#opts{}) -> no_return().
+%%--------------------------------------------------------------------
 badarg(#opts{orig_call = {Funcion, Args, Line}}) ->
     Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line}]} |
              lists:dropwhile(fun(T) -> element(1, T) == ?MODULE end,
