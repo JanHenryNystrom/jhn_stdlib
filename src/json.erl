@@ -717,7 +717,7 @@ char_code(Text, utf8, {utf32, big}) ->
 char_code(Text, utf8, {utf32, little}) ->
     << <<C/utf32-little>> || <<C/utf8>> <= Text >>;
 char_code(Text, {utf16, big}, latin1) ->
-    << <<C>> || <<Z, C>> <= Text, enforce_zero(Z) >>;
+    utf16_big_to_latin1(Text, <<>>);
 char_code(Text, {utf16, big}, utf8) ->
     << <<C/utf8>> || <<C/utf16-big>> <= Text >>;
 char_code(Text, {utf16, big}, {utf16, little}) ->
@@ -727,7 +727,7 @@ char_code(Text, {utf16, big}, {utf32, big}) ->
 char_code(Text, {utf16, big}, {utf32, little}) ->
     << <<C/utf32-little>> || <<C/utf16-big>> <= Text >>;
 char_code(Text, {utf16, little}, latin1) ->
-    << <<C>> || <<C, Z>> <= Text, enforce_zero(Z) >>;
+    utf16_little_to_latin1(Text, <<>>);
 char_code(Text, {utf16, little}, utf8) ->
     << <<C/utf8>> || <<C/utf16-little>> <= Text >>;
 char_code(Text, {utf16, little}, {utf16, big}) ->
@@ -737,7 +737,7 @@ char_code(Text, {utf16, little}, {utf32, big}) ->
 char_code(Text, {utf16, little}, {utf32, little}) ->
     << <<C/utf32-little>> || <<C/utf16-little>> <= Text >>;
 char_code(Text, {utf32, big}, latin1) ->
-    << <<C>> || <<Z1, Z2, Z3, C>> <= Text, enforce_zeros(Z1, Z2, Z3) >>;
+    utf32_big_to_latin1(Text, <<>>);
 char_code(Text, {utf32, big}, utf8) ->
     << <<C/utf8>> || <<C/utf32-big>> <= Text >>;
 char_code(Text, {utf32, big}, {utf16, big}) ->
@@ -747,7 +747,7 @@ char_code(Text, {utf32, big}, {utf16, little}) ->
 char_code(Text, {utf32, big}, {utf32, little}) ->
     << <<C/utf32-little>> || <<C/utf32-big>> <= Text >>;
 char_code(Text, {utf32, little}, latin1) ->
-    << <<C>> || <<C, Z1, Z2, Z3>> <= Text, enforce_zeros(Z1, Z2, Z3) >>;
+    utf32_little_to_latin1(Text, <<>>);
 char_code(Text, {utf32, little}, utf8) ->
     << <<C/utf8>> || <<C/utf32-little>> <= Text >>;
 char_code(Text, {utf32, little}, {utf16, big}) ->
@@ -757,9 +757,21 @@ char_code(Text, {utf32, little}, {utf16, little}) ->
 char_code(Text, {utf32, little}, {utf32, big}) ->
     << <<C/utf32-big>> || <<C/utf32-little>> <= Text >>.
 
-enforce_zero(0) -> true.
+utf16_big_to_latin1(<<>>, Acc) -> Acc;
+utf16_big_to_latin1(<<0, C, T/binary>>, Acc) ->
+    utf16_big_to_latin1(T, <<Acc/binary, C>>).
 
-enforce_zeros(0, 0, 0) -> true.
+utf16_little_to_latin1(<<>>, Acc) -> Acc;
+utf16_little_to_latin1(<<C, 0, T/binary>>, Acc) ->
+    utf16_little_to_latin1(T, <<Acc/binary, C>>).
+
+utf32_big_to_latin1(<<>>, Acc) -> Acc;
+utf32_big_to_latin1(<<0, 0, 0, C, T/binary>>, Acc) ->
+    utf32_big_to_latin1(T, <<Acc/binary, C>>).
+
+utf32_little_to_latin1(<<>>, Acc) -> Acc;
+utf32_little_to_latin1(<<C, 0, 0, 0, T/binary>>, Acc) ->
+    utf32_little_to_latin1(T, <<Acc/binary, C>>).
 
 %%--------------------------------------------------------------------
 -spec badarg(#opts{}) -> no_return().
