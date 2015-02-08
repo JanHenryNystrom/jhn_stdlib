@@ -49,9 +49,9 @@
 %% Types
 -type opt() :: {atom_strings, boolean()} | binary | iolist.
 
--type msgpack()       :: map() | msgpack_array() | integers() | floats() |
-                         boolean() | raw().
--type map()           :: {[msgpack()]}.
+-type msgpack()       :: msgpack_map() | msgpack_array() |
+                         integers() | floats() | boolean() | raw().
+-type msgpack_map()   :: {[msgpack()]}.
 -type msgpack_array() :: [msgpack()].
 -type integers()      :: integer() | {integer_type(), integer()}.
 -type integer_type()  :: pos_fixnum | neg_fixnum |
