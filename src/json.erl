@@ -23,7 +23,7 @@
 %%%  text  : object | array
 %%%  object: {[{string, value}*]}
 %%%  array : [value*]
-%%%  string: atom | <<octet*>>
+%%%  string: atom | `<<octet*>>'
 %%%  number: integer | float
 %%%  true  : 'true'
 %%%  false : 'false'

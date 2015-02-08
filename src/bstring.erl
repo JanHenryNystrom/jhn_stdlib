@@ -449,7 +449,7 @@ strip(<<H, T/binary>>, _, _, Char, Acc, RightSofar) ->
 %% Function: left(String, Number) -> Left
 %% @doc
 %%   Returns the String with the length adjusted in accordance with Number.
-%%   The left margin is fixed. If the length(String) < Number,
+%%   The left margin is fixed. If the `length(String) < Number',
 %%   String is padded with blanks.
 %% @end
 %%--------------------------------------------------------------------
@@ -461,7 +461,7 @@ left(Binary, Length) -> left(Binary, Length, $\s).
 %% Function: left(String, Number, Character) -> Left
 %% @doc
 %%   Returns the String with the length adjusted in accordance with Number.
-%%   The left margin is fixed. If the length(String) < Number,
+%%   The left margin is fixed. If the `length(String) < Number',
 %%   String is padded with Characters.
 %% @end
 %%--------------------------------------------------------------------
@@ -483,7 +483,7 @@ left(Binary, Length, Char)
 %% Function: right(String, Number) -> Right.
 %% @doc
 %%   Returns the String with the length adjusted in accordance with Number.
-%%   The right margin is fixed. If the length of (String) < Number,
+%%   The right margin is fixed. If the length of `(String) < Number',
 %%   String is padded with blanks.
 %% @end
 %%--------------------------------------------------------------------
@@ -495,7 +495,7 @@ right(Binary, Length) -> right(Binary, Length, $\s).
 %% Function: right(String, Number, Character) -> Right
 %% @doc
 %%   Returns the String with the length adjusted in accordance with Number.
-%%   The right margin is fixed. If the length of (String) < Number,
+%%   The right margin is fixed. If the length of `(String) < Number',
 %%   String is padded with Characters.
 %% @end
 %%--------------------------------------------------------------------
