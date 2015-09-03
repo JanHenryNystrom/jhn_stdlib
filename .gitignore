@@ -5,5 +5,8 @@ ebin
 *.beam
 *.plt
 rebar
-doc
 .rebar
+doc/*.html
+doc/*.png
+doc/*.css
+doc/edoc-info
