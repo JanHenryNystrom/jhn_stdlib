@@ -1,3 +1,6 @@
 language: erlang
 otp_release:
-  - R16B
+  - R16B3-1
+  - 17.5
+  - 18.0
+sudo: false
