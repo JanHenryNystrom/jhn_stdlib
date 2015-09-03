@@ -6,3 +6,4 @@ ebin
 *.plt
 rebar
 doc
+.rebar

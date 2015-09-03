@@ -757,7 +757,7 @@ pointer_gen(['-' | T], Opts = #opts{pointer = Encoding}, Acc) ->
     pointer_gen(T, Opts, [H1 | Acc]);
 pointer_gen([H | T], Opts, Acc) when is_atom(H) ->
     #opts{atom_strings = true, plain_string = Plain} = Opts,
-    H1 = iolist_to_binary(char_code(atom_to_list(H), latin1, Plain)),
+    H1 = iolist_to_binary(char_code(atom_to_binary(H, utf8), utf8, Plain)),
     pointer_gen([H1 | T], Opts, Acc);
 pointer_gen([H | T], Opts, Acc) when is_integer(H), H >= 0 ->
     H1 = encode_chars([$/ | integer_to_list(H)],
@@ -881,7 +881,6 @@ encode_char(C, #opts{encoding = {utf32, little}}) -> <<C, 0:24>>;
 encode_char(C, #opts{encoding = {utf32, big}}) -> <<0:24, C>>.
 
 char_code(Text, Coding, Coding) -> Text;
-
 char_code(Text, latin1, utf8) ->
     << <<C/utf8>> || <<C>> <= Text >>;
 char_code(Text, latin1, {utf16, big}) ->
