@@ -36,9 +36,8 @@
 %%%
 %%%  Strings can be represented by atoms when generating JSON, but will not
 %%%  not be generated when converting JSON to erlang. It can be specified
-%%%  what encoding is used for the strings with latin1 being the default
-%%%  when encoding but UTF-8 when decoding since otherwise it might fail.
-%%%  All atoms are assumed to be in latin1 and can not be specified.
+%%%  what encoding is used for the strings with UTF-8 being the default.
+%%%  All atoms are assumed to be in UTF-8 and can not be specified.
 %%%
 %%%  The encoding of a JSON text is determined and can be specified when
 %%%  convering from Erlang terms with the deafult being UTF-8.
@@ -46,7 +45,6 @@
 %%%  When converting Erlang terms to JSON iolists are generated but
 %%%  it can generate a binary if so instructed.
 %%%
-%%%  latin1 is defined in ISO-8859-1.
 %%%  UTF formats are defined in Unicode 5.0 (ISBN 0-321-48091-0).
 %%%
 %%% Only supports R17 and later.
@@ -72,13 +70,12 @@
 -export_type([json/0]).
 
 %% Types
--type plain_format() :: latin1 | encoding().
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
 -type opt()          :: {atom_strings, boolean()} | {atom_keys, boolean()} |
                         {existing_atom_keys, boolean()} |
                         bom |binary | iolist | decode |
-                        {pointer, plain_format()} |
-                        {plain_string, plain_format()} | {encoding, encoding()}.
+                        {pointer, encoding()} |
+                        {plain_string, encoding()} | {encoding, encoding()}.
 
 -type json()        :: json_text().
 -type json_text()   :: json_object() | json_array().
@@ -93,14 +90,14 @@
 
 %% Records
 -record(opts, {encoding = utf8 :: encoding(),
-               plain_string = latin1 :: plain_format(),
+               plain_string = utf8 :: encoding(),
                atom_strings = true :: boolean(),
                atom_keys = false :: boolean(),
                existing_atom_keys = false :: boolean(),
                bom = false :: boolean(),
                return_type = iolist :: iolist | binary,
                decode = true :: boolean(),
-               pointer = utf8 :: plain_format(),
+               pointer = utf8 :: encoding(),
                orig_call
               }).
 
@@ -135,8 +132,7 @@
         [utf8, {utf16, little}, {utf16, big}, {utf32, little}, {utf32, big}]).
 
 %% Supported string formats
--define(PLAINFORMATS,
-        [latin1 | ?ENCODINGS]).
+-define(PLAINFORMATS, ?ENCODINGS).
 
 %% Defines for float_to_binary/1.
 -define(BIG_POW, (1 bsl 52)).
@@ -369,8 +365,7 @@ encode_value(_, Opts) ->
     badarg(Opts).
 
 encode_string(Atom, Opts = #opts{atom_strings = true}) when is_atom(Atom) ->
-    encode_string(list_to_binary(atom_to_list(Atom)),
-                  Opts#opts{plain_string = latin1});
+    encode_string(atom_to_binary(Atom, utf8), Opts#opts{plain_string = utf8});
 encode_string(String, Opts) when is_binary(String) ->
     #opts{plain_string = Plain, encoding = Encoding} = Opts,
     [encode_char($", Opts),
@@ -386,7 +381,6 @@ escape(String, Plain, Opts) ->
     end.
 
 escapeable(<<>>, _) -> false;
-escapeable(<<H, _/binary>>, latin1) when ?ESCAPE(H) -> true;
 escapeable(<<H, _/binary>>, utf8) when ?ESCAPE(H) -> true;
 escapeable(<<H, 0, _/binary>>, {utf16, little}) when ?ESCAPE(H) -> true;
 escapeable(<<0, H, _/binary>>, {utf16, big}) when ?ESCAPE(H) -> true;
@@ -397,8 +391,6 @@ escapeable(<<_:32, T/binary>>, Plain = {utf32,_}) -> escapeable(T, Plain);
 escapeable(<<_, T/binary>>, Plain) -> escapeable(T, Plain).
 
 escape(<<>>, Acc, _, _) -> Acc;
-escape(<<H, T/binary>>, Acc, latin1, Opts) when ?ESCAPE(H) ->
-    escape(T, <<Acc/binary, (escape_char(H))/binary>>, latin1, Opts);
 escape(<<H, T/binary>>, Acc, utf8, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H))/binary>>, utf8, Opts);
 escape(<<H, 0, T/binary>>, Acc, Plain = {utf16, little},Opts) when ?ESCAPE(H) ->
@@ -595,13 +587,13 @@ decode_object(Binary, Expect, Acc, Opts) ->
         {{$}, T}, {false, _}} -> {{lists:reverse(Acc)}, T};
         {{$,, T}, {false, true}} -> decode_object(T, {true, false}, Acc, Opts);
         {{$", T}, {_, false}} when Opts#opts.atom_keys ->
-            {Name, T1} = decode_string(T, Opts#opts{plain_string = latin1}),
-            Name1 = binary_to_atom(Name, latin1),
+            {Name, T1} = decode_string(T, Opts#opts{plain_string = utf8}),
+            Name1 = binary_to_atom(Name, utf8),
             {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
             decode_object(T2, {false, true}, [{Name1, Value} | Acc], Opts);
         {{$", T}, {_, false}} when Opts#opts.existing_atom_keys ->
-            {Name, T1} = decode_string(T, Opts#opts{plain_string = latin1}),
-            Name1 = binary_to_existing_atom(Name, latin1),
+            {Name, T1} = decode_string(T, Opts#opts{plain_string = utf8}),
+            Name1 = binary_to_existing_atom(Name, utf8),
             {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
             decode_object(T2, {false, true}, [{Name1, Value} | Acc], Opts);
         {{$", T}, {_, false}} ->
@@ -778,7 +770,6 @@ pointer_escape(String, Plain) ->
     end.
 
 pointer_escapeable(<<>>, _) -> false;
-pointer_escapeable(<<H, _/binary>>, latin1) when ?POINTER_ESCAPE(H) -> true;
 pointer_escapeable(<<H, _/binary>>, utf8) when ?POINTER_ESCAPE(H) -> true;
 pointer_escapeable(<<H, 0, _/binary>>, {utf16, little})
   when ?POINTER_ESCAPE(H) -> true;
@@ -796,9 +787,6 @@ pointer_escapeable(<<_, T/binary>>, Plain) ->
     pointer_escapeable(T, Plain).
 
 pointer_escape(<<>>, Acc, _) -> Acc;
-pointer_escape(<<H, T/binary>>, Acc, latin1)
-  when ?POINTER_ESCAPE(H) ->
-    pointer_escape(T, <<Acc/binary, (pointer_escape_char(H))/binary>>, latin1);
 pointer_escape(<<H, T/binary>>, Acc, utf8)
   when ?POINTER_ESCAPE(H) ->
     pointer_escape(T, <<Acc/binary, (pointer_escape_char(H))/binary>>, utf8);
@@ -886,18 +874,6 @@ encode_char(C, #opts{encoding = {utf32, little}}) -> <<C, 0:24>>;
 encode_char(C, #opts{encoding = {utf32, big}}) -> <<0:24, C>>.
 
 char_code(Text, Coding, Coding) -> Text;
-char_code(Text, latin1, utf8) ->
-    << <<C/utf8>> || <<C>> <= Text >>;
-char_code(Text, latin1, {utf16, big}) ->
-    << <<0, C>> || <<C>> <= Text >>;
-char_code(Text, latin1, {utf16, little}) ->
-    << <<C, 0>> || <<C>> <= Text >>;
-char_code(Text, latin1, {utf32, big}) ->
-    << <<0, 0, 0, C>> || <<C>> <= Text >>;
-char_code(Text, latin1, {utf32, little}) ->
-    << <<C, 0, 0, 0>> || <<C>> <= Text >>;
-char_code(Text, utf8, latin1) ->
-    << <<C>> || <<C/utf8>> <= Text >>;
 char_code(Text, utf8, {utf16, big}) ->
     << <<C/utf16-big>> || <<C/utf8>> <= Text >>;
 char_code(Text, utf8, {utf16, little}) ->
@@ -906,8 +882,6 @@ char_code(Text, utf8, {utf32, big}) ->
     << <<C/utf32-big>> || <<C/utf8>> <= Text >>;
 char_code(Text, utf8, {utf32, little}) ->
     << <<C/utf32-little>> || <<C/utf8>> <= Text >>;
-char_code(Text, {utf16, big}, latin1) ->
-    utf16_big_to_latin1(Text, <<>>);
 char_code(Text, {utf16, big}, utf8) ->
     << <<C/utf8>> || <<C/utf16-big>> <= Text >>;
 char_code(Text, {utf16, big}, {utf16, little}) ->
@@ -916,8 +890,6 @@ char_code(Text, {utf16, big}, {utf32, big}) ->
     << <<C/utf32-big>> || <<C/utf16-big>> <= Text >>;
 char_code(Text, {utf16, big}, {utf32, little}) ->
     << <<C/utf32-little>> || <<C/utf16-big>> <= Text >>;
-char_code(Text, {utf16, little}, latin1) ->
-    utf16_little_to_latin1(Text, <<>>);
 char_code(Text, {utf16, little}, utf8) ->
     << <<C/utf8>> || <<C/utf16-little>> <= Text >>;
 char_code(Text, {utf16, little}, {utf16, big}) ->
@@ -926,8 +898,6 @@ char_code(Text, {utf16, little}, {utf32, big}) ->
     << <<C/utf32-big>> || <<C/utf16-little>> <= Text >>;
 char_code(Text, {utf16, little}, {utf32, little}) ->
     << <<C/utf32-little>> || <<C/utf16-little>> <= Text >>;
-char_code(Text, {utf32, big}, latin1) ->
-    utf32_big_to_latin1(Text, <<>>);
 char_code(Text, {utf32, big}, utf8) ->
     << <<C/utf8>> || <<C/utf32-big>> <= Text >>;
 char_code(Text, {utf32, big}, {utf16, big}) ->
@@ -936,8 +906,6 @@ char_code(Text, {utf32, big}, {utf16, little}) ->
     << <<C/utf16-little>> || <<C/utf32-big>> <= Text >>;
 char_code(Text, {utf32, big}, {utf32, little}) ->
     << <<C/utf32-little>> || <<C/utf32-big>> <= Text >>;
-char_code(Text, {utf32, little}, latin1) ->
-    utf32_little_to_latin1(Text, <<>>);
 char_code(Text, {utf32, little}, utf8) ->
     << <<C/utf8>> || <<C/utf32-little>> <= Text >>;
 char_code(Text, {utf32, little}, {utf16, big}) ->
@@ -946,22 +914,6 @@ char_code(Text, {utf32, little}, {utf16, little}) ->
     << <<C/utf16-little>> || <<C/utf32-little>> <= Text >>;
 char_code(Text, {utf32, little}, {utf32, big}) ->
     << <<C/utf32-big>> || <<C/utf32-little>> <= Text >>.
-
-utf16_big_to_latin1(<<>>, Acc) -> Acc;
-utf16_big_to_latin1(<<0, C, T/binary>>, Acc) ->
-    utf16_big_to_latin1(T, <<Acc/binary, C>>).
-
-utf16_little_to_latin1(<<>>, Acc) -> Acc;
-utf16_little_to_latin1(<<C, 0, T/binary>>, Acc) ->
-    utf16_little_to_latin1(T, <<Acc/binary, C>>).
-
-utf32_big_to_latin1(<<>>, Acc) -> Acc;
-utf32_big_to_latin1(<<0, 0, 0, C, T/binary>>, Acc) ->
-    utf32_big_to_latin1(T, <<Acc/binary, C>>).
-
-utf32_little_to_latin1(<<>>, Acc) -> Acc;
-utf32_little_to_latin1(<<C, 0, 0, 0, T/binary>>, Acc) ->
-    utf32_little_to_latin1(T, <<Acc/binary, C>>).
 
 %%--------------------------------------------------------------------
 -spec badarg(#opts{}) -> no_return().
