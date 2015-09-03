@@ -466,7 +466,7 @@ pointer_2_encodings_plains_test_() ->
      ?_test(?assertEqual(utf(Pointer, utf8, Encoding),
                          iolist_to_binary(
                            json:pointer(pointer_term_to_encoding(Term, Plain),
-                                        [{pointer, Encoding},
+                                        [{encoding, Encoding},
                                          {plain_string, Plain}])))) ||
         {Pointer, Term} <- ?POINTERS,
         Plain <- ?PLAIN_FORMATS,

@@ -67,14 +67,13 @@
         ]).
 
 %% Exported types
--export_type([json/0]).
+-export_type([json/0, pointer/0]).
 
 %% Types
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
 -type opt()          :: {atom_strings, boolean()} | {atom_keys, boolean()} |
                         {existing_atom_keys, boolean()} |
                         bom |binary | iolist | decode |
-                        {pointer, encoding()} |
                         {plain_string, encoding()} | {encoding, encoding()}.
 
 -type json()        :: json_text().
@@ -86,7 +85,7 @@
                        json_object() | json_array().
 -type json_string() :: atom() | string().
 
--type json_pointer() :: [binary() | atom() | '-' | pos_integer()].
+-type pointer() :: [binary() | atom() | '-' | pos_integer()].
 
 %% Records
 -record(opts, {encoding = utf8 :: encoding(),
@@ -97,7 +96,6 @@
                bom = false :: boolean(),
                return_type = iolist :: iolist | binary,
                decode = true :: boolean(),
-               pointer = utf8 :: encoding(),
                orig_call
               }).
 
@@ -169,8 +167,7 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 %%--------------------------------------------------------------------
 -spec encode(json(), [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
-encode(Term, Opts = #opts{}) ->
-    encode_text(Term, Opts);
+encode(Term, Opts = #opts{}) -> encode_text(Term, Opts);
 encode(Term, Opts) -> Line = ?LINE,
     #opts{return_type = Return, encoding = Encoding, bom = Bom} = ParsedOpts =
         parse_opts(Opts, #opts{orig_call = {encode, [Term, Opts], Line}}),
@@ -232,7 +229,7 @@ decode(Binary, Opts) -> Line = ?LINE,
 %%   Equivalent of pointer(Term, []) -> Pointer.
 %% @end
 %%--------------------------------------------------------------------
--spec pointer(json_pointer()) -> binary().
+-spec pointer(pointer()) -> binary().
 %%--------------------------------------------------------------------
 pointer(Term) -> Line = ?LINE,
     pointer(Term, #opts{orig_call = {pointer, [Term], Line}}).
@@ -246,12 +243,12 @@ pointer(Term) -> Line = ?LINE,
 %%   Options are:
 %%     binary -> a binary is returned
 %%     iolist -> a iolist is returned
-%%     {pointer, Format} -> The UTF encoding of the pointer, default UTF-8
+%%     {encoding, Format} -> The UTF encoding of the pointer, default UTF-8
 %%     {plain_string, Format} -> what format the strings are encoded in
 %%     {atom_strings, Bool}
 %% @end
 %%--------------------------------------------------------------------
--spec pointer(json_pointer(), [opt()]) -> binary().
+-spec pointer(pointer(), [opt()]) -> binary().
 %%--------------------------------------------------------------------
 pointer(Term, Opts = #opts{}) -> pointer_gen(Term, Opts, []);
 pointer(Term, Opts) -> Line = ?LINE,
@@ -286,7 +283,7 @@ select(Pointer, Binary) -> Line = ?LINE,
 %%     {decode, Bool} -> the fragment of the JSON selected(value) is decoded,
 %%                       default true.
 %%     bom -> the binary to decode has a UTF byte order mark
-%%     {pointer, Format} -> The UTF encoding of the pointer
+%%     {encoding, Format} -> The UTF encoding of the pointer
 %%   Options passed to decoding if enabled:
 %%     {plain_string, Format}
 %%     {atom_keys, Bool}
@@ -745,12 +742,12 @@ next(_, Opts) -> badarg(Opts).
 
 pointer_gen([], _, Acc) -> lists:reverse(Acc);
 pointer_gen([H | T], Opts, Acc) when is_binary(H) ->
-    #opts{plain_string = Plain, pointer = Encoding} = Opts,
-    H1 = [encode_char($/, Opts#opts{encoding = Encoding}),
+    #opts{plain_string = Plain, encoding = Encoding} = Opts,
+    H1 = [encode_char($/, Opts),
           char_code(pointer_escape(H, Plain), Plain, Encoding)],
     pointer_gen(T, Opts, [H1 | Acc]);
-pointer_gen(['-' | T], Opts = #opts{pointer = Encoding}, Acc) ->
-    H1 = encode_chars([$/, $-], Opts#opts{encoding = Encoding}),
+pointer_gen(['-' | T], Opts, Acc) ->
+    H1 = encode_chars([$/, $-], Opts),
     pointer_gen(T, Opts, [H1 | Acc]);
 pointer_gen([H | T], Opts, Acc) when is_atom(H) ->
     #opts{atom_strings = true, plain_string = Plain} = Opts,
@@ -758,7 +755,7 @@ pointer_gen([H | T], Opts, Acc) when is_atom(H) ->
     pointer_gen([H1 | T], Opts, Acc);
 pointer_gen([H | T], Opts, Acc) when is_integer(H), H >= 0 ->
     H1 = encode_chars([$/ | integer_to_list(H)],
-                      Opts#opts{encoding = Opts#opts.pointer}),
+                      Opts#opts{encoding = Opts#opts.encoding}),
     pointer_gen(T, Opts, [H1 | Acc]);
 pointer_gen(_, Opts, _) ->
     badarg(Opts).
@@ -851,11 +848,6 @@ parse_opt({plain_string, PlainString}, Opts) ->
 parse_opt({encoding, Encoding} , Opts) ->
     case lists:member(Encoding, ?ENCODINGS) of
         true -> Opts#opts{encoding = Encoding};
-        false -> badarg(Opts)
-    end;
-parse_opt({pointer, Encoding} , Opts) ->
-    case lists:member(Encoding, ?PLAINFORMATS) of
-        true -> Opts#opts{pointer = Encoding};
         false -> badarg(Opts)
     end;
 parse_opt(_, Rec) ->
