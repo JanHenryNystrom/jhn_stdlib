@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -147,8 +147,8 @@
                    ]).
 
 -define(EXISTING_ATOM_KEYS, [{<<"{}">>, {[]}},
-                    {<<"{\"one\":1}">>, {[{one, 1}]}}
-                   ]).
+                             {<<"{\"one\":1}">>, {[{one, 1}]}}
+                            ]).
 
 -define(POINTERS, [{<<"">>, []},
                    {<<"/foo">>, [<<"foo">>]},
@@ -437,7 +437,7 @@ pointer_1_test_() ->
     [
      ?_test(?assertEqual(Pointer, iolist_to_binary(json:pointer(Term)))) ||
         {Pointer, Term} <- ?POINTERS
-     ].
+    ].
 %%--------------------------------------------------------------------
 %% pointer/2
 %%--------------------------------------------------------------------
@@ -445,7 +445,7 @@ pointer_2_test_() ->
     [
      ?_test(?assertEqual(Pointer, iolist_to_binary(json:pointer(Term, [])))) ||
         {Pointer, Term} <- ?POINTERS
-     ].
+    ].
 
 %%--------------------------------------------------------------------
 %% pointer/2 with binary
@@ -456,7 +456,7 @@ pointer_2_binary_test_() ->
         ?assertEqual(Pointer,
                      iolist_to_binary(json:pointer(Term, [binary])))) ||
         {Pointer, Term} <- ?POINTERS
-     ].
+    ].
 
 %%--------------------------------------------------------------------
 %% pointer/2 with different plain and encoding

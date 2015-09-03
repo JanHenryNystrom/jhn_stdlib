@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -16,7 +16,12 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%  A JSON to and from erlang terms library based on rfc4627.
+%%%  A JSON library based on:
+%%%    The JavaScript Object Notation (JSON) Data Interchange Format (rfc7159)
+%%%    JavaScript Object Notation (JSON) Pointer (rfc6901)
+%%%    JavaScript Object Notation (JSON) Patch (rfc6902)
+%%%    JSON Reference (draft-pbryan-zyp-json-ref-03)
+%%%    JSON Schema: core definitions and terminology (draft-zyp-json-schema-04)
 %%%
 %%%  JSON is represented as follows:
 %%%
@@ -44,11 +49,11 @@
 %%%  latin1 is defined in ISO-8859-1.
 %%%  UTF formats are defined in Unicode 5.0 (ISBN 0-321-48091-0).
 %%%
-%%% Only supports R16 and later.
+%%% Only supports R17 and later.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
