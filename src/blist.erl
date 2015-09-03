@@ -25,7 +25,7 @@
 %%%   copies are more suitable apply binary/copy/1 on the result.
 %%%
 %%%   All functions in the stblib lists that would operate on tuples
-%%    operate on equally sized octet blogs binaries.
+%%    operate on equally sized octet blobs binaries.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -1328,7 +1328,7 @@ zip3_1(<<H1, T1/binary>>, <<H2, T2/binary>>, <<H3, T3/binary>>, Acc) ->
 %%   For each pair X, Y of binary octets from the two binarys, the binary
 %%   in the result binary will be Combine(X, Y).
 %%
-%%   zipwith(fun(X, Y) -> <<X, Y>> end, Binary1, Binary2) is equivalent
+%%   `zipwith(fun(X, Y) -> <<X, Y>> end, Binary1, Binary2)' is equivalent
 %%   to zip(Binary1, Binary2).
 %% @end
 %%--------------------------------------------------------------------
@@ -1349,7 +1349,7 @@ zipwith1(Fun, <<H1, T1/binary>>,<<H2, T2/binary>>, Acc) ->
 %%   For each triple X, Y, Z of binary octets from the thre binarys, the binary
 %%   in the result binary will be Combine(X, Y, Z).
 %%
-%%   zipwith(fun(X, Y, Z) -> <<X, Y, Z>> end, Binary1, Binary2, Binary3) is
+%%   `zipwith(fun(X, Y, Z) -> <<X, Y, Z>> end, Binary1, Binary2, Binary3)' is
 %%   equivalent to zip(Binary1, Binary2. Binary3).
 %% @end
 %%--------------------------------------------------------------------

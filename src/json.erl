@@ -23,7 +23,7 @@
 %%%  text  : object | array
 %%%  object: {[{string, value}*]}
 %%%  array : [value*]
-%%%  string: atom | <<octet*>>
+%%%  string: atom | `<<octet*>>'
 %%%  number: integer | float
 %%%  true  : 'true'
 %%%  false : 'false'
@@ -62,6 +62,9 @@
          pointer/1, pointer/2,
          select/2, select/3
         ]).
+
+%% Exported types
+-export_type([json/0]).
 
 %% Types
 -type plain_format() :: latin1 | encoding().
@@ -163,7 +166,7 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 %%     {encoding, Encoding} -> what encoding is used for the resulting JSON
 %% @end
 %%--------------------------------------------------------------------
--spec encode(json(), [opt()]) -> iolist() | binary().
+-spec encode(json(), [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
 encode(Term, Opts = #opts{}) ->
     encode_text(Term, Opts);
@@ -210,7 +213,7 @@ decode(Binary) -> Line = ?LINE,
 %%     characters up to 0xFF.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), [opt()]) -> json().
+-spec decode(binary(), [opt()] | #opts{}) -> json().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) ->
     {Binary, Encoding} = encoding(Binary, Opts),
@@ -878,8 +881,87 @@ encode_char(C, #opts{encoding = {utf32, little}}) -> <<C, 0:24>>;
 encode_char(C, #opts{encoding = {utf32, big}}) -> <<0:24, C>>.
 
 char_code(Text, Coding, Coding) -> Text;
-char_code(Text, From, To) -> unicode:characters_to_binary(Text, From, To).
 
+char_code(Text, latin1, utf8) ->
+    << <<C/utf8>> || <<C>> <= Text >>;
+char_code(Text, latin1, {utf16, big}) ->
+    << <<0, C>> || <<C>> <= Text >>;
+char_code(Text, latin1, {utf16, little}) ->
+    << <<C, 0>> || <<C>> <= Text >>;
+char_code(Text, latin1, {utf32, big}) ->
+    << <<0, 0, 0, C>> || <<C>> <= Text >>;
+char_code(Text, latin1, {utf32, little}) ->
+    << <<C, 0, 0, 0>> || <<C>> <= Text >>;
+char_code(Text, utf8, latin1) ->
+    << <<C>> || <<C/utf8>> <= Text >>;
+char_code(Text, utf8, {utf16, big}) ->
+    << <<C/utf16-big>> || <<C/utf8>> <= Text >>;
+char_code(Text, utf8, {utf16, little}) ->
+    << <<C/utf16-little>> || <<C/utf8>> <= Text >>;
+char_code(Text, utf8, {utf32, big}) ->
+    << <<C/utf32-big>> || <<C/utf8>> <= Text >>;
+char_code(Text, utf8, {utf32, little}) ->
+    << <<C/utf32-little>> || <<C/utf8>> <= Text >>;
+char_code(Text, {utf16, big}, latin1) ->
+    utf16_big_to_latin1(Text, <<>>);
+char_code(Text, {utf16, big}, utf8) ->
+    << <<C/utf8>> || <<C/utf16-big>> <= Text >>;
+char_code(Text, {utf16, big}, {utf16, little}) ->
+    << <<C/utf16-little>> || <<C/utf16-big>> <= Text >>;
+char_code(Text, {utf16, big}, {utf32, big}) ->
+    << <<C/utf32-big>> || <<C/utf16-big>> <= Text >>;
+char_code(Text, {utf16, big}, {utf32, little}) ->
+    << <<C/utf32-little>> || <<C/utf16-big>> <= Text >>;
+char_code(Text, {utf16, little}, latin1) ->
+    utf16_little_to_latin1(Text, <<>>);
+char_code(Text, {utf16, little}, utf8) ->
+    << <<C/utf8>> || <<C/utf16-little>> <= Text >>;
+char_code(Text, {utf16, little}, {utf16, big}) ->
+    << <<C/utf16-big>> || <<C/utf16-little>> <= Text >>;
+char_code(Text, {utf16, little}, {utf32, big}) ->
+    << <<C/utf32-big>> || <<C/utf16-little>> <= Text >>;
+char_code(Text, {utf16, little}, {utf32, little}) ->
+    << <<C/utf32-little>> || <<C/utf16-little>> <= Text >>;
+char_code(Text, {utf32, big}, latin1) ->
+    utf32_big_to_latin1(Text, <<>>);
+char_code(Text, {utf32, big}, utf8) ->
+    << <<C/utf8>> || <<C/utf32-big>> <= Text >>;
+char_code(Text, {utf32, big}, {utf16, big}) ->
+    << <<C/utf16-big>> || <<C/utf32-big>> <= Text >>;
+char_code(Text, {utf32, big}, {utf16, little}) ->
+    << <<C/utf16-little>> || <<C/utf32-big>> <= Text >>;
+char_code(Text, {utf32, big}, {utf32, little}) ->
+    << <<C/utf32-little>> || <<C/utf32-big>> <= Text >>;
+char_code(Text, {utf32, little}, latin1) ->
+    utf32_little_to_latin1(Text, <<>>);
+char_code(Text, {utf32, little}, utf8) ->
+    << <<C/utf8>> || <<C/utf32-little>> <= Text >>;
+char_code(Text, {utf32, little}, {utf16, big}) ->
+    << <<C/utf16-big>> || <<C/utf32-little>> <= Text >>;
+char_code(Text, {utf32, little}, {utf16, little}) ->
+    << <<C/utf16-little>> || <<C/utf32-little>> <= Text >>;
+char_code(Text, {utf32, little}, {utf32, big}) ->
+    << <<C/utf32-big>> || <<C/utf32-little>> <= Text >>.
+
+utf16_big_to_latin1(<<>>, Acc) -> Acc;
+utf16_big_to_latin1(<<0, C, T/binary>>, Acc) ->
+    utf16_big_to_latin1(T, <<Acc/binary, C>>).
+
+utf16_little_to_latin1(<<>>, Acc) -> Acc;
+utf16_little_to_latin1(<<C, 0, T/binary>>, Acc) ->
+    utf16_little_to_latin1(T, <<Acc/binary, C>>).
+
+utf32_big_to_latin1(<<>>, Acc) -> Acc;
+utf32_big_to_latin1(<<0, 0, 0, C, T/binary>>, Acc) ->
+    utf32_big_to_latin1(T, <<Acc/binary, C>>).
+
+utf32_little_to_latin1(<<>>, Acc) -> Acc;
+utf32_little_to_latin1(<<C, 0, 0, 0, T/binary>>, Acc) ->
+    utf32_little_to_latin1(T, <<Acc/binary, C>>).
+
+%%--------------------------------------------------------------------
+-spec badarg(#opts{}) -> no_return().
+%%--------------------------------------------------------------------
 badarg(#opts{orig_call = {Funcion, Args, Line}}) ->
     Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line}]} |
              lists:dropwhile(fun(T) -> element(1, T) == ?MODULE end,
