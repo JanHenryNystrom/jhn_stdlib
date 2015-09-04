@@ -95,6 +95,7 @@
 
 %% Records
 -record(opts, {pointer = false :: boolean(),
+               map = false :: boolean(),
                rfc4627 = false :: boolean(),
                encoding = utf8 :: encoding(),
                plain_string = utf8 :: encoding(),
@@ -173,9 +174,9 @@ encode(Term) ->
 %%   Options are:
 %%     pointer -> the term represents a pointer
 %%     rfc4627 -> compability rfc4627 mode
+%%     map -> maps are allowed as a representation for objects
 %%     binary -> a binary is returned
 %%     iolist -> a iolist is returned
-%%     map -> maps are allowed as a representation for objects
 %%     bom -> a UTF byte order mark is added at the head of the encoding
 %%     {atom_strings, Bool} -> determines if atoms for strings are allowed
 %%     {plain_string, Format} -> what format the strings are encoded in
@@ -300,8 +301,7 @@ eval(Pointer, Binary, Opts = #opts{}) ->
     {Binary, Encoding} = encoding(Binary, Opts),
     eval_text(Pointer, Binary, Opts#opts{encoding = Encoding});
 eval(Pointer, Binary, Opts) -> Line = ?LINE,
-    OptsRec = parse_opts(Opts, #opts{orig_call = {eval, [Binary, Opts], Line},
-                                     plain_string = utf8}),
+    OptsRec = parse_opts(Opts, #opts{orig_call = {eval, [Binary, Opts], Line}}),
     {Binary1, Encoding} = encoding(Binary, OptsRec),
     eval_text(Pointer, Binary1, OptsRec#opts{encoding = Encoding}).
 
@@ -318,6 +318,8 @@ encode_rfc4627_text({Object}, Opts) when is_list(Object) ->
     encode_object(Object, [], Opts);
 encode_rfc4627_text(Array, Opts) when is_list(Array) ->
     [encode_char($[, Opts) | encode_array(Array, [], Opts)];
+encode_rfc4627_text(Object = #{}, Opts = #opts{map = true}) ->
+        encode_object(maps:to_list(Object), [], Opts);
 encode_rfc4627_text(_, Opts) ->
     badarg(Opts).
 
@@ -352,6 +354,8 @@ encode_value(null, Opts) -> encode_chars(<<"null">>, Opts);
 encode_value(String, Opts) when is_atom(String) -> encode_string(String, Opts);
 encode_value({Object}, Opts) when is_list(Object) ->
     encode_object(Object, [], Opts);
+encode_value(Object = #{}, Opts) ->
+    encode_object(maps:to_list(Object), [], Opts);
 encode_value(Array, Opts) when is_list(Array) ->
     [encode_char($[, Opts) | encode_array(Array, [], Opts)];
 encode_value(BinaryString, Opts) when is_binary(BinaryString) ->
@@ -364,7 +368,7 @@ encode_value(_, Opts) ->
     badarg(Opts).
 
 encode_string(Atom, Opts = #opts{atom_strings = true}) when is_atom(Atom) ->
-    encode_string(atom_to_binary(Atom, utf8), Opts#opts{plain_string = utf8});
+    encode_string(atom_to_binary(Atom, utf8), Opts);
 encode_string(String, Opts) when is_binary(String) ->
     #opts{plain_string = Plain, encoding = Encoding} = Opts,
     [encode_char($", Opts),
@@ -588,12 +592,12 @@ decode_object(Binary, Expect, Acc, Opts) ->
         {{$}, T}, {false, _}} -> {{lists:reverse(Acc)}, T};
         {{$,, T}, {false, true}} -> decode_object(T, {true, false}, Acc, Opts);
         {{$", T}, {_, false}} when Opts#opts.atom_keys ->
-            {Name, T1} = decode_string(T, Opts#opts{plain_string = utf8}),
+            {Name, T1} = decode_string(T, Opts),
             Name1 = binary_to_atom(Name, utf8),
             {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
             decode_object(T2, {false, true}, [{Name1, Value} | Acc], Opts);
         {{$", T}, {_, false}} when Opts#opts.existing_atom_keys ->
-            {Name, T1} = decode_string(T, Opts#opts{plain_string = utf8}),
+            {Name, T1} = decode_string(T, Opts),
             Name1 = binary_to_existing_atom(Name, utf8),
             {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
             decode_object(T2, {false, true}, [{Name1, Value} | Acc], Opts);
@@ -835,10 +839,11 @@ eval_text(_, _, _) -> nyi.
 parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
+parse_opt(pointer, Opts) -> Opts#opts{pointer = true};
+parse_opt(rfc4627, Opts) -> Opts#opts{rfc4627 = true};
+parse_opt(map, Opts) -> Opts#opts{map = true};
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
-parse_opt(rfc4627, Opts) -> Opts#opts{rfc4627 = true};
-parse_opt(pointer, Opts) -> Opts#opts{pointer = true};
 parse_opt(bom, Opts) -> Opts#opts{bom = true};
 parse_opt(decode, Opts) -> Opts#opts{decode = false};
 parse_opt({atom_strings, Bool}, Opts) when is_boolean(Bool)->
