@@ -33,7 +33,7 @@
 %%%  value         : true | false | null | object | array | number | string
 %%%
 %%%  object        : {[{string, value}*]} |
-%%%                  map() (map option enabled)
+%%%                  map() (maps option enabled)
 %%%  array         : [value*]
 %%%  string        : atom() | `<<octet*>>'
 %%%  number        : integer() | float()
@@ -95,7 +95,7 @@
 
 %% Records
 -record(opts, {pointer = false :: boolean(),
-               map = false :: boolean(),
+               maps = false :: boolean() | safe,
                rfc4627 = false :: boolean(),
                encoding = utf8 :: encoding(),
                plain_string = utf8 :: encoding(),
@@ -174,7 +174,9 @@ encode(Term) ->
 %%   Options are:
 %%     pointer -> the term represents a pointer
 %%     rfc4627 -> compability rfc4627 mode
-%%     map -> maps are allowed as a representation for objects
+%%     maps -> shorthand for {maps, true}
+%%     {maps, Bool} -> if true maps is a valid representation for objects,
+%%                     default false.
 %%     binary -> a binary is returned
 %%     iolist -> a iolist is returned
 %%     bom -> a UTF byte order mark is added at the head of the encoding
@@ -229,14 +231,19 @@ decode(Binary) ->
 %%   Decode will give an exception if the binary is not well formed JSON.
 %%   Options are:
 %%     rfc4627 -> compability rfc4627 mode
-%%     map -> maps are used as representation for objects, since this causes
-%%            potential compatibility issues it is recomended only in
-%%            combination with schema validation where the schema requires
-%%            unique items
+%%     maps -> shorthand for {maps, true}
+%%     {maps, safe} -> maps are used as representation for objects with unique
+%%                     items
+%%     {maps, Bool} -> if true maps are used as representation for objects,
+%%                     since this causes potential compatibility issues it is
+%%                     recomended only in combination with schema validation
+%%                     where the schema requires unique items, default false.
 %%     bom -> the binary to decode has a UTF byte order mark
 %%     {plain_string, Format} -> what format the strings are encoded in
+%%     atom_keys -> shorthand for {atom_keys, true}
 %%     {atom_keys, Bool} -> if true all object keys are converted to atoms,
 %%                          default is false.
+%%     existing_atom_keys -> shorthand for {existing_atom_keys, true}
 %%     {existing_atom_keys, Bool} -> if true all object keys are converted
 %%                          to atoms, decoding fails if the atom does not
 %%                          already exist, default is false.
@@ -318,7 +325,7 @@ encode_rfc4627_text({Object}, Opts) when is_list(Object) ->
     encode_object(Object, [], Opts);
 encode_rfc4627_text(Array, Opts) when is_list(Array) ->
     [encode_char($[, Opts) | encode_array(Array, [], Opts)];
-encode_rfc4627_text(Object = #{}, Opts = #opts{map = true}) ->
+encode_rfc4627_text(Object = #{}, Opts = #opts{maps = true}) ->
         encode_object(maps:to_list(Object), [], Opts);
 encode_rfc4627_text(_, Opts) ->
     badarg(Opts).
@@ -589,7 +596,14 @@ decode_rfc4627_text(Binary, Opts) ->
 decode_object(Binary, Expect, Acc, Opts) ->
     case {next(Binary, Opts), Expect} of
         {{WS, T}, _} when ?IS_WS(WS) -> decode_object(T, Expect, Acc, Opts);
-        {{$}, T}, {false, _}} -> {{lists:reverse(Acc)}, T};
+        {{$}, T}, {false, _}} when Opts#opts.maps -> {maps:from_list(Acc), T};
+        {{$}, T}, {false, _}} when Opts#opts.maps == safe ->
+            case unique_keys(Acc) of
+                true -> {maps:from_list(Acc), T};
+                false -> {{lists:reverse(Acc)}, T}
+            end;
+        {{$}, T}, {false, _}} ->
+            {{lists:reverse(Acc)}, T};
         {{$,, T}, {false, true}} -> decode_object(T, {true, false}, Acc, Opts);
         {{$", T}, {_, false}} when Opts#opts.atom_keys ->
             {Name, T1} = decode_string(T, Opts),
@@ -608,6 +622,8 @@ decode_object(Binary, Expect, Acc, Opts) ->
         _ ->
             badarg(Opts)
     end.
+
+unique_keys(Members) -> length(Members) == length(lists:ukeysort(1, Members)).
 
 decode_array(Binary, Expect, Acc, Opts) ->
     case {next(Binary, Opts), Expect} of
@@ -841,15 +857,21 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(pointer, Opts) -> Opts#opts{pointer = true};
 parse_opt(rfc4627, Opts) -> Opts#opts{rfc4627 = true};
-parse_opt(map, Opts) -> Opts#opts{map = true};
+parse_opt(maps, Opts) -> Opts#opts{maps = true};
+parse_opt({maps, Bool}, Opts) when is_boolean(Bool) -> Opts#opts{maps = Bool};
+parse_opt({maps, safe}, Opts) -> Opts#opts{maps = safe};
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(bom, Opts) -> Opts#opts{bom = true};
 parse_opt(decode, Opts) -> Opts#opts{decode = false};
 parse_opt({atom_strings, Bool}, Opts) when is_boolean(Bool)->
     Opts#opts{atom_strings = Bool};
+parse_opt(atom_keys, Opts) ->
+    Opts#opts{atom_keys = true};
 parse_opt({atom_keys, Bool}, Opts) when is_boolean(Bool)->
     Opts#opts{atom_keys = Bool};
+parse_opt(existing_atom_keys, Opts)->
+    Opts#opts{existing_atom_keys = true};
 parse_opt({existing_atom_keys, Bool}, Opts) when is_boolean(Bool)->
     Opts#opts{existing_atom_keys = Bool};
 parse_opt({plain_string, PlainString}, Opts) ->
