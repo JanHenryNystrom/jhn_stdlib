@@ -17,22 +17,29 @@
 %%%-------------------------------------------------------------------
 %%% @doc
 %%%  A JSON library based on:
-%%%    The JavaScript Object Notation (JSON) Data Interchange Format (rfc7159)
-%%%    JavaScript Object Notation (JSON) Pointer (rfc6901)
-%%%    JavaScript Object Notation (JSON) Patch (rfc6902)
-%%%    JSON Reference (draft-pbryan-zyp-json-ref-03)
-%%%    JSON Schema: core definitions and terminology (draft-zyp-json-schema-04)
+%%%    The application/json Media Type for JavaScript Object Notation (JSON)
+%%%                                                                     (rfc4627)
+%%%    The JavaScript Object Notation (JSON) Data Interchange Format    (rfc7159)
+%%%    JavaScript Object Notation (JSON) Pointer                        (rfc6901)
+%%%    JavaScript Object Notation (JSON) Patch                          (rfc6902)
+%%%    JSON Reference                              (draft-pbryan-zyp-json-ref-03)
+%%%    JSON Schema: core definitions and terminology   (draft-zyp-json-schema-04)
 %%%
 %%%  JSON is represented as follows:
 %%%
-%%%  text  : object | array
-%%%  object: {[{string, value}*]}
-%%%  array : [value*]
-%%%  string: atom | `<<octet*>>'
-%%%  number: integer | float
-%%%  true  : 'true'
-%%%  false : 'false'
-%%%  null  : 'null'
+%%%  text          : value
+%%%  rfc4627_text  : object | array (rfc4627 compability mode)
+%%%  
+%%%  value         : true | false | null | object | array | number | string
+%%%
+%%%  object        : {[{string, value}*]} |
+%%%                  map() (map option enabled)
+%%%  array         : [value*]
+%%%  string        : atom() | `<<octet*>>'
+%%%  number        : integer() | float()
+%%%  true          : atom(true)
+%%%  false         : atom(false)
+%%%  null          : atom(null)
 %%%
 %%%  Strings can be represented by atoms when generating JSON, but will not
 %%%  not be generated when converting JSON to erlang. It can be specified
@@ -40,7 +47,7 @@
 %%%  All atoms are assumed to be in UTF-8 and can not be specified.
 %%%
 %%%  The encoding of a JSON text is determined and can be specified when
-%%%  convering from Erlang terms with the deafult being UTF-8.
+%%%  converting from Erlang terms with the deafult being UTF-8.
 %%%
 %%%  When converting Erlang terms to JSON iolists are generated but
 %%%  it can generate a binary if so instructed.
@@ -62,8 +69,7 @@
 %% Library functions
 -export([encode/1, encode/2,
          decode/1, decode/2,
-         pointer/1, pointer/2,
-         select/2, select/3
+         eval/2, eval/3
         ]).
 
 %% Exported types
@@ -76,19 +82,21 @@
                         bom |binary | iolist | decode |
                         {plain_string, encoding()} | {encoding, encoding()}.
 
--type json()        :: json_text().
--type json_text()   :: json_object() | json_array().
--type json_object() :: {[{json_string(), json_value()}]}.
--type json_array()  :: [json_value()].
--type json_value()  :: false | true | null |
-                       number() | json_string() |
-                       json_object() | json_array().
--type json_string() :: atom() | string().
+-type json()                :: json_value() | json_rfc4627_text().
+-type json_rfc4627_text()   :: json_object() | json_array().
+-type json_object()         :: {[{json_string(), json_value()}]} | map().
+-type json_array()          :: [json_value()].
+-type json_value()          :: false | true | null |
+                               number() | json_string() |
+                               json_object() | json_array().
+-type json_string()         :: atom() | string().
 
 -type pointer() :: [binary() | atom() | '-' | pos_integer()].
 
 %% Records
--record(opts, {encoding = utf8 :: encoding(),
+-record(opts, {pointer = false :: boolean(),
+               rfc4627 = false :: boolean(),
+               encoding = utf8 :: encoding(),
                plain_string = utf8 :: encoding(),
                atom_strings = true :: boolean(),
                atom_keys = false :: boolean(),
@@ -132,6 +140,11 @@
 %% Supported string formats
 -define(PLAINFORMATS, ?ENCODINGS).
 
+-define(UTF16L, {utf16, little}).
+-define(UTF16B, {utf16, big}).
+-define(UTF32L, {utf32, little}).
+-define(UTF32B, {utf32, big}).
+
 %% Defines for float_to_binary/1.
 -define(BIG_POW, (1 bsl 52)).
 -define(MIN_EXP, (-1074)).
@@ -149,36 +162,50 @@
 %%--------------------------------------------------------------------
 -spec encode(json()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
+encode(Term) ->
+    encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 
 %%--------------------------------------------------------------------
-%% Function: encode(Term, Options) -> JSON.
+%% Function: encode(Term, Options) -> JSON | JSONPointer.
 %% @doc
 %%   Encodes the structured Erlang term as an iolist or binary.
 %%   Encode will give an exception if the erlang term is not well formed.
 %%   Options are:
+%%     pointer -> the term represents a pointer
+%%     rfc4627 -> compability rfc4627 mode
 %%     binary -> a binary is returned
 %%     iolist -> a iolist is returned
+%%     map -> maps are allowed as a representation for objects
 %%     bom -> a UTF byte order mark is added at the head of the encoding
 %%     {atom_strings, Bool} -> determines if atoms for strings are allowed
 %%     {plain_string, Format} -> what format the strings are encoded in
 %%     {encoding, Encoding} -> what encoding is used for the resulting JSON
 %% @end
 %%--------------------------------------------------------------------
--spec encode(json(), [opt()] | #opts{}) -> iolist() | binary().
+-spec encode(json() | pointer(), [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
-encode(Term, Opts = #opts{}) -> encode_text(Term, Opts);
-encode(Term, Opts) -> Line = ?LINE,
-    #opts{return_type = Return, encoding = Encoding, bom = Bom} = ParsedOpts =
+encode(Term, Opts = #opts{}) ->
+    encode_value(Term, Opts);
+encode(Term, Opts) ->
+    Line = ?LINE,
+    ParsedOpts =
+        #opts{pointer = Pointer,
+              rfc4627 = RFC4627,
+              return_type = ReturnType,
+              encoding = Encoding,
+              bom = Bom} =
         parse_opts(Opts, #opts{orig_call = {encode, [Term, Opts], Line}}),
-    case {Bom, Return} of
-        {false, iolist} -> encode_text(Term, ParsedOpts);
-        {false, binary} -> iolist_to_binary(encode_text(Term, ParsedOpts));
-        {true, iolist} ->
-            [unicode:encoding_to_bom(Encoding), encode_text(Term, ParsedOpts)];
+    Encoded = case {Pointer, RFC4627} of
+                  {true, _} -> encode_pointer(Term, ParsedOpts, []);
+                  {false, true} -> encode_rfc4627_text(Term, ParsedOpts);
+                  _ -> encode_value(Term, ParsedOpts)
+              end,
+    case {Bom, ReturnType} of
+        {false, iolist} -> Encoded;
+        {false, binary} -> iolist_to_binary(Encoded);
+        {true, iolist} -> [unicode:encoding_to_bom(Encoding), Encoded];
         {true, binary} ->
-            iolist_to_binary([unicode:encoding_to_bom(Encoding),
-                              encode_text(Term, ParsedOpts)])
+            iolist_to_binary([unicode:encoding_to_bom(Encoding), Encoded])
     end.
 
 %%--------------------------------------------------------------------
@@ -190,9 +217,9 @@ encode(Term, Opts) -> Line = ?LINE,
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> json().
 %%--------------------------------------------------------------------
-decode(Binary) -> Line = ?LINE,
-    decode(Binary, #opts{orig_call = {decode, [Binary], Line},
-                         plain_string = utf8}).
+decode(Binary) ->
+    Line = ?LINE,
+    decode(Binary, #opts{orig_call = {decode, [Binary], Line}}).
 
 %%--------------------------------------------------------------------
 %% Function: decode(JSON, Options) -> Term.
@@ -200,6 +227,11 @@ decode(Binary) -> Line = ?LINE,
 %%   Decodes the binary into a structured Erlang.
 %%   Decode will give an exception if the binary is not well formed JSON.
 %%   Options are:
+%%     rfc4627 -> compability rfc4627 mode
+%%     map -> maps are used as representation for objects, since this causes
+%%            potential compatibility issues it is recomended only in
+%%            combination with schema validation where the schema requires
+%%            unique items
 %%     bom -> the binary to decode has a UTF byte order mark
 %%     {plain_string, Format} -> what format the strings are encoded in
 %%     {atom_keys, Bool} -> if true all object keys are converted to atoms,
@@ -207,73 +239,44 @@ decode(Binary) -> Line = ?LINE,
 %%     {existing_atom_keys, Bool} -> if true all object keys are converted
 %%                          to atoms, decoding fails if the atom does not
 %%                          already exist, default is false.
-%%     For both atom_keys and existing_atom_keys the string has to Unicode
-%%     characters up to 0xFF.
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary(), [opt()] | #opts{}) -> json().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) ->
     {Binary, Encoding} = encoding(Binary, Opts),
-    decode_text(Binary, Opts#opts{encoding = Encoding});
-decode(Binary, Opts) -> Line = ?LINE,
-    OptsRec = parse_opts(Opts, #opts{orig_call = {decode, [Binary, Opts], Line},
-                                     plain_string = utf8}),
-    {Binary1, Encoding} = encoding(Binary, OptsRec),
-    decode_text(Binary1, OptsRec#opts{encoding = Encoding}).
-
-%%--------------------------------------------------------------------
-%% Function: pointer(Term) -> Pointer Pointer.
-%% @doc
-%%   Encodes a term as a JSON pointer.
-%%   Equivalent of pointer(Term, []) -> Pointer.
-%% @end
-%%--------------------------------------------------------------------
--spec pointer(pointer()) -> binary().
-%%--------------------------------------------------------------------
-pointer(Term) -> Line = ?LINE,
-    pointer(Term, #opts{orig_call = {pointer, [Term], Line}}).
-
-%%--------------------------------------------------------------------
-%% Function: pointer(Term, Options) -> Json Pointer
-%% @doc
-%%   Encodes a term as a JSON pointer.
-%%   Pointer will give an exception if the Term is malformed.
-%%   the pointer not well formed json_string.
-%%   Options are:
-%%     binary -> a binary is returned
-%%     iolist -> a iolist is returned
-%%     {encoding, Format} -> The UTF encoding of the pointer, default UTF-8
-%%     {plain_string, Format} -> what format the strings are encoded in
-%%     {atom_strings, Bool}
-%% @end
-%%--------------------------------------------------------------------
--spec pointer(pointer(), [opt()]) -> binary().
-%%--------------------------------------------------------------------
-pointer(Term, Opts = #opts{}) -> pointer_gen(Term, Opts, []);
-pointer(Term, Opts) -> Line = ?LINE,
-    OptsRec = #opts{return_type = Return} =
-        parse_opts(Opts,
-                   #opts{orig_call = {pointer, [Term, Opts], Line}}),
-    case Return of
-        iolist -> pointer_gen(Term, OptsRec, []);
-        binary -> iolist_to_binary(pointer_gen(Term, OptsRec, []))
+    {Value, _} = decode_value(Binary, Opts#opts{encoding = Encoding}),
+    Value;
+decode(Binary, Opts) ->
+    Line = ?LINE,
+    ParsedOpts = #opts{rfc4627 = RFC4627} =
+        parse_opts(Opts, #opts{orig_call = {decode, [Binary, Opts], Line}}),
+    {Binary1, Encoding} = encoding(Binary, ParsedOpts),
+    ParsedOpts1 = ParsedOpts#opts{encoding = Encoding},
+    case RFC4627 of
+        true ->
+            {RFC4627Text, _} = decode_rfc4627_text(Binary1, ParsedOpts1),
+            RFC4627Text;
+        _ ->
+            {Value, _} = decode_value(Binary1, ParsedOpts1),
+            Value
     end.
 
 %%--------------------------------------------------------------------
-%% Function: select(JSONPointer, JSON) -> Term.
+%% Function: eval(JSONPointer, JSON) -> Term.
 %% @doc
 %%   Selects and decodes a Fragment of a JSON document based on the Pointer.
 %%   Equivalent of select(JSONPointer, JSON, []) -> Term.
 %% @end
 %%--------------------------------------------------------------------
--spec select(binary(), binary()) -> json_value() | binary() | {error, _}.
+-spec eval(binary(), binary()) -> json_value() | binary() | {error, _}.
 %%--------------------------------------------------------------------
-select(Pointer, Binary) -> Line = ?LINE,
-    decode(Binary, #opts{orig_call = {select, [Pointer, Binary], Line}}).
+eval(Pointer, Binary) ->
+    Line = ?LINE,
+    eval(Binary, #opts{orig_call = {eval, [Pointer, Binary], Line}}).
 
 %%--------------------------------------------------------------------
-%% Function: select(JSONPointer, JSON, Options) -> Term or Fragment or error.
+%% Function: eval(JSONPointer, JSON, Options) -> Term or Fragment or error.
 %% @doc
 %%   Selects and optionally decodes a Fragment of a JSON document based on
 %%%  the Pointer.
@@ -290,17 +293,17 @@ select(Pointer, Binary) -> Line = ?LINE,
 %%     {existing_atom_keys, Bool}
 %% @end
 %%--------------------------------------------------------------------
--spec select(binary(), binary(), [opt()]) ->
+-spec eval(binary(), binary(), [opt()]) ->
           json_value() | binary() | {error, _}.
 %%--------------------------------------------------------------------
-select(Pointer, Binary, Opts = #opts{}) ->
+eval(Pointer, Binary, Opts = #opts{}) ->
     {Binary, Encoding} = encoding(Binary, Opts),
-    select_text(Pointer, Binary, Opts#opts{encoding = Encoding});
-select(Pointer, Binary, Opts) -> Line = ?LINE,
-    OptsRec = parse_opts(Opts, #opts{orig_call = {select, [Binary, Opts], Line},
+    eval_text(Pointer, Binary, Opts#opts{encoding = Encoding});
+eval(Pointer, Binary, Opts) -> Line = ?LINE,
+    OptsRec = parse_opts(Opts, #opts{orig_call = {eval, [Binary, Opts], Line},
                                      plain_string = utf8}),
     {Binary1, Encoding} = encoding(Binary, OptsRec),
-    select_text(Pointer, Binary1, OptsRec#opts{encoding = Encoding}).
+    eval_text(Pointer, Binary1, OptsRec#opts{encoding = Encoding}).
 
 
 %% ===================================================================
@@ -311,13 +314,12 @@ select(Pointer, Binary, Opts) -> Line = ?LINE,
 %% Encoding
 %% ===================================================================
 
-encode_text({Object}, Opts) when is_list(Object) ->
+encode_rfc4627_text({Object}, Opts) when is_list(Object) ->
     encode_object(Object, [], Opts);
-encode_text(Array, Opts) when is_list(Array) ->
+encode_rfc4627_text(Array, Opts) when is_list(Array) ->
     [encode_char($[, Opts) | encode_array(Array, [], Opts)];
-encode_text(_, Opts) ->
+encode_rfc4627_text(_, Opts) ->
     badarg(Opts).
-
 
 encode_object([], [], Opts) -> encode_chars(<<"{}">>, Opts);
 encode_object([{Name, Value}], Acc, Opts) ->
@@ -379,10 +381,10 @@ escape(String, Plain, Opts) ->
 
 escapeable(<<>>, _) -> false;
 escapeable(<<H, _/binary>>, utf8) when ?ESCAPE(H) -> true;
-escapeable(<<H, 0, _/binary>>, {utf16, little}) when ?ESCAPE(H) -> true;
-escapeable(<<0, H, _/binary>>, {utf16, big}) when ?ESCAPE(H) -> true;
-escapeable(<<H, 0:24, _/binary>>, {utf32, little}) when ?ESCAPE(H) -> true;
-escapeable(<<0:24, H, _/binary>>, {utf32, big}) when ?ESCAPE(H) -> true;
+escapeable(<<H, 0, _/binary>>, ?UTF16L) when ?ESCAPE(H) -> true;
+escapeable(<<0, H, _/binary>>, ?UTF16B) when ?ESCAPE(H) -> true;
+escapeable(<<H, 0:24, _/binary>>, ?UTF32L) when ?ESCAPE(H) -> true;
+escapeable(<<0:24, H, _/binary>>, ?UTF32B) when ?ESCAPE(H) -> true;
 escapeable(<<_:16, T/binary>>, Plain = {utf16, _}) -> escapeable(T, Plain);
 escapeable(<<_:32, T/binary>>, Plain = {utf32,_}) -> escapeable(T, Plain);
 escapeable(<<_, T/binary>>, Plain) -> escapeable(T, Plain).
@@ -390,13 +392,13 @@ escapeable(<<_, T/binary>>, Plain) -> escapeable(T, Plain).
 escape(<<>>, Acc, _, _) -> Acc;
 escape(<<H, T/binary>>, Acc, utf8, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H))/binary>>, utf8, Opts);
-escape(<<H, 0, T/binary>>, Acc, Plain = {utf16, little},Opts) when ?ESCAPE(H) ->
+escape(<<H, 0, T/binary>>, Acc, Plain = ?UTF16L, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
-escape(<<0, H, T/binary>>, Acc, Plain = {utf16, big}, Opts) when ?ESCAPE(H) ->
+escape(<<0, H, T/binary>>, Acc, Plain = ?UTF16B, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
-escape(<<H, 0:24,T/binary>>,Acc,Plain={utf32, little},Opts) when ?ESCAPE(H) ->
+escape(<<H, 0:24,T/binary>>,Acc,Plain=?UTF32L, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
-escape(<<0:24, H, T/binary>>, Acc, Plain={utf32, big},Opts) when ?ESCAPE(H) ->
+escape(<<0:24, H, T/binary>>, Acc, Plain=?UTF32B, Opts) when ?ESCAPE(H) ->
     escape(T, <<Acc/binary, (escape_char(H, Opts))/binary>>, Plain, Opts);
 escape(<<H:16, T/binary>>, Acc, Plain = {utf16, _}, Opts) ->
     escape(T, <<Acc/binary, H:16>>, Plain, Opts);
@@ -564,17 +566,19 @@ encoding(Binary, #opts{bom = true}) ->
     BOM = (8 * Size),
     <<_:BOM, Binary1/binary>> = Binary,
     {Binary1, Encoding};
-encoding(B = <<_, 0, 0, 0, _/binary>>, _) -> {B, {utf32, little}};
-encoding(B = <<0, 0, 0, _/binary>>, _) -> {B, {utf32, big}};
-encoding(B = <<_, 0, _, 0, _/binary>>, _) -> {B, {utf16, little}};
-encoding(B = <<0, _, 0, _/binary>>, _) -> {B, {utf16, big}};
+encoding(B = <<_, 0, 0, 0, _/binary>>, _) -> {B, ?UTF32L};
+encoding(B = <<0, 0, 0, _/binary>>, _) -> {B, ?UTF32B};
+encoding(B = <<_, 0, _, 0, _/binary>>, _) -> {B, ?UTF16L};
+encoding(B = <<0, _, 0, _/binary>>, _) -> {B, ?UTF16B};
+encoding(B = <<_, 0, _/binary>>, _) -> {B, ?UTF16L};
+encoding(B = <<0, _, _/binary>>, _) -> {B, ?UTF16B};
 encoding(B, _) -> {B, utf8}.
 
-decode_text(Binary, Opts) ->
+decode_rfc4627_text(Binary, Opts) ->
     case next(Binary, Opts) of
-        {WS, T} when ?IS_WS(WS)-> decode_text(T, Opts);
-        {${, T} -> {Object, _} = decode_object(T,{false,false},[],Opts), Object;
-        {$[, T}-> {Array, _} = decode_array(T, {false, false}, [], Opts), Array;
+        {WS, T} when ?IS_WS(WS)-> decode_rfc4627_text(T, Opts);
+        {${, T} -> decode_object(T,{false,false},[], Opts);
+        {$[, T}-> decode_array(T, {false, false}, [], Opts);
         _ -> badarg(Opts)
     end.
 
@@ -672,10 +676,10 @@ unescape(Binary, Acc, Opts = #opts{encoding = Encoding}) ->
         {$\\, T} -> unescape_solid(T, Acc, Opts);
         {$", T} -> {lists:reverse(Acc), T};
         {H, T} when Encoding == utf8 -> unescape(T, [H | Acc], Opts);
-        _ when Encoding == {utf16, little}; Encoding == {utf16, big} ->
+        _ when Encoding == ?UTF16L; Encoding == ?UTF16B ->
             <<H:16, T/binary>> = Binary,
             unescape(T, [<<H:16>> | Acc], Opts);
-        _ when Encoding == {utf32, little}; Encoding == {utf32, big} ->
+        _ when Encoding == ?UTF32L; Encoding == ?UTF32B ->
             <<H:32, T/binary>> = Binary,
             unescape(T, [<<H:32>> | Acc], Opts)
     end.
@@ -703,16 +707,16 @@ unescape_solid(Binary, Acc, Opts) ->
 
 unescape_hex(<<A, B, C, D, T/binary>>, Acc, Opts = #opts{encoding = utf8}) ->
     unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
-unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf16, little}}) ->
+unescape_hex(Binary, Acc, Opts = #opts{encoding = ?UTF16L}) ->
     <<A, 0, B, 0, C, 0, D, 0, T/binary>> = Binary,
     unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
-unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf16, big}}) ->
+unescape_hex(Binary, Acc, Opts = #opts{encoding = ?UTF16B}) ->
     <<0, A, 0, B, 0, C, 0, D, T/binary>> = Binary,
     unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
-unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf32, little}}) ->
+unescape_hex(Binary, Acc, Opts = #opts{encoding = ?UTF32L}) ->
     <<A, 0:24, B, 0:24, C, 0:24, D, 0:24, T/binary>> = Binary,
     unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
-unescape_hex(Binary, Acc, Opts = #opts{encoding = {utf32, big}}) ->
+unescape_hex(Binary, Acc, Opts = #opts{encoding = ?UTF32B}) ->
     <<0:24, A, 0:24, B, 0:24, C, 0:24, D, T/binary>> = Binary,
     unescape(T, [encode_hex([A, B, C, D], Opts) | Acc], Opts);
 unescape_hex(_, _, Opts) ->
@@ -728,36 +732,36 @@ skip(Binary, H, Opts) ->
     end.
 
 next(<<H, T/binary>>, #opts{encoding = utf8}) -> {H, T};
-next(<<H, 0, T/binary>>, #opts{encoding = {utf16, little}}) -> {H, T};
-next(<<0, H, T/binary>>, #opts{encoding = {utf16, big}}) -> {H, T};
+next(<<H, 0, T/binary>>, #opts{encoding = ?UTF16L}) -> {H, T};
+next(<<0, H, T/binary>>, #opts{encoding = ?UTF16B}) -> {H, T};
 next(<<H:16, T/binary>>, #opts{encoding = {utf16, _}}) -> {<<H:16>>, T};
-next(<<H, 0:24, T/binary>>, #opts{encoding = {utf32, little}}) -> {H, T};
-next(<<0:24, H, T/binary>>, #opts{encoding = {utf32, big}}) -> {H, T};
+next(<<H, 0:24, T/binary>>, #opts{encoding = ?UTF32L}) -> {H, T};
+next(<<0:24, H, T/binary>>, #opts{encoding = ?UTF32B}) -> {H, T};
 next(<<H:32, T/binary>>, #opts{encoding = {utf32, _}}) -> {<<H:32>>, T};
+next(<<>>, _) -> eob;
 next(_, Opts) -> badarg(Opts).
 
 %% ===================================================================
 %% Pointer encoding
 %% ===================================================================
 
-pointer_gen([], _, Acc) -> lists:reverse(Acc);
-pointer_gen([H | T], Opts, Acc) when is_binary(H) ->
+encode_pointer([], _, Acc) -> lists:reverse(Acc);
+encode_pointer([H | T], Opts, Acc) when is_binary(H) ->
     #opts{plain_string = Plain, encoding = Encoding} = Opts,
     H1 = [encode_char($/, Opts),
           char_code(pointer_escape(H, Plain), Plain, Encoding)],
-    pointer_gen(T, Opts, [H1 | Acc]);
-pointer_gen(['-' | T], Opts, Acc) ->
-    H1 = encode_chars([$/, $-], Opts),
-    pointer_gen(T, Opts, [H1 | Acc]);
-pointer_gen([H | T], Opts, Acc) when is_atom(H) ->
+    encode_pointer(T, Opts, [H1 | Acc]);
+encode_pointer(['-' | T], Opts, Acc) ->
+    encode_pointer(T, Opts, [encode_chars([$/, $-], Opts) | Acc]);
+encode_pointer([H | T], Opts, Acc) when is_atom(H) ->
     #opts{atom_strings = true, plain_string = Plain} = Opts,
     H1 = iolist_to_binary(char_code(atom_to_binary(H, utf8), utf8, Plain)),
-    pointer_gen([H1 | T], Opts, Acc);
-pointer_gen([H | T], Opts, Acc) when is_integer(H), H >= 0 ->
+    encode_pointer([H1 | T], Opts, Acc);
+encode_pointer([H | T], Opts, Acc) when is_integer(H), H >= 0 ->
     H1 = encode_chars([$/ | integer_to_list(H)],
                       Opts#opts{encoding = Opts#opts.encoding}),
-    pointer_gen(T, Opts, [H1 | Acc]);
-pointer_gen(_, Opts, _) ->
+    encode_pointer(T, Opts, [H1 | Acc]);
+encode_pointer(_, Opts, _) ->
     badarg(Opts).
 
 pointer_escape(String, Plain) ->
@@ -767,14 +771,15 @@ pointer_escape(String, Plain) ->
     end.
 
 pointer_escapeable(<<>>, _) -> false;
-pointer_escapeable(<<H, _/binary>>, utf8) when ?POINTER_ESCAPE(H) -> true;
-pointer_escapeable(<<H, 0, _/binary>>, {utf16, little})
+pointer_escapeable(<<H, _/binary>>, utf8)
   when ?POINTER_ESCAPE(H) -> true;
-pointer_escapeable(<<0, H, _/binary>>, {utf16, big})
+pointer_escapeable(<<H, 0, _/binary>>, ?UTF16L)
   when ?POINTER_ESCAPE(H) -> true;
-pointer_escapeable(<<H, 0:24, _/binary>>, {utf32, little})
+pointer_escapeable(<<0, H, _/binary>>, ?UTF16B)
   when ?POINTER_ESCAPE(H) -> true;
-pointer_escapeable(<<0:24, H, _/binary>>, {utf32, big})
+pointer_escapeable(<<H, 0:24, _/binary>>, ?UTF32L)
+  when ?POINTER_ESCAPE(H) -> true;
+pointer_escapeable(<<0:24, H, _/binary>>, ?UTF32B)
   when ?POINTER_ESCAPE(H) -> true;
 pointer_escapeable(<<_:16, T/binary>>, Plain = {utf16, _}) ->
     pointer_escapeable(T, Plain);
@@ -787,19 +792,19 @@ pointer_escape(<<>>, Acc, _) -> Acc;
 pointer_escape(<<H, T/binary>>, Acc, utf8)
   when ?POINTER_ESCAPE(H) ->
     pointer_escape(T, <<Acc/binary, (pointer_escape_char(H))/binary>>, utf8);
-pointer_escape(<<H, 0, T/binary>>, Acc, Plain = {utf16, little})
+pointer_escape(<<H, 0, T/binary>>, Acc, Plain = ?UTF16L)
   when ?POINTER_ESCAPE(H) ->
     Acc1 = <<Acc/binary, (pointer_escape_char(H, Plain))/binary>>,
     pointer_escape(T, Acc1, Plain);
-pointer_escape(<<0, H, T/binary>>, Acc, Plain = {utf16, big})
+pointer_escape(<<0, H, T/binary>>, Acc, Plain = ?UTF16B)
   when ?POINTER_ESCAPE(H) ->
     Acc1 = <<Acc/binary, (pointer_escape_char(H, Plain))/binary>>,
     pointer_escape(T, Acc1, Plain);
-pointer_escape(<<H, 0:24,T/binary>>,Acc,Plain = {utf32, little})
+pointer_escape(<<H, 0:24,T/binary>>,Acc,Plain = ?UTF32L)
   when ?POINTER_ESCAPE(H) ->
     Acc1 = <<Acc/binary, (pointer_escape_char(H, Plain))/binary>>,
     pointer_escape(T, Acc1, Plain);
-pointer_escape(<<0:24, H, T/binary>>, Acc, Plain = {utf32, big})
+pointer_escape(<<0:24, H, T/binary>>, Acc, Plain = ?UTF32B)
   when ?POINTER_ESCAPE(H) ->
     Acc1 = <<Acc/binary, (pointer_escape_char(H, Plain))/binary>>,
     pointer_escape(T, Acc1, Plain);
@@ -817,11 +822,11 @@ pointer_escape_char($~) -> <<$~, $0>>;
 pointer_escape_char($/) -> <<$~, $1>>.
 
 %% ===================================================================
-%% Selection
+%% Evaluation
 %% ===================================================================
 
-select_text(<<"">>, Bin, Opts) when is_binary(Bin) -> decode(Bin, Opts);
-select_text(_, _, _) -> nyi.
+eval_text(<<"">>, Bin, Opts) when is_binary(Bin) -> decode(Bin, Opts);
+eval_text(_, _, _) -> nyi.
 
 %% ===================================================================
 %% Common parts
@@ -832,6 +837,8 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt(rfc4627, Opts) -> Opts#opts{rfc4627 = true};
+parse_opt(pointer, Opts) -> Opts#opts{pointer = true};
 parse_opt(bom, Opts) -> Opts#opts{bom = true};
 parse_opt(decode, Opts) -> Opts#opts{decode = false};
 parse_opt({atom_strings, Bool}, Opts) when is_boolean(Bool)->
@@ -860,58 +867,58 @@ encode_chars(Chars, Opts) when is_binary(Chars) ->
     << <<(encode_char(C, Opts))/binary>> || <<C>> <= Chars>>.
 
 encode_char(C, #opts{encoding = utf8}) -> <<C>>;
-encode_char(C, #opts{encoding = {utf16, little}}) -> <<C, 0>>;
-encode_char(C, #opts{encoding = {utf16, big}}) -> <<0, C>>;
-encode_char(C, #opts{encoding = {utf32, little}}) -> <<C, 0:24>>;
-encode_char(C, #opts{encoding = {utf32, big}}) -> <<0:24, C>>.
+encode_char(C, #opts{encoding = ?UTF16L}) -> <<C, 0>>;
+encode_char(C, #opts{encoding = ?UTF16B}) -> <<0, C>>;
+encode_char(C, #opts{encoding = ?UTF32L}) -> <<C, 0:24>>;
+encode_char(C, #opts{encoding = ?UTF32B}) -> <<0:24, C>>.
 
 char_code(Text, Coding, Coding) -> Text;
-char_code(Text, utf8, {utf16, big}) ->
+char_code(Text, utf8, ?UTF16B) ->
     << <<C/utf16-big>> || <<C/utf8>> <= Text >>;
-char_code(Text, utf8, {utf16, little}) ->
+char_code(Text, utf8, ?UTF16L) ->
     << <<C/utf16-little>> || <<C/utf8>> <= Text >>;
-char_code(Text, utf8, {utf32, big}) ->
+char_code(Text, utf8, ?UTF32B) ->
     << <<C/utf32-big>> || <<C/utf8>> <= Text >>;
-char_code(Text, utf8, {utf32, little}) ->
+char_code(Text, utf8, ?UTF32L) ->
     << <<C/utf32-little>> || <<C/utf8>> <= Text >>;
-char_code(Text, {utf16, big}, utf8) ->
+char_code(Text, ?UTF16B, utf8) ->
     << <<C/utf8>> || <<C/utf16-big>> <= Text >>;
-char_code(Text, {utf16, big}, {utf16, little}) ->
+char_code(Text, ?UTF16B, ?UTF16L) ->
     << <<C/utf16-little>> || <<C/utf16-big>> <= Text >>;
-char_code(Text, {utf16, big}, {utf32, big}) ->
+char_code(Text, ?UTF16B, ?UTF32B) ->
     << <<C/utf32-big>> || <<C/utf16-big>> <= Text >>;
-char_code(Text, {utf16, big}, {utf32, little}) ->
+char_code(Text, ?UTF16B, ?UTF32L) ->
     << <<C/utf32-little>> || <<C/utf16-big>> <= Text >>;
-char_code(Text, {utf16, little}, utf8) ->
+char_code(Text, ?UTF16L, utf8) ->
     << <<C/utf8>> || <<C/utf16-little>> <= Text >>;
-char_code(Text, {utf16, little}, {utf16, big}) ->
+char_code(Text, ?UTF16L, ?UTF16B) ->
     << <<C/utf16-big>> || <<C/utf16-little>> <= Text >>;
-char_code(Text, {utf16, little}, {utf32, big}) ->
+char_code(Text, ?UTF16L, ?UTF32B) ->
     << <<C/utf32-big>> || <<C/utf16-little>> <= Text >>;
-char_code(Text, {utf16, little}, {utf32, little}) ->
+char_code(Text, ?UTF16L, ?UTF32L) ->
     << <<C/utf32-little>> || <<C/utf16-little>> <= Text >>;
-char_code(Text, {utf32, big}, utf8) ->
+char_code(Text, ?UTF32B, utf8) ->
     << <<C/utf8>> || <<C/utf32-big>> <= Text >>;
-char_code(Text, {utf32, big}, {utf16, big}) ->
+char_code(Text, ?UTF32B, ?UTF16B) ->
     << <<C/utf16-big>> || <<C/utf32-big>> <= Text >>;
-char_code(Text, {utf32, big}, {utf16, little}) ->
+char_code(Text, ?UTF32B, ?UTF16L) ->
     << <<C/utf16-little>> || <<C/utf32-big>> <= Text >>;
-char_code(Text, {utf32, big}, {utf32, little}) ->
+char_code(Text, ?UTF32B, ?UTF32L) ->
     << <<C/utf32-little>> || <<C/utf32-big>> <= Text >>;
-char_code(Text, {utf32, little}, utf8) ->
+char_code(Text, ?UTF32L, utf8) ->
     << <<C/utf8>> || <<C/utf32-little>> <= Text >>;
-char_code(Text, {utf32, little}, {utf16, big}) ->
+char_code(Text, ?UTF32L, ?UTF16B) ->
     << <<C/utf16-big>> || <<C/utf32-little>> <= Text >>;
-char_code(Text, {utf32, little}, {utf16, little}) ->
+char_code(Text, ?UTF32L, ?UTF16L) ->
     << <<C/utf16-little>> || <<C/utf32-little>> <= Text >>;
-char_code(Text, {utf32, little}, {utf32, big}) ->
+char_code(Text, ?UTF32L, ?UTF32B) ->
     << <<C/utf32-big>> || <<C/utf32-little>> <= Text >>.
 
 %%--------------------------------------------------------------------
 -spec badarg(#opts{}) -> no_return().
 %%--------------------------------------------------------------------
 badarg(#opts{orig_call = {Funcion, Args, Line}}) ->
-    Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line}]} |
+    Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line - 1}]} |
              lists:dropwhile(fun(T) -> element(1, T) == ?MODULE end,
                              erlang:get_stacktrace())],
     exit({badarg, Trace}).

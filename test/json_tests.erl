@@ -30,6 +30,31 @@
 
 %% Defines
 -define(BASE,
+        [{<<"true">>, true},
+         {<<"false">>, false},
+         {<<"null">>, null},
+         {<<"1">>, 1},
+         {<<"1.0">>, 1.0},
+         {<<"\"Foo\"">>, <<"Foo">>},
+         {<<"{}">>, {[]}},
+         {<<"{\"empty\":[]}">>, {[{<<"empty">>, []}]}},
+         {<<"{\"empty\":{}}">>, {[{<<"empty">>, {[]}}]}},
+         {<<"[]">>, []},
+         {<<"[[]]">>, [[]]},
+         {<<"[{}]">>, [{[]}]},
+         {<<"{\"one\":1}">>, {[{<<"one">>, 1}]}},
+         {<<"{\"one\":1,\"two\":2}">>, {[{<<"one">>, 1}, {<<"two">>, 2}]}},
+         {<<"{\"one\":1.0}">>, {[{<<"one">>, 1.0}]}},
+         {<<"{\"one\":0.1,\"two\":2.2}">>,
+          {[{<<"one">>, 0.1}, {<<"two">>, 2.2}]}},
+         {<<"{\"one\":null}">>, {[{<<"one">>, null}]}},
+         {<<"{\"one\":true}">>, {[{<<"one">>, true}]}},
+         {<<"{\"one\":false}">>, {[{<<"one">>, false}]}},
+         {<<"[null,true,false]">>, [null, true, false]},
+         {<<"[1,-1,1.0,-1.0]">>, [1, -1, 1.0, -1.0]}
+        ]).
+
+-define(BASE_RFC4627,
         [{<<"{}">>, {[]}},
          {<<"{\"empty\":[]}">>, {[{<<"empty">>, []}]}},
          {<<"{\"empty\":{}}">>, {[{<<"empty">>, {[]}}]}},
@@ -119,8 +144,8 @@
                    non_option
                   ]).
 
--define(BAD_JSON, [true, false, null, foo, 1, 1.0, <<"Foo">>,
-                   {[true]}, {[<<"Foo">>]}, {[{<<"one">>, 1} | true]},
+%% true, false, null, foo, 1, 1.0, <<"Foo">>,
+-define(BAD_JSON, [{[true]}, {[<<"Foo">>]}, {[{<<"one">>, 1} | true]},
                    [1 | 1],
                    {[{1, 1}]},
                    [{foo, bar}]
@@ -133,7 +158,8 @@
                   {<<"[\"\\0\\a\\v\\s\\q\"]">>, [<<0, 7, 11, 32, $\\, $q>>]}
                  ]).
 
--define(BAD_BINARY, [<<"true">>, <<"false">>, <<"null">>, <<"1">>, <<"1.0">>,
+%% <<"true">>, <<"false">>, <<"null">>, <<"1">>, <<"1.0">>,
+-define(BAD_BINARY, [
                      <<"<true>">>, <<"{\"one\":1]">>, <<"{\"one\":1">>,
                      <<"{\"one\":1 \"two\":2}">>, <<"{\"one\":1,\"two\":2,}">>,
                      <<"{,\"one\":1,\"two\":2}">>,
@@ -431,20 +457,13 @@ decode_2_binary_test_() ->
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% pointer/1
-%%--------------------------------------------------------------------
-pointer_1_test_() ->
-    [
-     ?_test(?assertEqual(Pointer, iolist_to_binary(json:pointer(Term)))) ||
-        {Pointer, Term} <- ?POINTERS
-    ].
-%%--------------------------------------------------------------------
 %% pointer/2
 %%--------------------------------------------------------------------
 pointer_2_test_() ->
     [
-     ?_test(?assertEqual(Pointer, iolist_to_binary(json:pointer(Term, [])))) ||
-        {Pointer, Term} <- ?POINTERS
+     ?_test(?assertEqual(Pointer,
+                         iolist_to_binary(json:encode(Term, [pointer]))))
+     || {Pointer, Term} <- ?POINTERS
     ].
 
 %%--------------------------------------------------------------------
@@ -453,9 +472,8 @@ pointer_2_test_() ->
 pointer_2_binary_test_() ->
     [
      ?_test(
-        ?assertEqual(Pointer,
-                     iolist_to_binary(json:pointer(Term, [binary])))) ||
-        {Pointer, Term} <- ?POINTERS
+        ?assertEqual(Pointer, json:encode(Term, [pointer, binary])))
+     || {Pointer, Term} <- ?POINTERS
     ].
 
 %%--------------------------------------------------------------------
@@ -465,8 +483,9 @@ pointer_2_encodings_plains_test_() ->
     [
      ?_test(?assertEqual(utf(Pointer, utf8, Encoding),
                          iolist_to_binary(
-                           json:pointer(pointer_term_to_encoding(Term, Plain),
-                                        [{encoding, Encoding},
+                           json:encode(pointer_term_to_encoding(Term, Plain),
+                                        [pointer,
+                                         {encoding, Encoding},
                                          {plain_string, Plain}])))) ||
         {Pointer, Term} <- ?POINTERS,
         Plain <- ?PLAIN_FORMATS,
