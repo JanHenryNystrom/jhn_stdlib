@@ -321,28 +321,43 @@ eval(Pointer, Binary, Opts) -> Line = ?LINE,
 %% Encoding
 %% ===================================================================
 
-encode_rfc4627_text({Object}, Opts) when is_list(Object) ->
-    encode_object(Object, [], Opts);
+encode_rfc4627_text({Object}, Opts) -> encode_object(Object, Opts);
+encode_rfc4627_text(Object = #{}, Opts = #opts{maps = true}) ->
+    encode_object(Object, Opts);
 encode_rfc4627_text(Array, Opts) when is_list(Array) ->
     [encode_char($[, Opts) | encode_array(Array, [], Opts)];
-encode_rfc4627_text(Object = #{}, Opts = #opts{maps = true}) ->
-        encode_object(maps:to_list(Object), [], Opts);
 encode_rfc4627_text(_, Opts) ->
     badarg(Opts).
 
-encode_object([], [], Opts) -> encode_chars(<<"{}">>, Opts);
-encode_object([{Name, Value}], Acc, Opts) ->
-    [encode_char(${, Opts) |
-     lists:reverse([encode_char($}, Opts),
-                    encode_value(Value, Opts),
-                    encode_char($:, Opts),
-                    encode_string(Name, Opts) | Acc])];
-encode_object([{Name, Value} | T], Acc, Opts) ->
-    Value1 = encode_value(Value, Opts),
+encode_object([], Opts) -> encode_chars(<<"{}">>, Opts);
+encode_object(Object = #{}, Opts) -> 
+    Comma = encode_char($,, Opts),
+    Colon = encode_char($:, Opts),
+    Encode = fun(Name, Value, Acc) ->
+                     [encode_value(Value, Opts), Colon,
+                      encode_string(Name, Opts), Comma | Acc]
+             end,
+    case lists:reverse(maps:fold(Encode, [], Object)) of
+        [] -> encode_chars(<<"{}">>, Opts);
+        [_ | Members] ->
+            [encode_char(${, Opts), Members, encode_char($}, Opts)]
+    end;
+encode_object(Members, Opts) ->
+    Comma = encode_char($,, Opts),
+    Colon = encode_char($:, Opts),
+    encode_object1(Members, [], Comma, Colon, Opts).
+
+encode_object1([{Name, Value}], Acc, _, Colon, Opts) ->
     Name1 = encode_string(Name, Opts),
-    Acc1 = [encode_char($,, Opts), Value1, encode_char($:, Opts), Name1 | Acc],
-    encode_object(T, Acc1, Opts);
-encode_object(_, _, Opts) ->
+    Value1 = encode_value(Value, Opts),
+    [encode_char(${, Opts) |
+     lists:reverse([encode_char($}, Opts), Value1, Colon, Name1 | Acc])];
+encode_object1([{Name, Value} | T], Acc, Comma, Colon, Opts) ->
+    Name1 = encode_string(Name, Opts),
+    Value1 = encode_value(Value, Opts),
+    Acc1 = [Comma, Value1, Colon, Name1 | Acc],
+    encode_object1(T, Acc1, Comma, Colon, Opts);
+encode_object1(_, _, _, _, Opts) ->
     badarg(Opts).
 
 encode_array([], Acc, Opts) -> lists:reverse([encode_char($],Opts) | Acc]);
@@ -359,10 +374,9 @@ encode_value(true, Opts) -> encode_chars(<<"true">>, Opts);
 encode_value(false, Opts) -> encode_chars(<<"false">>, Opts);
 encode_value(null, Opts) -> encode_chars(<<"null">>, Opts);
 encode_value(String, Opts) when is_atom(String) -> encode_string(String, Opts);
-encode_value({Object}, Opts) when is_list(Object) ->
-    encode_object(Object, [], Opts);
-encode_value(Object = #{}, Opts) ->
-    encode_object(maps:to_list(Object), [], Opts);
+encode_value({Object}, Opts)  -> encode_object(Object, Opts);
+encode_value(Object = #{}, Opts = #opts{maps = true}) ->
+    encode_object(Object, Opts);
 encode_value(Array, Opts) when is_list(Array) ->
     [encode_char($[, Opts) | encode_array(Array, [], Opts)];
 encode_value(BinaryString, Opts) when is_binary(BinaryString) ->
