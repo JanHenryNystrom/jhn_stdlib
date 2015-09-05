@@ -926,12 +926,8 @@ pointer_key(Key, #opts{encoding = Encoding, plain_string = Plain}) ->
 
 eval_binary([], Binary, _, Opts = #opts{decode = true}) -> decode(Binary, Opts);
 eval_binary([], Binary, _, Opts) ->
-    io:format("X1: <<\"~s\">> ~n", [Binary]),
     {T, Opts1  = #opts{steps = Pos}} = skip_ws(Binary, Opts),
-    io:format("X2: <<\"~s\">> ~n", [T]),
     {T1, #opts{steps = Pos1}} = skip_value(T, Opts1),
-    io:format("X3: <<\"~s\">> ~n", [T1]),
-    io:format("Y: ~p => ~p (~p) ~n", [Pos, Pos1, Pos1 - Pos - 1]),
     {pos, Pos, Pos1 - Pos - 1};
 eval_binary([N | T], Binary, Path, Opts) when is_integer(N) ->
     case next(Binary, Opts) of
