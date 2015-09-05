@@ -640,16 +640,16 @@ decode_object(Binary, Expect, Acc, Opts) ->
         {{$", T}, {_, false}} when Opts#opts.atom_keys ->
             {Name, T1} = decode_string(T, Opts#opts{plain_string = utf8}),
             Name1 = binary_to_atom(Name, utf8),
-            {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
+            {Value, T2} = decode_value(decode_skip(T1, $:, Opts), Opts),
             decode_object(T2, {false, true}, [{Name1, Value} | Acc], Opts);
         {{$", T}, {_, false}} when Opts#opts.existing_atom_keys ->
             {Name, T1} = decode_string(T, Opts#opts{plain_string = utf8}),
             Name1 = binary_to_existing_atom(Name, utf8),
-            {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
+            {Value, T2} = decode_value(decode_skip(T1, $:, Opts), Opts),
             decode_object(T2, {false, true}, [{Name1, Value} | Acc], Opts);
         {{$", T}, {_, false}} ->
             {Name, T1} = decode_string(T, Opts),
-            {Value, T2} = decode_value(skip(T1, $:, Opts), Opts),
+            {Value, T2} = decode_value(decode_skip(T1, $:, Opts), Opts),
             decode_object(T2, {false, true}, [{Name, Value} | Acc], Opts);
         _ ->
             badarg(Opts)
@@ -776,10 +776,10 @@ unescape_hex(_, _, Opts) ->
 
 encode_hex(List, Opts) -> encode_char(list_to_integer(List, 16), Opts).
 
-skip(Binary, H, Opts) ->
+decode_skip(Binary, H, Opts) ->
     case next(Binary, Opts) of
         {H, T} -> T;
-        {WS, T} when ?IS_WS(WS) -> skip(T, H, Opts);
+        {WS, T} when ?IS_WS(WS) -> decode_skip(T, H, Opts);
         _ -> badarg(Opts)
     end.
 
@@ -927,7 +927,7 @@ pointer_key(Key, #opts{encoding = Encoding, plain_string = Plain}) ->
 eval_binary([], Binary, _, Opts = #opts{decode = true}) -> decode(Binary, Opts);
 eval_binary([], Binary, _, Opts) ->
     {T, Opts1  = #opts{steps = Pos}} = skip_ws(Binary, Opts),
-    {T1, #opts{steps = Pos1}} = skip_value(T, Opts1),
+    {_, #opts{steps = Pos1}} = skip_value(T, Opts1),
     {pos, Pos, Pos1 - Pos - 1};
 eval_binary([N | T], Binary, Path, Opts) when is_integer(N) ->
     case next(Binary, Opts) of
