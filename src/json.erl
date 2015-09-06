@@ -314,9 +314,10 @@ eval(Pointer, Binary, Opts = #opts{decode = true}) when is_binary(Binary) ->
     eval_binary(Pointer, Binary1, [], step_size(Opts#opts{encoding = Enc}));
 eval(Pointer, Binary, Opts = #opts{}) when is_binary(Binary) ->
     {Binary1, Enc} = encoding(Binary, Opts),
-    {pos, Start, Length} = 
-        eval_binary(Pointer, Binary1, [], step_size(Opts#opts{encoding = Enc})),
-    binary:part(Binary, {Start, Length});
+    case eval_binary(Pointer, Binary1, [], step_size(Opts#opts{encoding=Enc})) of
+        {pos, Start, Length} -> binary:part(Binary, {Start, Length});
+        Error = {error, _} -> Error
+    end;
 eval(Pointer, Binary, Opts = #opts{}) ->
     {Binary, Encoding} = encoding(Binary, Opts),
     eval_json(Pointer, Binary, [], Opts#opts{encoding = Encoding});
@@ -929,9 +930,20 @@ eval_binary([], Binary, _, Opts) ->
     {T, Opts1  = #opts{steps = Pos}} = skip_ws(Binary, Opts),
     {_, #opts{steps = Pos1}} = skip_value(T, Opts1),
     {pos, Pos, Pos1 - Pos - 1};
-eval_binary([N | T], Binary, Path, Opts) when is_integer(N) ->
+eval_binary(P = ['-' | _ ], Binary, Path, Opts) ->
     case next(Binary, Opts) of
-        {H, BT} when ?IS_WS(H) -> eval_binary([N | T], BT, Path, step(Opts));
+        {H, BT} when ?IS_WS(H) -> eval_binary(P, BT, Path, Opts);
+        {$[, BT} ->
+            case eval_binary_dash(BT, {false, false}, 0, Opts) of
+                Error = {error, _} -> Error;
+                Size -> {error, {too_large_index, lists:reverse([Size | Path])}}
+            end;
+        _ ->
+            {error, {incorrect_pointer, lists:reverse(['-' | Path])}}
+    end;
+eval_binary(P = [N | T], Binary, Path, Opts) when is_integer(N) ->
+    case next(Binary, Opts) of
+        {H, BT} when ?IS_WS(H) -> eval_binary(P, BT, Path, step(Opts));
         {$[, BT} ->
             case eval_binary_array(N, BT, {false, false}, Path, step(Opts)) of
                 {error, too_large_index} ->
@@ -942,9 +954,9 @@ eval_binary([N | T], Binary, Path, Opts) when is_integer(N) ->
         _ ->
             {error, {incorrect_pointer, lists:reverse([N | Path])}}
     end;
-eval_binary([Key | T], Binary, Path, Opts) when is_binary(Key); is_atom(Key) ->
+eval_binary(P = [Key | T], Binary, Path,Opts) when is_binary(Key);is_atom(Key) ->
     case next(Binary, Opts) of
-        {H, BT} when ?IS_WS(H) -> eval_binary([Key | T], BT, Path, step(Opts));
+        {H, BT} when ?IS_WS(H) -> eval_binary(P, BT, Path, step(Opts));
         {${, BT} ->
             case eval_binary_object(Key, BT, {false, false}, Path, step(Opts)) of
                 Error = {error, _} -> Error;
@@ -952,6 +964,20 @@ eval_binary([Key | T], Binary, Path, Opts) when is_binary(Key); is_atom(Key) ->
             end;
         _ ->
             {error, {incorrect_pointer, lists:reverse([Key | Path])}}
+    end.
+
+eval_binary_dash(Binary, Expect, Size, Opts) -> 
+    case {next(Binary, Opts), Expect} of
+        {{WS, T}, _} when ?IS_WS(WS) -> eval_binary_dash(T, Expect, Size, Opts);
+        {{$,, T}, {false, true}} ->
+            eval_binary_dash(T, {true, false}, Size, Opts);
+        {{$], _}, {false, _}} ->
+            Size;
+        {_, {_, false}} ->
+            {T, _} = skip_value(Binary, Opts),
+            eval_binary_dash(T, {false, true}, Size + 1, Opts);
+        _ ->
+            badarg(Opts)
     end.
 
 eval_binary_object(Key, Binary, Expect, Path, Opts) ->
