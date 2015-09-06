@@ -929,7 +929,7 @@ eval_binary([], Binary, _, Opts = #opts{decode = true}) -> decode(Binary, Opts);
 eval_binary([], Binary, _, Opts) ->
     {T, Opts1  = #opts{steps = Pos}} = skip_ws(Binary, Opts),
     {_, #opts{steps = Pos1}} = skip_value(T, Opts1),
-    {pos, Pos, Pos1 - Pos - 1};
+    {pos, Pos, Pos1 - Pos};
 eval_binary(P = ['-' | _ ], Binary, Path, Opts) ->
     case next(Binary, Opts) of
         {H, BT} when ?IS_WS(H) -> eval_binary(P, BT, Path, Opts);
@@ -987,7 +987,7 @@ eval_binary_object(Key, Binary, Expect, Path, Opts) ->
         {{$}, _}, {false, _}} ->
             {error, {non_member, lists:reverse([key | Path])}};
         {{$,, T}, {false, true}} ->
-            eval_binary_object(Key, T, {true, false}, Path, Opts);
+            eval_binary_object(Key, T, {true, false}, Path, step(Opts));
         {{$", T}, {_, false}} ->
             case eval_binary_string(T, step(Opts)) of
                 {Key, T1, Opts1} -> skip_char(T1, $:, Opts1);
@@ -1006,7 +1006,7 @@ eval_binary_array(N, Binary, Expect, Path, Opts) ->
         {{WS, T}, _} when ?IS_WS(WS) ->
             eval_binary_array(N, T, Expect, Path, step(Opts));
         {{$,, T}, {false, true}} ->
-            eval_binary_array(N - 1, T, {true, false}, Path, Opts);
+            eval_binary_array(N - 1, T, {true, false}, Path, step(Opts));
         {{$], _}, {false, _}} ->
             {error, too_large_index};
         {_, {_, false}} ->
@@ -1110,7 +1110,7 @@ skip_value(Binary, Opts) ->
         {$", T} -> skip_string(T, step(Opts));
         {$-, T} -> skip_number(T, pre, int, step(Opts));
         {H, _} when H >= $0, H =< $9 ->
-            skip_number(Binary, pre, int, step(Opts));
+            skip_number(Binary, pre, int, Opts);
         _ -> badarg(Opts)
     end.
 
