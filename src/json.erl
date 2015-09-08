@@ -77,9 +77,10 @@
 
 %% Types
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
--type opt()          :: {atom_strings, boolean()} | {atom_keys, boolean()} |
-                        {existing_atom_keys, boolean()} |
-                        bom |binary | iolist | decode |
+-type opt()          :: {atom_strings, boolean()} |
+                        atom_keys | {atom_keys, boolean()} |
+                        existing_atom_keys | {existing_atom_keys, boolean()} |
+                        bom | binary | iolist | decode | encode |
                         {plain_string, encoding()} | {encoding, encoding()}.
 
 -type json()                :: json_value() | json_rfc4627_text().
