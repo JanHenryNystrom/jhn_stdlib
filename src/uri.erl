@@ -279,10 +279,11 @@ decode_port(I, Acc, URI, Opts) ->
 
 decode_ipv6(I, Acc, Components, URI, Opts) ->
     case next(I) of
-        {$:, T} -> decode_ipv6(T, [], [to_binary(Acc) | Components], URI, Opts);
+        {$:, T} ->
+            decode_ipv6(T, [], [to_binary(Acc) | Components], URI, Opts);
         {$], T} ->
             IPv6 =
-                decode_ipv6_host(lists:reverse([to_binary(Acc) | Components])),
+                decode_ipv6_host([to_binary(Acc) | Components], Opts),
             URI1 = URI#uri{host = IPv6},
             case next(T) of
                 eos -> URI1;
@@ -298,25 +299,49 @@ decode_ipv6(I, Acc, Components, URI, Opts) ->
             badarg(Opts)
     end.
 
-decode_ipv6_host(Components = [_, _, _, _, _, _, _, _]) ->
-    list_to_tuple([decode_hex(C) || C <- Components]);
-decode_ipv6_host([H1, H2, H3, H4, H5, H6, IPv4]) ->
-    {A, B , C, D} = decode_ipv4(IPv4, [], []),
+
+decode_ipv6_host([H | T], Opts)  when byte_size(H) > 4 ->
+    {A, B , C, D} = decode_ipv4(H, [], []),
     <<H7:16/unsigned-integer, H8:16/unsigned-integer>> =
         <<A:8/unsigned-integer,
           B:8/unsigned-integer,
           C:8/unsigned-integer,
           D:8/unsigned-integer>>,
-    {decode_hex(H1),
-     decode_hex(H2),
-     decode_hex(H3),
-     decode_hex(H4),
-     decode_hex(H5),
-     decode_hex(H6),
-     H7,
-     H8}.
+    case [decode_hex(E) || E <- lists:reverse(T)] of
+        Decoded when length(Decoded) == 6 ->
+            list_to_tuple(ensure_non_empty(Decoded ++ [H7, H8], Opts));
+        [empty, empty | Decoded] ->
+            Pad = lists:duplicate(6 - length(Decoded), 0),
+            list_to_tuple(ensure_non_empty(Pad ++ Decoded ++ [H7, H8], Opts));
+        Decoded ->
+            list_to_tuple(ipv6_fill(Decoded ++ [H7, H8], 6 - length(Decoded),
+                                    Opts))
+    end;
+decode_ipv6_host(L, Opts) ->
+    case [decode_hex(E) || E <- lists:reverse(L)] of
+        [empty, empty, empty] -> {0, 0, 0, 0, 0, 0, 0, 0};
+        [empty, empty | Decoded] ->
+            Pad = lists:duplicate(8 - length(Decoded), 0),
+            list_to_tuple(ensure_non_empty(Pad ++ Decoded, Opts));
+        Decoded ->
+            list_to_tuple(ipv6_fill(Decoded, 8 - length(Decoded), Opts))
+    end.
 
-decode_hex(<<>>) -> 0;
+ipv6_fill(L, 0, Opts) -> ensure_non_empty(L, Opts);
+ipv6_fill([empty, empty], N, Opts) ->
+    ensure_non_empty(lists:duplicate(N + 2, 0), Opts);
+ipv6_fill([empty | T], N, Opts) ->
+    ensure_non_empty(lists:duplicate(N + 1, 0) ++ T, Opts);
+ipv6_fill([H | T], N, Opts) when H /= empty ->
+    [H | ipv6_fill(T, N, Opts)].
+
+ensure_non_empty(E, Opts) ->
+    case lists:any(fun(empty) -> true; (_) -> false end, E) of
+        true -> badarg(Opts);
+        false -> E
+    end.
+            
+decode_hex(<<>>) -> empty;
 decode_hex(Hex) ->
     <<Value:16/unsigned-integer>> = 
         case [unhex(C) || <<C>> <= Hex] of
@@ -336,14 +361,15 @@ decode_hex(Hex) ->
     Value.
 
 decode_ipv4(<<>>, Acc, Components) ->
-    decode_ipv4_host(lists:reverse([to_binary(Acc) | Components]));
+    list_to_tuple([binary_to_integer(I) ||
+                      I <- lists:reverse([to_binary(Acc) | Components])]);
 decode_ipv4(<<$., T/binary>>, Acc, Components) ->
     decode_ipv4(T, [], [to_binary(Acc) | Components]);
 decode_ipv4(<<H, T/binary>>, Acc, Components) when ?IS_INT(H) ->
-    decode_ipv4(T, [H | Acc], Components).
+    decode_ipv4(T, [H | Acc], Components);
+decode_ipv4(_, _, _) ->
+    false.
 
-decode_ipv4_host(IPv4 = [_, _, _, _]) ->
-    list_to_tuple([binary_to_integer(I) || I <- IPv4]).
 
 decode_path(I, Acc, Components, URI, Opts) ->
     case next(I) of
