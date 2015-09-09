@@ -34,7 +34,7 @@ Features/Modules
     * Evaluation JSON Patch -- json [rfc6902][9]
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10]
     * MessagePack -- msgpack [MessagePack][11]/Erlang
-  * Standard
+  * Standards
     * Encoding/decoding URI/Erlang -- uri [rfc3986][12]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
