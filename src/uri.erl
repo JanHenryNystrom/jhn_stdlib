@@ -35,17 +35,12 @@
 %% Exported types
 -export_type([uri/0]).
 
-%% Records
--record(opts, {orig_call}).
+%% Includes
+-include_lib("jhn_stdlib/include/uri.hrl").
 
--record(uri, {scheme = http :: scheme(),
-              userinfo = [] :: [binary()],
-              host = <<>> :: binary() | inet:ip_address(),
-              port :: undefined | inet:port_number(),
-              path = [] :: [binary()],
-              query = <<>> :: binary(),
-              fragment = <<>> :: binary()
-             }).
+%% Records
+-record(opts, {return_type = iolist :: iolist | binary,
+               orig_call}).
 
 %% Types
 -type uri() :: #uri{}.
@@ -102,6 +97,8 @@ encode(Term) ->
 %%   Encodes the structured Erlang term as an iolist or binary.
 %%   Encode will give an exception if the erlang term is not well formed.
 %%   Options are:
+%%     binary -> a binary is returned
+%%     iolist -> a iolist is returned
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(uri(), [opt()] | #opts{}) -> iolist() | binary().
@@ -111,7 +108,10 @@ encode(Term, Opts) ->
     Line = ?LINE,
     ParsedOpts =
         parse_opts(Opts, #opts{orig_call = {encode, [Term, Opts], Line}}),
-    do_encode(Term, ParsedOpts).
+    case ParsedOpts#opts.return_type of
+        iolist-> do_encode(Term, ParsedOpts);
+        binary -> iolist_to_binary(do_encode(Term, ParsedOpts))
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: decode(Binary) -> URI.
@@ -151,7 +151,17 @@ decode(Binary, Opts) ->
 %% Encoding
 %% ===================================================================
 
-do_encode(_, _) -> <<>>.
+do_encode(URI = #uri{}, _) ->
+    #uri{scheme = Scheme,
+         userinfo = UserInfo,
+         host = Host,
+         port = Port,
+         path = Path,
+         query = Query,
+         fragment = Fragment} = URI,
+    [atom_to_binary(Scheme, utf8), $:].
+     
+    
 
 %% ===================================================================
 %% Decoding
@@ -398,7 +408,7 @@ decode_query(I, Acc, URI, Opts) ->
         {$%, T} ->
             {H, T1} = decode_escaped(T),
             decode_query(T1, [H | Acc], URI, Opts);
-        {H, T} when ?IS_PCHAR(H); H == $/; $? ->
+        {H, T} when ?IS_PCHAR(H); H == $/; H == $? ->
             decode_query(T, [H | Acc], URI, Opts)
     end.
 
@@ -473,7 +483,9 @@ unhex($f) -> 15.
 parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
-parse_opt(_, Rec) -> badarg(Rec).
+parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
+parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt(_, Opts) -> badarg(Opts).
 
 %%--------------------------------------------------------------------
 -spec badarg(#opts{}) -> no_return().
