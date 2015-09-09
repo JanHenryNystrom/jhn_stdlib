@@ -724,9 +724,9 @@ decode_number(Binary, Stage, Phase, Acc, State) ->
             badarg(State)
     end.
 
-decode_string(Binary, State=#state{encoding = enc, plain_string = Plain}) ->
+decode_string(Binary, State=#state{encoding = Enc, plain_string = Plain}) ->
     {Unescaped, T} = unescape(Binary, [], State),
-    {char_code(iolist_to_binary(Unescaped), enc, Plain), T}.
+    {char_code(iolist_to_binary(Unescaped), Enc, Plain), T}.
 
 unescape(Binary, Acc, State = #state{encoding = Encoding}) ->
     case next(Binary, State) of
