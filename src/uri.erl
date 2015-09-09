@@ -17,7 +17,7 @@
 %%%-------------------------------------------------------------------
 %%% @doc
 %%%  A URI library based on:
-%%%    Uniform Resource Identifier (URI): Generic Syntax                (rfc3986)
+%%%    Uniform Resource Identifier (URI): Generic Syntax               (rfc3986)
 %%%
 %%% @end
 %%%

@@ -18,12 +18,12 @@
 %%% @doc
 %%%  A JSON library based on:
 %%%    The application/json Media Type for JavaScript Object Notation (JSON)
-%%%                                                                     (rfc4627)
-%%%    The JavaScript Object Notation (JSON) Data Interchange Format    (rfc7159)
-%%%    JavaScript Object Notation (JSON) Pointer                        (rfc6901)
-%%%    JavaScript Object Notation (JSON) Patch                          (rfc6902)
-%%%    JSON Reference                              (draft-pbryan-zyp-json-ref-03)
-%%%    JSON Schema: core definitions and terminology   (draft-zyp-json-schema-04)
+%%%                                                                    (rfc4627)
+%%%    The JavaScript Object Notation (JSON) Data Interchange Format   (rfc7159)
+%%%    JavaScript Object Notation (JSON) Pointer                       (rfc6901)
+%%%    JavaScript Object Notation (JSON) Patch                         (rfc6902)
+%%%    JSON Reference                             (draft-pbryan-zyp-json-ref-03)
+%%%    JSON Schema: core definitions and terminology  (draft-zyp-json-schema-04)
 %%%
 %%%  JSON is represented as follows:
 %%%
@@ -724,9 +724,9 @@ decode_number(Binary, Stage, Phase, Acc, State) ->
             badarg(State)
     end.
 
-decode_string(Binary, State=#state{encoding = Encoding, plain_string = Plain}) ->
+decode_string(Binary, State=#state{encoding = enc, plain_string = Plain}) ->
     {Unescaped, T} = unescape(Binary, [], State),
-    {char_code(iolist_to_binary(Unescaped), Encoding, Plain), T}.
+    {char_code(iolist_to_binary(Unescaped), enc, Plain), T}.
 
 unescape(Binary, Acc, State = #state{encoding = Encoding}) ->
     case next(Binary, State) of
@@ -757,7 +757,7 @@ unescape_solid(Binary, Acc, State) ->
         {$s, T} -> unescape(T, [encode_char(?SPC, State) | Acc], State);
         {$u, T} -> unescape_hex(T, Acc, State);
         {H, T} when is_integer(H) ->
-            unescape(T, [encode_char(H,State),encode_char($\\,State)|Acc],State);
+            unescape(T,[encode_char(H,State),encode_char($\\,State)|Acc],State);
         {H, T} when is_binary(H) ->
             unescape(T, [H, encode_char($\\, State) | Acc], State)
     end.
@@ -896,7 +896,7 @@ decode_pointer_int(Binary, Acc, State) ->
         {H, T} when ?IS_INT(H) -> decode_pointer_int(T, [H | Acc], State)
     end.    
 
-decode_pointer_member(Bin, Acc, State=#state{encoding=Enc,plain_string=Plain}) ->
+decode_pointer_member(Bin, Acc,State=#state{encoding=Enc,plain_string=Plain}) ->
     #state{encoding = Enc, plain_string = Plain} = State,
     case next(Bin, State) of
         eob ->
@@ -959,8 +959,8 @@ eval_binary(P = [N | T], Binary, Path, State) when is_integer(N) ->
         _ ->
             {error, {incorrect_pointer, lists:reverse([N | Path])}}
     end;
-eval_binary(P = [Key | T], Binary,Path,State) when is_binary(Key);is_atom(Key) ->
-    case next(Binary, State) of
+eval_binary(P = [Key | T], Bin,Path,State) when is_binary(Key); is_atom(Key) ->
+    case next(Bin, State) of
         {H, BT} when ?IS_WS(H) -> eval_binary(P, BT, Path, inc(State));
         {${, BT} ->
             case eval_binary_object(Key, BT, {false, false}, Path, inc(State)) of
@@ -973,7 +973,8 @@ eval_binary(P = [Key | T], Binary,Path,State) when is_binary(Key);is_atom(Key) -
 
 eval_binary_dash(Binary, Expect, Size, State) -> 
     case {next(Binary, State), Expect} of
-        {{WS, T}, _} when ?IS_WS(WS) -> eval_binary_dash(T, Expect, Size, State);
+        {{WS, T}, _} when ?IS_WS(WS) ->
+            eval_binary_dash(T, Expect, Size, State);
         {{$,, T}, {false, true}} ->
             eval_binary_dash(T, {true, false}, Size, State);
         {{$], _}, {false, _}} ->
@@ -1021,85 +1022,85 @@ eval_binary_array(N, Binary, Expect, Path, State) ->
             badarg(State)
     end.
 
-eval_binary_string(Binary, State=#state{encoding = Enc, atom_keys = true}) ->
-    {Unescaped, T, State1} = eval_binary_unescape(Binary, [], State),
+eval_binary_string(Bin, State=#state{encoding = Enc, atom_keys = true}) ->
+    {Unescaped, T, State1} = eval_binary_unescape(Bin, [], State),
     {binary_to_atom(char_code(iolist_to_binary(Unescaped), Enc, utf8),utf8),
      T,
      State1};
-eval_binary_string(Binary, State=#state{encoding=Enc,existing_atom_keys=true}) ->
-    {Unescaped, T, State1} = eval_binary_unescape(Binary, [], State),
+eval_binary_string(Bin, State=#state{encoding=Enc, existing_atom_keys=true}) ->
+    {Unescaped, T, State1} = eval_binary_unescape(Bin, [], State),
     {binary_to_atom(char_code(iolist_to_binary(Unescaped), Enc, utf8),utf8),
      T,
      State1};
-eval_binary_string(Binary, State=#state{encoding = Enc, plain_string = Plain}) ->
-    {Unescaped, T, State1} = eval_binary_unescape(Binary, [], State),
+eval_binary_string(Bin, State=#state{encoding = Enc, plain_string = Plain}) ->
+    {Unescaped, T, State1} = eval_binary_unescape(Bin, [], State),
     {char_code(iolist_to_binary(Unescaped), Enc, Plain), T, State1}.
 
-eval_binary_unescape(Binary, Acc, State = #state{encoding = Encoding}) ->
-    case next(Binary, State) of
+eval_binary_unescape(Bin, Acc, State = #state{encoding = Encoding}) ->
+    case next(Bin, State) of
         {$\\, T} -> eval_binary_unescape_solid(T, Acc, inc(State));
         {$", T} -> {lists:reverse(Acc), T, inc(State)};
         {H, T} when Encoding == utf8 ->
             eval_binary_unescape(T, [H | Acc], inc(State));
         _ when Encoding == ?UTF16L; Encoding == ?UTF16B ->
-            <<H:16, T/binary>> = Binary,
+            <<H:16, T/binary>> = Bin,
             eval_binary_unescape(T, [<<H:16>> | Acc], inc(State));
         _ when Encoding == ?UTF32L; Encoding == ?UTF32B ->
-            <<H:32, T/binary>> = Binary,
+            <<H:32, T/binary>> = Bin,
             eval_binary_unescape(T, [<<H:32>> | Acc], inc(State))
     end.
 
 eval_binary_unescape_solid(Binary, Acc, State) ->
     case next(Binary, State) of
         {$", T} ->
-            eval_binary_unescape(T, [encode_char($", State) | Acc], inc(State));
+            eval_binary_unescape(T, [encode_char($", State) | Acc],inc(State));
         {$\\, T} ->
-            eval_binary_unescape(T, [encode_char($\\, State) | Acc], inc(State));
+            eval_binary_unescape(T, [encode_char($\\, State) | Acc],inc(State));
         {$/, T} ->
             eval_binary_unescape(T, [encode_char($/, State) | Acc], inc(State));
         {$0, T} ->
-            eval_binary_unescape(T, [encode_char(?NULL, State)|Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?NULL, State)|Acc],inc(State));
         {$a, T} ->
-            eval_binary_unescape(T, [encode_char(?BEL, State) |Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?BEL, State) |Acc],inc(State));
         {$b, T} ->
-            eval_binary_unescape(T, [encode_char(?BS, State) | Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?BS, State) | Acc],inc(State));
         {$t, T} ->
-            eval_binary_unescape(T, [encode_char(?HT, State) | Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?HT, State) | Acc],inc(State));
         {$n, T} ->
-            eval_binary_unescape(T, [encode_char(?LF, State) | Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?LF, State) | Acc],inc(State));
         {$f, T} ->
-            eval_binary_unescape(T, [encode_char(?FF, State) | Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?FF, State) | Acc],inc(State));
         {$v, T} ->
-            eval_binary_unescape(T, [encode_char(?VT, State) | Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?VT, State) | Acc],inc(State));
         {$r, T} ->
-            eval_binary_unescape(T, [encode_char(?CR, State) | Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?CR, State) | Acc],inc(State));
         {$s, T} ->
-            eval_binary_unescape(T, [encode_char(?SPC, State) |Acc], inc(State));
+            eval_binary_unescape(T, [encode_char(?SPC, State) |Acc],inc(State));
         {$u, T} -> eval_binary_unescape_hex(T, Acc, State);
         {H, T} when is_integer(H) ->
             eval_binary_unescape(T,
-                                 [encode_char(H, State), encode_char($\\,State) |
-                                  Acc],
+                                 [encode_char(H, State),
+                                  encode_char($\\,State) | Acc],
                                  inc(State));
         {H, T} when is_binary(H) ->
-            eval_binary_unescape(T, [H, encode_char($\\, State)|Acc], inc(State))
+            eval_binary_unescape(T, [H, encode_char($\\, State)|Acc],inc(State))
     end.
 
 eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = utf8}) ->
     <<A, B, C, D, T/binary>> = Binary,
-    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc], inc(State,4));
+    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4));
 eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = ?UTF16L}) ->
     <<A, 0, B, 0, C, 0, D, 0, T/binary>> = Binary,
-    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc], inc(State,4));
+    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4));
 eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = ?UTF16B}) ->
     <<0, A, 0, B, 0, C, 0, D, T/binary>> = Binary,
-    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc], inc(State,4));
+    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4));
 eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32L}) ->
     <<A, 0:24, B, 0:24, C, 0:24, D, 0:24, T/binary>> = Binary,
-    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc], inc(State,4));
+    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4));
 eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32B}) ->
     <<0:24, A, 0:24, B, 0:24, C, 0:24, D, T/binary>> = Binary,
-    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc], inc(State,4));
+    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4));
 eval_binary_unescape_hex(_, _, State) ->
     badarg(State).
 
@@ -1233,7 +1234,7 @@ eval_json([N | T], JSON, Path, State) when is_integer(N), length(JSON) > N ->
     eval_json(T, lists:nth(N + 1, JSON), [N | Path], State);
 eval_json([N | _], _, Path, _) when is_integer(N) ->
     {error, {too_large_index, lists:reverse([N | Path])}};
-eval_json([Key | T], JSON = #{}, Path, State = #state{maps=M}) when M /= false ->
+eval_json([Key | T], JSON = #{}, Path, State =#state{maps=M}) when M /= false ->
     case maps:find(Key, JSON) of
         {ok, Value} -> eval_json(T, Value, [Key | Path], State);
         _ -> {error, {non_member, lists:reverse([key | Path])}}
@@ -1256,7 +1257,7 @@ parse_opts(Opts, State) -> lists:foldl(fun parse_opt/2, State, Opts).
 parse_opt(pointer, State) -> State#state{pointer = true};
 parse_opt(rfc4627, State) -> State#state{rfc4627 = true};
 parse_opt(maps, State) -> State#state{maps = true};
-parse_opt({maps, Bool}, State) when is_boolean(Bool) -> State#state{maps = Bool};
+parse_opt({maps, Bool}, State) when is_boolean(Bool) -> State#state{maps=Bool};
 parse_opt({maps, safe}, State) -> State#state{maps = safe};
 parse_opt(binary, State) -> State#state{return_type = binary};
 parse_opt(iolist, State) -> State#state{return_type = iolist};
