@@ -29,7 +29,7 @@ Features/Modules
     * blist -- drop in replacement for the lists module in stdlib
     * bstring -- drop in replacement for the string module in stdlib
   * Protocols
-    * Encoding/decoding JSON/Erlang  -- json [rfc4627, rfc7159][6, 7]
+    * Encoding/decoding JSON/Erlang  -- json [rfc4627][6], [rfc7159][7]
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- json [rfc6901][8]
     * Evaluation JSON Patch -- json [rfc6902][9]
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10]
