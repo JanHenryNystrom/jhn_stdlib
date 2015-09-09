@@ -114,10 +114,10 @@ I know I really should.
        "JavaScript Object Notation (JSON) Pointer"
   [9]: http://www.ietf.org/rfc/rfc6902.txt
        "JavaScript Object Notation (JSON) Patch"
-  [10]: http://tools.ietf.org/html/draft-zyp-json-schema-04
+  [10]: http://tools.ietf.org/id/draft-zyp-json-schema-04.txt
        "JSON Schema: core definitions and terminology"
   [11]: http://msgpack.org/
        "An efficient binary serialization format"
-  [12]: http://www.ietf.org/rfc/3986.txt
+  [12]: http://www.ietf.org/rfc3986.txt
        "Uniform Resource Identifier (URI): Generic Syntax"
 
