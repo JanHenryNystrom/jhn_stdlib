@@ -15,10 +15,13 @@
 %% limitations under the License.
 %%==============================================================================
 
+%% Types
+-type scheme() :: http | https | file.
+
 %% Records
--record(uri, {scheme = http :: scheme(),
+-record(uri, {scheme  :: undefined | scheme(),
               userinfo = [] :: [binary()],
-              host = <<>> :: binary() | inet:ip_address(),
+              host :: undefined | binary() | inet:ip_address(),
               port :: undefined | inet:port_number(),
               path = [] :: [binary()],
               query = <<>> :: binary(),

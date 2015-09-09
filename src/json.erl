@@ -186,7 +186,7 @@ encode(Term) ->
 %%     {maps, Bool} -> if true maps is a valid representation for objects,
 %%                     default false.
 %%     binary -> a binary is returned
-%%     iolist -> a iolist is returned
+%%     iolist -> an iolist is returned
 %%     bom -> a UTF byte order mark is added at the head of the encoding
 %%     {atom_strings, Bool} -> determines if atoms for strings are allowed
 %%     {plain_string, Format} -> what format the strings are encoded in

@@ -39,12 +39,12 @@
 -include_lib("jhn_stdlib/include/uri.hrl").
 
 %% Records
--record(opts, {return_type = iolist :: iolist | binary,
+-record(opts, {ipv4 = false :: boolean(),
+               return_type = iolist :: iolist | binary,
                orig_call}).
 
 %% Types
 -type uri() :: #uri{}.
--type scheme() :: http | https | file.
 
 -type opt() :: none.
 
@@ -69,6 +69,12 @@
             C >= $a, C =< $z; C >=$@, C =< $Z;
             C >=$0, C =< $9; C >= $&, C =< $.;
             C == $!; C == $$; C == $:; C == $;;
+            C == $=; C == $_; C == $~).
+
+-define(IS_NC(C),
+            C >= $a, C =< $z; C >=$@, C =< $Z;
+            C >=$0, C =< $9; C >= $&, C =< $.;
+            C == $!; C == $$; C == $;;
             C == $=; C == $_; C == $~).
 
 -define(IS_HEX(C),
@@ -99,6 +105,8 @@ encode(Term) ->
 %%   Options are:
 %%     binary -> a binary is returned
 %%     iolist -> a iolist is returned
+%%     ipv4 -> encoded IPv6 host address has the two least sigificant
+%%             segments repesented in IPv4 address format
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(uri(), [opt()] | #opts{}) -> iolist() | binary().
@@ -151,7 +159,23 @@ decode(Binary, Opts) ->
 %% Encoding
 %% ===================================================================
 
-do_encode(URI = #uri{}, _) ->
+do_encode(URI = #uri{host = undefined}, _) ->
+    #uri{scheme = Scheme,
+         path = Path,
+         query = Query,
+         fragment = Fragment} = URI,
+    S = [atom_to_binary(Scheme, utf8), $:],
+    P = join(Path, $/),
+    Q = case Query of
+            <<>> -> [];
+            _ -> [$?, Query]
+        end,
+    F = case Fragment of
+            <<>> -> [];
+            _ -> [$#, Fragment]
+        end,
+    [S, P, Q, F];
+do_encode(URI = #uri{}, Opts) ->
     #uri{scheme = Scheme,
          userinfo = UserInfo,
          host = Host,
@@ -159,9 +183,44 @@ do_encode(URI = #uri{}, _) ->
          path = Path,
          query = Query,
          fragment = Fragment} = URI,
-    [atom_to_binary(Scheme, utf8), $:].
-     
-    
+    S = [atom_to_binary(Scheme, utf8), "://"],
+    I  = case UserInfo of
+             [] -> [];
+             _ -> [join(UserInfo, $:), $@]
+         end,
+    Po = case Port of
+             undefined -> [];
+             _ -> [$:, integer_to_binary(Port)]
+         end,
+    Pa = case Path of
+             [] -> [];
+             _ -> [$/, join(Path, $/)]
+         end,
+    Q = case Query of
+            <<>> -> [];
+            _ -> [$?, Query]
+        end,
+    F = case Fragment of
+            <<>> -> [];
+            _ -> [$#, Fragment]
+        end,
+    [S, I, encode_host(Host, Opts), Po, Pa, Q, F].
+
+encode_host(Bin, _) when is_binary(Bin) -> Bin;
+encode_host(IPv4 = {_, _, _, _}, _) ->
+    join([integer_to_binary(I) || I <- tuple_to_list(IPv4)], $.);
+encode_host({A, B, C, D, E, F, G, H}, Opts = #opts{ipv4 = true}) ->
+    <<A1:8/unsigned-integer,
+      B1:8/unsigned-integer,
+      C1:8/unsigned-integer,
+      D1:8/unsigned-integer>> = <<G:16/unsigned-integer, H:16/unsigned-integer>>,
+    IPv4 = encode_host({A1, B1, C1, D1}, Opts),
+    [join([integer_to_binary(I) || I <- [A, B, C, D, E, F]], $:), $:, IPv4];
+encode_host(IPv6 = {_, _, _, _, _, _, _, _}, _) ->
+    join([integer_to_binary(I) || I <- tuple_to_list(IPv6)], $:).
+
+join([], _) -> [];
+join([H | T], Sep) -> [H | [[Sep, E] || E <- T]].
 
 %% ===================================================================
 %% Decoding
@@ -169,7 +228,16 @@ do_encode(URI = #uri{}, _) ->
 
 do_decode(IOData, Opts) ->
     case next(IOData) of
-        {C, T} when ?IS_ALPHA(C) -> decode_scheme(T, [C], Opts);
+        {$/, _} -> decode_authority_or_path(IOData, [], #uri{}, Opts);
+        {$?, T} -> decode_query(T, [], #uri{}, Opts);
+        {$#, T} -> decode_fragment(T, [], #uri{}, Opts);
+        {$%, T} ->
+            {H, T1} = decode_escaped(T),
+            decode_nc(T1, [H], Opts);
+        {C, T} when ?IS_ALPHA(C) ->
+            decode_scheme(T, [C], Opts);
+        {C, T} when ?IS_NC(C) ->
+            decode_nc(T, [C], Opts);
         _ -> badarg(Opts)
     end.
 
@@ -178,18 +246,44 @@ decode_scheme(I, Acc, Opts) ->
         {$:, T} ->
             URI = #uri{scheme = to_scheme(Acc, [])},
             decode_authority_or_path(T, [], URI, Opts);
+        {$%, T} ->
+            {H, T1} = decode_escaped(T),
+            decode_nc(T1, [H | Acc], Opts);
+        {$/, T} ->
+            decode_path(T, [], [to_binary(Acc)], #uri{}, Opts);
         {C, T} when ?IS_SCHEME(C) ->
             decode_scheme(T, [C | Acc], Opts);
+        {C, T} when ?IS_NC(C) ->
+            decode_nc(T, [C| Acc], Opts);
         _ ->
             badarg(Opts)
     end.
 
+decode_nc(I, Acc, Opts) ->
+    case next(I) of
+        eos -> #uri{path = [to_binary(Acc)]};
+        {$/, T} -> decode_path(T, [], [to_binary(Acc)], #uri{}, Opts);
+        {$?, T} -> decode_query(T, [], #uri{path = [to_binary(Acc)]}, Opts);
+        {$#, T} -> decode_fragment(T, [], #uri{path = [to_binary(Acc)]}, Opts);
+        {$%, T} ->
+            {H, T1} = decode_escaped(T),
+            decode_nc(T1, [H | Acc], Opts);
+        {H, T} when ?IS_NC(H) ->
+            decode_nc(T, [H | Acc], Opts);
+        _ ->
+            badarg(Opts)
+    end.
+            
 decode_authority_or_path(I, Acc, URI, Opts) ->
     case {next(I), Acc} of
         {eos, _} -> URI#uri{path = to_binary(Acc)};
         {{$/, T}, []} -> decode_authority_or_path(T, [$/], URI, Opts);
         {{$/, T}, [$/]} -> decode_authority(T, [], URI, Opts);
-        {{H, T}, _} -> decode_path(T, [H], [], URI, Opts);
+        {{$%, T}, _} ->
+            {H, T1} = decode_escaped(T),
+            decode_path(T1, [H], [], URI, Opts);
+        {{H, T}, _} when ?IS_PCHAR(H) ->
+            decode_path(T, [H], [], URI, Opts);
         _ ->
             badarg(Opts)
     end.
@@ -485,6 +579,7 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt(ipv4, Opts) -> Opts#opts{ipv4 = true};
 parse_opt(_, Opts) -> badarg(Opts).
 
 %%--------------------------------------------------------------------
