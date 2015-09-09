@@ -118,6 +118,6 @@ I know I really should.
        "JSON Schema: core definitions and terminology"
   [11]: http://msgpack.org/
        "An efficient binary serialization format"
-  [12]: http://www.ietf.org/rfc3986.txt
+  [12]: http://www.ietf.org/rfc/rfc3986.txt
        "Uniform Resource Identifier (URI): Generic Syntax"
 
