@@ -164,7 +164,10 @@ do_encode(URI = #uri{host = undefined}, _) ->
          path = Path,
          query = Query,
          fragment = Fragment} = URI,
-    S = [atom_to_binary(Scheme, utf8), $:],
+    S = case Scheme of
+            undefined -> [];
+            _ -> [atom_to_binary(Scheme, utf8), $:]
+        end,
     P = join(Path, $/),
     Q = case Query of
             <<>> -> [];
@@ -183,7 +186,10 @@ do_encode(URI = #uri{}, Opts) ->
          path = Path,
          query = Query,
          fragment = Fragment} = URI,
-    S = [atom_to_binary(Scheme, utf8), "://"],
+    S = case Scheme of
+            undefined -> [];
+            _ -> [atom_to_binary(Scheme, utf8), "://"]
+        end,
     I  = case UserInfo of
              [] -> [];
              _ -> [join(UserInfo, $:), $@]
