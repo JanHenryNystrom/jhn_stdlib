@@ -1486,7 +1486,10 @@ validate_json([{format, Format} | T], JSON, State) when is_binary(Format) ->
     validate_json(T, JSON, State);
 validate_json([{id, Id} | T], JSON, State) when is_binary(Id)->
     validate_json(T, JSON, State);
-validate_json([{'$schema', Schema} | T], JSON, State) when is_binary(Schema)->
+validate_json([{'$schema', Schema} | T], JSON, State) when is_binary(Schema) ->
+    validate_json(T, JSON, State);
+%% REFs not implemented yet
+validate_json([{'$ref', _} | T], JSON, State) ->
     validate_json(T, JSON, State).
 
 validate_array([], _, _, _) -> true;
@@ -1581,7 +1584,8 @@ validate_enum([S | T], JSON, State) when is_binary(S), is_binary(JSON) ->
         JSON -> true;
         _ -> validate_enum(T, JSON, State)
     end;
-validate_enum([N | _], JSON, _) when is_number(N), is_number(JSON) -> N =:= JSON;
+validate_enum([N | _], JSON, _) when is_number(N), is_number(JSON) ->
+    true = N =:= JSON;
 validate_enum([Array | T], JSON, State) when is_list(Array), is_list(JSON) ->
     try [validate_enum([A], J, State) || {A, J} <- lists:zip(Array, JSON)]
     catch _:_ ->
@@ -1591,7 +1595,9 @@ validate_enum([{SProps} | T], JSON = {JProps}, State) ->
     try [validate_enum_prop(SProp, JProp, State)  ||
             {SProp, JProp} <- lists:zip(lists:sort(SProps), lists:sort(JProps))]
     catch _:_ -> validate_enum(T, JSON, State)
-    end.
+    end;
+validate_enum([_ | T], JSON, State) ->
+    validate_enum(T, JSON, State).
                      
 validate_enum_prop({Key, SVal}, {Key, JVal}, State = #state{atom_keys = true}) ->
     validate_enum([SVal], JVal, State);
@@ -1612,15 +1618,15 @@ validate_anyof([Schema | Schemas], JSON, State) ->
     end.
 
 validate_oneof([], _, true, _) -> true;
-validate_oneof([Schema | Schemas], false, JSON, State) ->
+validate_oneof([Schema | Schemas], JSON, false, State) ->
     try validate_schema(Schema, JSON, State) of
-        _ -> validate_oneof(Schemas, true, JSON, State)
-    catch _: _ -> validate_oneof(Schemas, false, JSON, State)
+        _ -> validate_oneof(Schemas, JSON, true, State)
+    catch _: _ -> validate_oneof(Schemas, JSON, false, State)
     end;
-validate_oneof([Schema | Schemas], true, JSON, State) ->
+validate_oneof([Schema | Schemas], JSON, true, State) ->
     try validate_schema(Schema, JSON, State) of
         _ -> erlang:throw(more_than_oneof)
-    catch _: _ -> validate_oneof(Schemas, true, JSON, State)
+    catch _: _ -> validate_oneof(Schemas, JSON, true, State)
     end.
 
 string_length(String, #state{plain_string = {utf16,_}}) -> byte_size(String) * 2;

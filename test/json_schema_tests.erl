@@ -36,144 +36,139 @@
 %% additionalItems
 %%--------------------------------------------------------------------
 
-additionalItems_test_() -> [gen_suite(Suite) || Suite <- load(additionalItems)].
+additionalItems_test_() -> suites(additionalItems).
 
 %%--------------------------------------------------------------------
 %% additionalProperties
 %%--------------------------------------------------------------------
 
-additionalProperties_test_() ->
-    [gen_suite(Suite) || Suite <- load(additionalProperties)].
+additionalProperties_test_() -> suites(additionalProperties).
 
 %%--------------------------------------------------------------------
 %% allOf
 %%--------------------------------------------------------------------
 
-allOf_test_() -> [gen_suite(Suite) || Suite <- load(allOf)].
+allOf_test_() -> suites(allOf).
 
 %%--------------------------------------------------------------------
 %% anyOf
 %%--------------------------------------------------------------------
 
-anyOf_test_() -> [gen_suite(Suite) || Suite <- load(anyOf)].
+anyOf_test_() -> suites(anyOf).
 
 %%--------------------------------------------------------------------
 %% default
 %%--------------------------------------------------------------------
 
-default_test_() -> [gen_suite(Suite) || Suite <- load(default)].
+default_test_() -> suites(default).
 
 %%--------------------------------------------------------------------
 %% definitions
 %%--------------------------------------------------------------------
 
-%% definitions_test_() ->
-%%     [gen_suite(Suite) || Suite <- load(definitions)].
+%% definitions_test_() -> [gen_suite(Suite) || Suite <- load(definitions)].
 
 %%--------------------------------------------------------------------
 %% dependencies
 %%--------------------------------------------------------------------
 
-dependencies_test_() -> [gen_suite(Suite) || Suite <- load(dependencies)].
+dependencies_test_() -> suites(dependencies).
 
 %%--------------------------------------------------------------------
 %% enum
 %%--------------------------------------------------------------------
 
-%% enum_test_() ->
-%%     [gen_suite(Suite) || Suite <- load(enum)].
+enum_test_() -> suites(enum).
 
 %%--------------------------------------------------------------------
 %% items
 %%--------------------------------------------------------------------
 
-items_test_() -> [gen_suite(Suite) || Suite <- load(items)].
+items_test_() -> suites(items).
 
 %%--------------------------------------------------------------------
 %% maxItems
 %%--------------------------------------------------------------------
 
-maxItems_test_() -> [gen_suite(Suite) || Suite <- load(maxItems)].
+maxItems_test_() -> suites(maxItems).
 
 %%--------------------------------------------------------------------
 %% maxLength
 %%--------------------------------------------------------------------
 
-maxLength_test_() -> [gen_suite(Suite) || Suite <- load(maxLength)].
+maxLength_test_() -> suites(maxLength).
 
 %%--------------------------------------------------------------------
 %% maxProperties
 %%--------------------------------------------------------------------
 
-maxProperties_test_() -> [gen_suite(Suite) || Suite <- load(maxProperties)].
+maxProperties_test_() -> suites(maxProperties).
 
 %%--------------------------------------------------------------------
 %% maximum
 %%--------------------------------------------------------------------
 
-maximum_test_() -> [gen_suite(Suite) || Suite <- load(maximum)].
+maximum_test_() -> suites(maximum).
 
 %%--------------------------------------------------------------------
 %% minItems
 %%--------------------------------------------------------------------
 
-minItems_test_() -> [gen_suite(Suite) || Suite <- load(minItems)].
+minItems_test_() -> suites(minItems).
 
 %%--------------------------------------------------------------------
 %% minLength
 %%--------------------------------------------------------------------
 
-minLength_test_() -> [gen_suite(Suite) || Suite <- load(minLength)].
+minLength_test_() -> suites(minLength).
 
 %%--------------------------------------------------------------------
 %% minProperties
 %%--------------------------------------------------------------------
 
-minProperties_test_() -> [gen_suite(Suite) || Suite <- load(minProperties)].
+minProperties_test_() -> suites(minProperties).
 
 %%--------------------------------------------------------------------
 %% minimum
 %%--------------------------------------------------------------------
 
-minimum_test_() -> [gen_suite(Suite) || Suite <- load(minimum)].
+minimum_test_() -> suites(minimum).
 
 %%--------------------------------------------------------------------
 %% multipleOf
 %%--------------------------------------------------------------------
 
-multipleOf_test_() -> [gen_suite(Suite) || Suite <- load(multipleOf)].
+multipleOf_test_() -> suites(multipleOf).
 
 %%--------------------------------------------------------------------
 %% not
 %%--------------------------------------------------------------------
 
-not_test_() -> [gen_suite(Suite) || Suite <- load('not')].
+not_test_() -> suites('not').
 
 %%--------------------------------------------------------------------
 %% oneOf
 %%--------------------------------------------------------------------
 
-%% oneOf_test_() ->
-%%     [gen_suite(Suite) || Suite <- load(oneOf)].
+oneOf_test_() -> suites(oneOf).
 
 %%--------------------------------------------------------------------
 %% pattern
 %%--------------------------------------------------------------------
 
-pattern_test_() -> [gen_suite(Suite) || Suite <- load(pattern)].
+pattern_test_() -> suites(pattern).
 
 %%--------------------------------------------------------------------
 %% patternProperties
 %%--------------------------------------------------------------------
 
-patternProperties_test_() ->
-    [gen_suite(Suite) || Suite <- load(patternProperties)].
+patternProperties_test_() -> suites(patternProperties).
 
 %%--------------------------------------------------------------------
 %% properties
 %%--------------------------------------------------------------------
 
-properties_test_() -> [gen_suite(Suite) || Suite <- load(properties)].
+properties_test_() -> suites(properties).
 
 %%--------------------------------------------------------------------
 %% ref
@@ -193,51 +188,52 @@ properties_test_() -> [gen_suite(Suite) || Suite <- load(properties)].
 %% required
 %%--------------------------------------------------------------------
 
-required_test_() -> [gen_suite(Suite) || Suite <- load(required)].
+required_test_() -> suites(required).
 
 %%--------------------------------------------------------------------
 %% type
 %%--------------------------------------------------------------------
 
-type_test_() -> [gen_suite(Suite) || Suite <- load(type)].
+type_test_() -> suites(type).
 
 %%--------------------------------------------------------------------
 %% uniqueItems
 %%--------------------------------------------------------------------
 
-uniqueItems_test_() -> [gen_suite(Suite) || Suite <- load(uniqueItems)].
+uniqueItems_test_() -> suites(uniqueItems).
+    
 
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
 
-gen_suite({Suite}) ->        
+suites(Name) ->
+    [[gen_suite(Suite, Opts) || Suite <- load(Name, Opts)] ||
+        Opts <- [[atom_keys]]].
+
+gen_suite({Suite}, Opts) ->        
     Description = plist:find(description, Suite),
     Schema = plist:find(schema, Suite),
     Tests = plist:find(tests, Suite),
-    [gen_test(Description, Schema, Test) || Test <- Tests].
+    {Description, [gen_test(Schema, Test, Opts)|| Test <- Tests]}.
 
-gen_test(Description, Schema, {Test}) ->
+gen_test(Schema, {Test}, Opts) ->
     TestDescription = plist:find(description, Test),
     Data = plist:find(data, Test),
     case plist:find(valid, Test) of
         true ->
-            {iolist_to_binary([Description, " : ", TestDescription]),
-             begin
-                 %% ?debugFmt("~n~n~n~njson:validate(~w, ~w)~n~n~n~n",
-                 %%           [Schema, Data]),
-                 ?_test(?assertEqual(true,
-                                     json:validate(Schema, Data, [atom_keys])))
-             end};
+            {TestDescription,
+             ?_test(?assertEqual(true,
+                                 json:validate(Schema, Data, Opts)))};
         false ->
-            {iolist_to_binary([Description, " : ", TestDescription]),
+            {TestDescription,
              ?_test(?assertEqual(false,
-                                 json:validate(Schema, Data, [atom_keys])))}
+                                 json:validate(Schema, Data, Opts)))}
     end.
 
-load(TestSuites) ->
+load(TestSuites, Opts) ->
     {ok, Bin} = file:read_file(file(TestSuites)),
-    json:decode(Bin, [atom_keys]).
+    json:decode(Bin, Opts).
 
 file(TestSuites) ->
     filename:join([code:lib_dir(jhn_stdlib, deps),
