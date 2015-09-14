@@ -365,7 +365,7 @@ validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 %%--------------------------------------------------------------------
 validate(Schema, JSON, State = #state{}) when is_binary(Schema) ->
     validate(decode(Schema, #state{atom_keys = true}), JSON, State);
-validate(Schema, Binary, State) when is_binary(Binary) ->
+validate(Schema, Binary, State = #state{decode = true}) when is_binary(Binary) ->
     validate(Schema, decode(Binary, State));
 validate(Schema, JSON, State = #state{decode = Decode}) ->
     try {Decode, validate_schema(Schema, JSON, State)} of
@@ -826,7 +826,8 @@ unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32B}) ->
 unescape_hex(_, _, State) ->
     badarg(State).
 
-encode_hex(List, State) -> encode_char(list_to_integer(List, 16), State).
+encode_hex(List, #state{encoding = Enc}) ->
+    char_code(<<(list_to_integer(List, 16)):16/unsigned-integer>>, ?UTF16B, Enc).
 
 decode_skip(Binary, H, State) ->
     case next(Binary, State) of
@@ -1301,6 +1302,8 @@ eval_json(X, _, Path, _) ->
 validate_schema({Schema}, JSON, State) ->
     validate_json(Schema, JSON, State#state{schema = Schema}).
 
+%% Done
+validate_json([], _, _) -> true;
 %% Numeric
 validate_json([{multipleOf, _} | T], JSON, State) when not is_number(JSON) ->
     validate_json(T, JSON, State);
@@ -1389,8 +1392,15 @@ validate_json([{minProperties, N}|T],JSON={M},State) when is_integer(N), N > 0 -
 validate_json([{required, _} | T], JSON, State) when not is_tuple(JSON) ->
     validate_json(T, JSON, State);
 validate_json([{required, Reqs = [_ | _]} | T], JSON = {M}, State) ->
+    #state{atom_keys = AtomKeys,
+           existing_atom_keys = ExistingAtomKeys,
+           plain_string = Plain} = State,
     Keys = plist:keys(M),
-    [true = lists:member(Req, Keys) || Req <- Reqs],
+    Reqs1 = case AtomKeys or ExistingAtomKeys of
+                true -> [binary_to_atom(R, utf8) || R <- Reqs];
+                false -> [char_code(R, utf8, Plain) || R <- Reqs]
+            end,
+    [true = lists:member(Req, Keys) || Req <- Reqs1],
     validate_json(T, JSON, State);
 validate_json([{properties, _} | T], JSON, State=#state{props_validated=true}) ->
     validate_json(T, JSON, State);
@@ -1398,20 +1408,20 @@ validate_json([{patternProperties,_}|T],J,State=#state{props_validated=true}) ->
     validate_json(T, J, State);
 validate_json([{additionalProperties, _}|T],J,S=#state{props_validated=true}) ->
     validate_json(T, J, S);
-validate_json([{properties, Props} | T], JSON = {_}, State) ->
+validate_json([{properties, Props} | T], JSON = {M}, State) ->
     Patterns = plist:find(patternProperties, T),
     Additional = plist:find(additionalProperties, T),
-    validate_object(JSON, Props, Patterns, Additional, State),
+    validate_object(M, Props, Patterns, Additional, State),
     validate_json(T, JSON, State#state{props_validated = true});
-validate_json([{patternProperties, Patterns} | T], JSON = {_}, State) ->
+validate_json([{patternProperties, Patterns} | T], JSON = {M}, State) ->
     Props = plist:find(properties, T),
     Additional = plist:find(additionalProperties, T),
-    validate_object(JSON, Props, Patterns, Additional, State),
+    validate_object(M, Props, Patterns, Additional, State),
     validate_json(T, JSON, State#state{props_validated = true});
-validate_json([{additionalProperties, Additional} | T], JSON = {_}, State) ->
+validate_json([{additionalProperties, Additional} | T], JSON = {M}, State) ->
     Props = plist:find(properties, T),
     Patterns = plist:find(patternProperties, T),
-    validate_object(JSON, Props, Patterns, Additional, State),
+    validate_object(M, Props, Patterns, Additional, State),
     validate_json(T, JSON, State#state{props_validated = true});
 validate_json([{properties, _} | T], JSON, State) ->
     validate_json(T, JSON, State);
@@ -1479,7 +1489,6 @@ validate_json([{id, Id} | T], JSON, State) when is_binary(Id)->
 validate_json([{'$schema', Schema} | T], JSON, State) when is_binary(Schema)->
     validate_json(T, JSON, State).
 
-
 validate_array([], _, _, _) -> true;
 validate_array(_, [], true, _) -> true;
 validate_array(JSON, [], Schema = {_}, State) ->
@@ -1508,7 +1517,7 @@ select_property(Key, {Props}, #state{atom_keys = true}) ->
 select_property(Key, {Props}, #state{existing_atom_keys = true}) ->
     plist:find(Key, Props);
 select_property(Key, {Props}, #state{plain_string = Plain}) ->
-    Key1 = char_code(atom_to_binary(Key, utf8), utf8, Plain),
+    Key1 = binary_to_atom(char_code(Key, Plain, utf8), utf8),
     plist:find(Key1, Props).
 
 select_patterns(_, undefined, _) -> [];
