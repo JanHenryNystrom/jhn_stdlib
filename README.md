@@ -33,9 +33,10 @@ Features/Modules
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- json [rfc6901][8]
     * Evaluation JSON Patch -- json [rfc6902][9]
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10]
-    * MessagePack -- msgpack [MessagePack][11]/Erlang
+                                     [draft-fge-json-schema-validation-00][11]
+    * MessagePack -- msgpack [MessagePack][12]/Erlang
   * Standards
-    * Encoding/decoding URI/Erlang -- uri [rfc3986][12]
+    * Encoding/decoding URI/Erlang -- uri [rfc3986][13]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
   * Data structures
@@ -116,8 +117,10 @@ I know I really should.
        "JavaScript Object Notation (JSON) Patch"
   [10]: http://tools.ietf.org/id/draft-zyp-json-schema-04.txt
        "JSON Schema: core definitions and terminology"
-  [11]: http://msgpack.org/
+  [11]: http://tools.ietf.org/id/draft-fge-json-schema-validation-00.txt
+       "JSON Schema: interactive and non interactive validation"
+  [12]: http://msgpack.org/
        "An efficient binary serialization format"
-  [12]: http://www.ietf.org/rfc/rfc3986.txt
+  [13]: http://www.ietf.org/rfc/rfc3986.txt
        "Uniform Resource Identifier (URI): Generic Syntax"
 
