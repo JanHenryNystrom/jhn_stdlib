@@ -72,11 +72,14 @@
 -export([encode/1, encode/2,
          decode/1, decode/2,
          eval/2, eval/3,
-         validate/2, validate/3
+         validate/1, validate/2, validate/3
         ]).
 
 %% Exported types
 -export_type([json/0, pointer/0]).
+
+%% Includes
+-include_lib("jhn_stdlib/include/uri.hrl").
 
 %% Types
 -type encoding()     :: utf8 | {utf16, little | big} | {utf32, little | big}.
@@ -116,6 +119,8 @@
           %% Internal use
           step = 1 :: 1 | 2 | 4,
           pos = 0 :: integer(),
+          top :: json(),
+          base = #uri{},
           schema :: json(),
           props_validated = false :: boolean(),
           orig_call
@@ -336,13 +341,24 @@ eval(Pointer, Binary, Opts) ->
     eval(Pointer, Binary, State).
 
 %%--------------------------------------------------------------------
-%% Function: validate(JSONSchema, JSON) -> true | {true, Term} | false.
+%% Function: validate(JSONSchema) -> {true, Term} | false.
+%% @doc
+%%   Validates a JSONSchema document based on the json-schema schema.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate(json() | binary()) -> {true, json()} | false.
+%%--------------------------------------------------------------------
+validate(Schema) ->
+    validate(load_schema('schema.json'), Schema, [decode]).
+
+%%--------------------------------------------------------------------
+%% Function: validate(JSONSchema, JSON) -> true | false.
 %% @doc
 %%   Validates a JSON document based on the Schema.
 %%   Equivalent of validate(JSONSchema, JSON, [])
 %% @end
 %%--------------------------------------------------------------------
--spec validate(binary(), binary()) -> true | {true, json()} | false.
+-spec validate(json() | binary(), json()) -> true | false.
 %%--------------------------------------------------------------------
 validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 
@@ -366,9 +382,9 @@ validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 validate(Schema, JSON, State = #state{}) when is_binary(Schema) ->
     validate(decode(Schema, State), JSON, State);
 validate(Schema, Binary, State = #state{decode = true}) when is_binary(Binary) ->
-    validate(Schema, decode(Binary, State));
+    validate(Schema, decode(Binary, State), State);
 validate(Schema, JSON, State = #state{decode = Decode}) ->
-    try {Decode, validate_schema(Schema, JSON, State)} of
+    try {Decode, validate_schema(Schema, JSON, State#state{top = Schema})} of
         {true, _} -> {true, JSON};
         {false, _} -> true
     catch
@@ -955,11 +971,11 @@ decode_pointer_member(Bin, Acc,State=#state{encoding=Enc,plain_string=Plain}) ->
             case next(T, State) of
                 {$0, T1} ->
                     decode_pointer_member(T1,
-                                          [encode_char($~, Plain) | Acc],
+                                          [encode_char($~, State) | Acc],
                                           State);
                 {$1, T1} ->
                     decode_pointer_member(T1,
-                                          [encode_char($/, Plain) | Acc],
+                                          [encode_char($/, State) | Acc],
                                           State)
             end;
         {H, T} ->
@@ -1304,15 +1320,21 @@ validate_schema({Schema}, JSON, State) ->
 
 validate_json([], _, _) -> true;
 validate_json([{K, V} | T], JSON, State = #state{atom_keys = true}) ->
-    validate_prop(K, V, JSON, State),
-    validate_json(T, JSON, State);
+    case validate_prop(K, V, JSON, State) of
+        State1 = #state{} -> validate_json(T, JSON, State1);
+        _ -> validate_json(T, JSON, State)
+    end;
 validate_json([{K, V} | T], JSON, State = #state{existing_atom_keys = true}) ->
-    validate_prop(K, V, JSON, State),
-    validate_json(T, JSON, State);
+    case validate_prop(K, V, JSON, State) of
+        State1 = #state{} -> validate_json(T, JSON, State1);
+        _ -> validate_json(T, JSON, State)
+    end;
 validate_json([{K, V}  | T], JSON, State = #state{plain_string = Plain}) ->
     K1 = binary_to_atom(char_code(K, Plain, utf8), utf8),
-    validate_prop(K1, V, JSON, State),
-    validate_json(T, JSON, State).
+    case validate_prop(K1, V, JSON, State) of
+        State1 = #state{} -> validate_json(T, JSON, State1);
+        _ -> validate_json(T, JSON, State)
+    end.
 
 %% Numeric
 validate_prop(multipleOf, _, JSON, _) when not is_number(JSON) -> true;
@@ -1455,6 +1477,8 @@ validate_prop(type, <<"object">>, {_}, _) ->
     true;
 validate_prop(type, Types, JSON, State) when is_list(Types) ->
     validate_type(Types, JSON, State);
+validate_prop(type, _, _, _) ->
+    erlang:throw(invalid_type);
 validate_prop(allOf, Schemas = [_ | _], JSON, State) ->
     State1 = State#state{props_validated = false},
     [validate_schema(Schema, JSON, State1) || Schema <- Schemas];
@@ -1479,12 +1503,15 @@ validate_prop(default, _, _, _) ->
 %% Format
 validate_prop(format, Format, _, _) when is_binary(Format) ->
     true;
-validate_prop(id, Id, _, _) when is_binary(Id)->
-    true;
+validate_prop(id, Id, _, State = #state{plain_string=utf8}) when is_binary(Id)->
+    State#state{base = uri:decode(Id)};
+validate_prop(id, Id, _, State = #state{plain_string=Plain}) when is_binary(Id)->
+    State#state{base = uri:decode(char_code(Id, Plain, utf8))};
 validate_prop('$schema', Schema, _, _) when is_binary(Schema) ->
     true;
-%% REFs not implemented yet
-validate_prop('$ref', _, _, _) ->
+validate_prop('$ref', Ref, JSON, State) ->
+    validate_ref(Ref, JSON, State);
+validate_prop(_, {_}, _, _) ->
     true.
 
 schema(Key, #state{atom_keys = true, schema = Schema}, Default) ->
@@ -1613,6 +1640,56 @@ validate_oneof([Schema | Schemas], JSON, true, State) ->
     catch _: _ -> validate_oneof(Schemas, JSON, true, State)
     end.
 
+validate_ref(Ref, JSON, State = #state{top = Top, base = Base,plain_string=P}) ->
+    Ref1 = case P of
+               utf8 -> Ref;
+               _ -> char_code(Ref, P, utf8)
+           end,
+    State1 = State#state{props_validated = false},
+    case uri:decode(Ref1) of
+        #uri{path = [], fragment = <<>>} -> validate_schema(Top, JSON, State1);
+        #uri{path = [], fragment = Pointer} ->
+            validate_schema(eval(Pointer, Top, State#state{decode = true}),
+                            JSON,
+                            State1);
+        URI ->
+            #uri{scheme = BS, host = BH, path = BP} = Base, 
+            case URI of
+                #uri{scheme = BS, host = BH, path = BP, fragment = <<>>} ->
+                    validate_schema(Top, JSON, State1);
+                #uri{scheme = BS, host = BH, path = BP, fragment=Pointer} ->
+                    Schema = eval(Pointer, Top, State#state{decode = true}),
+                    validate_schema(Schema, JSON, State1);
+                #uri{scheme = http,
+                     host = <<"json-schema.org">>,
+                     path = [<<"draft-04">>,<<"schema">>],
+                     fragment = <<>>} ->
+                    Schema = decode(load_schema('schema.json'), State),
+                    validate_schema(Schema, JSON, State1#state{top = Schema});
+                #uri{scheme = http,
+                     host = <<"json-schema.org">>,
+                     path = [<<"draft-04">>,<<"schema">>],
+                     fragment = Pointer} ->
+                    Schema =
+                        eval(Pointer,
+                             load_schema('schema.json'),
+                             State#state{decode = true}),
+                    validate_schema(Schema, JSON, State1#state{top = Schema});
+                #uri{fragment = <<>>} ->
+                    Schema = decode(resolve(URI, State), State),
+                    validate_schema(Schema, JSON, State1);
+                #uri{fragment = Pointer} ->
+                    Schema =
+                        eval(Pointer,
+                             resolve(URI, State),
+                             State#state{decode = true}),
+                    validate_schema(Schema, JSON, State1)
+                end
+    end.
+
+resolve(_, _) -> erlang:error(tbd).
+
+
 string_length(String, #state{plain_string = {utf16,_}}) ->
     byte_size(String) div 2;
 string_length(String, #state{plain_string = {utf32,_}}) ->
@@ -1724,6 +1801,11 @@ char_code(Text, ?UTF32L, ?UTF16L) ->
     << <<C/utf16-little>> || <<C/utf32-little>> <= Text >>;
 char_code(Text, ?UTF32L, ?UTF32B) ->
     << <<C/utf32-big>> || <<C/utf32-little>> <= Text >>.
+
+load_schema(Schema) ->
+    {ok, Bin} =
+        file:read_file(filename:join([code:priv_dir(jhn_stdlib), Schema])),
+    Bin.
 
 %%--------------------------------------------------------------------
 -spec badarg(#state{}) -> no_return().

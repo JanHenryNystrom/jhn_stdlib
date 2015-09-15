@@ -33,6 +33,32 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
+%% schema.json
+%%--------------------------------------------------------------------
+json_schema_test_() ->
+    {ok, Schema} =
+        file:read_file(
+          filename:join([code:priv_dir(jhn_stdlib), 'schema.json'])),
+    [{"schema.json", ?_test(?assertMatch({true, _}, json:validate(Schema)))}].
+
+all_schema_test_() ->
+    Dir = filename:join([code:lib_dir(jhn_stdlib, deps),
+                         'JSON-Schema-Test-Suite',
+                         'tests',
+                         'draft4']),
+    {ok, Files} = file:list_dir(Dir),
+    Files1 = [File || File <- Files, filename:extension(File) == ".json"],
+    [{File,
+      [?_test(?assertMatch({true, _}, json:validate(Schema))) ||
+          Schema <-
+              [plist:find(<<"schema">>, Suite) ||
+                  {Suite} <-
+                      json:decode(
+                        element(2,
+                                file:read_file(filename:join(Dir, File))))]]} ||
+        File <- Files1].
+
+%%--------------------------------------------------------------------
 %% additionalItems
 %%--------------------------------------------------------------------
 
@@ -66,7 +92,7 @@ default_test_() -> suites(default).
 %% definitions
 %%--------------------------------------------------------------------
 
-%% definitions_test_() -> [gen_suite(Suite) || Suite <- load(definitions)].
+definitions_test_() -> suites(definitions).
 
 %%--------------------------------------------------------------------
 %% dependencies
@@ -174,8 +200,7 @@ properties_test_() -> suites(properties).
 %% ref
 %%--------------------------------------------------------------------
 
-%% ref_test_() ->
-%%     [gen_suite(Suite) || Suite <- load(ref)].
+ref_test_() -> suites(ref).
 
 %%--------------------------------------------------------------------
 %% refRemote
