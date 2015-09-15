@@ -417,7 +417,7 @@ encode_object(Object = #{}, State) ->
                      [encode_value(Value, State), Colon,
                       encode_string(Name, State), Comma | Acc]
              end,
-    case lists:reverse(maps:fold(Encode, [], Object)) of
+    case maps:fold(Encode, [], Object) of
         [] -> encode_chars(<<"{}">>, State);
         [_ | Members] ->
             [encode_char(${, State), Members, encode_char($}, State)]
