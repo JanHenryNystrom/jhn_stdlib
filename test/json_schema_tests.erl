@@ -209,18 +209,29 @@ uniqueItems_test_() -> suites(uniqueItems).
 
 suites(Name) ->
     [[gen_suite(Suite, Opts) || Suite <- load(Name, Opts)] ||
-        Opts <- [[atom_keys]]].
+        Opts <- [
+                 [],
+                 [atom_keys],
+                 [{plain_string, utf8}],
+                 [{plain_string, {utf16, big}}],
+                 [{plain_string, {utf16, little}}],
+                 [{plain_string, {utf32, big}}],
+                 [{plain_string, {utf32, little}}],
+                 [atom_keys, {plain_string, {utf16, big}}],
+                 [atom_keys, {plain_string, {utf32, big}}]
+                ]
+    ].
 
-gen_suite({Suite}, Opts) ->        
-    Description = plist:find(description, Suite),
-    Schema = plist:find(schema, Suite),
-    Tests = plist:find(tests, Suite),
+gen_suite(Suite, Opts) ->
+    Description = find(description, Suite, Opts),
+    Schema = find(schema, Suite, Opts),
+    Tests = find(tests, Suite, Opts),
     {Description, [gen_test(Schema, Test, Opts)|| Test <- Tests]}.
 
-gen_test(Schema, {Test}, Opts) ->
-    TestDescription = plist:find(description, Test),
-    Data = plist:find(data, Test),
-    case plist:find(valid, Test) of
+gen_test(Schema, Test, Opts) ->
+    TestDescription = find(description, Test, Opts),
+    Data = find(data, Test, Opts),
+    case find(valid, Test, Opts) of
         true ->
             {TestDescription,
              ?_test(?assertEqual(true,
@@ -242,4 +253,14 @@ file(TestSuites) ->
                    'draft4',
                    atom_to_list(TestSuites) ++ ".json"
                   ]).
-    
+
+find(Key, {Object}, Opts) ->
+    Atom = lists:member(atom_keys,Opts) or lists:member(existing_atom_keys,Opts),
+    case {Atom, plist:find(plain_string, Opts, utf8)} of
+        {true, _} -> plist:find(Key, Object);
+        {_, Plain} ->
+            Key1 = unicode:characters_to_binary(atom_to_binary(Key, utf8),
+                                                utf8,
+                                                Plain),
+            plist:find(Key1, Object)
+    end.

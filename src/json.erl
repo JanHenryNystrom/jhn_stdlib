@@ -364,7 +364,7 @@ validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
           true | {true, json()} | false.
 %%--------------------------------------------------------------------
 validate(Schema, JSON, State = #state{}) when is_binary(Schema) ->
-    validate(decode(Schema, #state{atom_keys = true}), JSON, State);
+    validate(decode(Schema, State), JSON, State);
 validate(Schema, Binary, State = #state{decode = true}) when is_binary(Binary) ->
     validate(Schema, decode(Binary, State));
 validate(Schema, JSON, State = #state{decode = Decode}) ->
@@ -1302,195 +1302,197 @@ eval_json(X, _, Path, _) ->
 validate_schema({Schema}, JSON, State) ->
     validate_json(Schema, JSON, State#state{schema = Schema}).
 
-%% Done
 validate_json([], _, _) -> true;
+validate_json([{K, V} | T], JSON, State = #state{atom_keys = true}) ->
+    validate_prop(K, V, JSON, State),
+    validate_json(T, JSON, State);
+validate_json([{K, V} | T], JSON, State = #state{existing_atom_keys = true}) ->
+    validate_prop(K, V, JSON, State),
+    validate_json(T, JSON, State);
+validate_json([{K, V}  | T], JSON, State = #state{plain_string = Plain}) ->
+    K1 = binary_to_atom(char_code(K, Plain, utf8), utf8),
+    validate_prop(K1, V, JSON, State),
+    validate_json(T, JSON, State).
+
 %% Numeric
-validate_json([{multipleOf, _} | T], JSON, State) when not is_number(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{multipleOf, N} | T], JSON, State) when is_number(N), N > 0 ->
-    0.0 = (JSON / N - trunc(JSON / N)) * N,
-    validate_json(T, JSON, State);
-validate_json([{maximum, _} | T], JSON, State) when not is_number(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{maximum, N} | T], JSON, State) when is_number(N) ->
-    case plist:find(exclusiveMaximum, State#state.schema, false) of
+validate_prop(multipleOf, _, JSON, _) when not is_number(JSON) -> true;
+validate_prop(multipleOf, N, JSON, _) when is_number(N), N > 0 ->
+    0.0 = (JSON / N - trunc(JSON / N)) * N;
+validate_prop(maximum, _, JSON, _) when not is_number(JSON) ->
+    true;
+validate_prop(maximum, N, JSON, State) when is_number(N) ->
+    case schema(exclusiveMaximum, State, false) of
+        undefined -> true = JSON =< N;
         false -> true = JSON =< N;
         true -> true = JSON < N
-    end,
-    validate_json(T, JSON, State);
-validate_json([{exclusiveMaximum, _} | T], JSON, State) ->
-    validate_json(T, JSON, State);
-validate_json([{minimum, _} | T], JSON, State) when not is_number(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{minimum, N} | T], JSON, State) when is_number(N) ->
-    case plist:find(exclusiveMinimum, State#state.schema, false) of
+    end;
+validate_prop(exclusiveMaximum, _, _, _) ->
+    true;
+validate_prop(minimum, _, JSON, _) when not is_number(JSON) ->
+    true;
+validate_prop(minimum, N, JSON, State) when is_number(N) ->
+    case schema(exclusiveMinimum, State, false) of
         false -> true = JSON >= N;
         true -> true = JSON > N
-    end,
-    validate_json(T, JSON, State);
-validate_json([{exclusiveMinimum, _} | T], JSON, State) ->
-    validate_json(T, JSON, State);
+    end;
+validate_prop(exclusiveMinimum, _, _, _) ->
+    true;
 %%  Strings
-validate_json([{maxLength, _} | T], JSON, State) when not is_binary(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{maxLength, N} | T], JSON, State) when is_integer(N), N >= 0 ->
-    true = string_length(JSON, State) =< N,
-    validate_json(T, JSON, State);
-validate_json([{minLength, _} | T], JSON, State) when not is_binary(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{minLength, N} | T], JSON, State) when is_integer(N), N >= 0 ->
-    true = string_length(JSON, State) >= N,
-    validate_json(T, JSON, State);
-validate_json([{pattern, _} | T], JSON, State) when not is_binary(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{pattern, Pattern} | T], JSON, State) when is_binary(Pattern) ->
+validate_prop(maxLength, _, JSON, _) when not is_binary(JSON) ->
+    true;
+validate_prop(maxLength, N, JSON, State) when is_integer(N), N >= 0 ->
+    true = string_length(JSON, State) =< N;
+validate_prop(minLength, _, JSON, _) when not is_binary(JSON) ->
+    true;
+validate_prop(minLength, N, JSON, State) when is_integer(N), N >= 0 ->
+    true = string_length(JSON, State) >= N;
+validate_prop(pattern, _, JSON, _) when not is_binary(JSON) ->
+    true;
+validate_prop(pattern, Pattern, JSON, State) when is_binary(Pattern) ->
     #state{plain_string = Plain} = State,
-    {match, _} = re:run(char_code(JSON, Plain, utf8), Pattern, [unicode]),
-    validate_json(T, JSON, State);
+    {match, _} = re:run(char_code(JSON, Plain, utf8),
+                        char_code(Pattern, Plain, utf8),
+                        [unicode]);
 %%  Arrays
-validate_json([{items, _} | T], JSON, State) when not is_list(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{items, Items = {_}} | T], JSON, State) ->
+validate_prop(items, _, JSON, _) when not is_list(JSON) ->
+    true;
+validate_prop(items, Items = {_}, JSON, State) ->
     State1 = State#state{props_validated = false},
-    [validate_schema(Items, J, State1) || J <- JSON],
-    validate_json(T, JSON, State1);
-validate_json([{items, Items} | T], JSON, State) when is_list(Items) ->
-    AdditionalItems = plist:find(additionalItems, State#state.schema, true),
-    validate_array(JSON, Items, AdditionalItems, State),
-    validate_json(T, JSON, State);
-validate_json([{additionalItems, _} | T], JSON, State) ->
-    validate_json(T, JSON, State);
-validate_json([{maxItems, _} | T], JSON, State) when not is_list(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{maxItems, N} | T], JSON, State) when is_integer(N), N >= 0 ->
-    true = length(JSON) =< N,
-    validate_json(T, JSON, State);
-validate_json([{minItems, _} | T], JSON, State) when not is_list(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{minItems, N} | T], JSON, State) when is_integer(N), N >= 0 ->
-    true = length(JSON) >= N,
-    validate_json(T, JSON, State);
-validate_json([{uniqueItems, _} | T], JSON, State) when not is_list(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{uniqueItems, false} | T], JSON, State) ->
-    validate_json(T, JSON, State);
-validate_json([{uniqueItems, true} | T], JSON, State) ->
+    [validate_schema(Items, J, State1) || J <- JSON];
+validate_prop(items, Items, JSON, State) when is_list(Items) ->
+    AdditionalItems = schema(additionalItems, State, true),
+    validate_array(JSON, Items, AdditionalItems, State);
+validate_prop(additionalItems, _, _, _) ->
+    true;
+validate_prop(maxItems, _, JSON, _) when not is_list(JSON) ->
+    true;
+validate_prop(maxItems, N, JSON, _) when is_integer(N), N >= 0 ->
+    true = length(JSON) =< N;
+validate_prop(minItems, _, JSON, _) when not is_list(JSON) ->
+    true;
+validate_prop(minItems, N, JSON, _) when is_integer(N), N >= 0 ->
+    true = length(JSON) >= N;
+validate_prop(uniqueItems, _, JSON, _) when not is_list(JSON) ->
+    true;
+validate_prop(uniqueItems, false, _, _) ->
+    true;
+validate_prop(uniqueItems, true, JSON, _) ->
     Length = length(JSON),
-    Length = length(lists:usort(JSON)),
-    validate_json(T, JSON, State);
+    Length = length(lists:usort(JSON));
 %%  Objects
-validate_json([{maxProperties, _} | T], JSON, State) when not is_tuple(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{maxProperties, N}|T],JSON={M},State) when is_integer(N), N > 0 ->
-    true = length(M) =< N,
-    validate_json(T, JSON, State);
-validate_json([{minProperties, _} | T], JSON, State) when not is_tuple(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{minProperties, N}|T],JSON={M},State) when is_integer(N), N > 0 ->
-    true = length(M) >= N,
-    validate_json(T, JSON, State);
-validate_json([{required, _} | T], JSON, State) when not is_tuple(JSON) ->
-    validate_json(T, JSON, State);
-validate_json([{required, Reqs = [_ | _]} | T], JSON = {M}, State) ->
+validate_prop(maxProperties, _, JSON, _) when not is_tuple(JSON) ->
+    true;
+validate_prop(maxProperties, N, {M}, _) when is_integer(N), N > 0 ->
+    true = length(M) =< N;
+validate_prop(minProperties, _, JSON, _) when not is_tuple(JSON) ->
+    true;
+validate_prop(minProperties, N, {M}, _) when is_integer(N), N > 0 ->
+    true = length(M) >= N;
+validate_prop(required, _, JSON, _) when not is_tuple(JSON) ->
+    true;
+validate_prop(required, Reqs = [_ | _], {M}, State) ->
     #state{atom_keys = AtomKeys,
            existing_atom_keys = ExistingAtomKeys,
            plain_string = Plain} = State,
     Keys = plist:keys(M),
     Reqs1 = case AtomKeys or ExistingAtomKeys of
-                true -> [binary_to_atom(R, utf8) || R <- Reqs];
-                false -> [char_code(R, utf8, Plain) || R <- Reqs]
+                false -> Reqs;
+                true ->
+                    [binary_to_atom(char_code(R, Plain, utf8), utf8) ||
+                        R <- Reqs]
             end,
-    [true = lists:member(Req, Keys) || Req <- Reqs1],
-    validate_json(T, JSON, State);
-validate_json([{properties, _} | T], JSON, State=#state{props_validated=true}) ->
-    validate_json(T, JSON, State);
-validate_json([{patternProperties,_}|T],J,State=#state{props_validated=true}) ->
-    validate_json(T, J, State);
-validate_json([{additionalProperties, _}|T],J,S=#state{props_validated=true}) ->
-    validate_json(T, J, S);
-validate_json([{properties, Props} | T], JSON = {M}, State) ->
-    Patterns = plist:find(patternProperties, T),
-    Additional = plist:find(additionalProperties, T),
-    validate_object(M, Props, Patterns, Additional, State),
-    validate_json(T, JSON, State#state{props_validated = true});
-validate_json([{patternProperties, Patterns} | T], JSON = {M}, State) ->
-    Props = plist:find(properties, T),
-    Additional = plist:find(additionalProperties, T),
-    validate_object(M, Props, Patterns, Additional, State),
-    validate_json(T, JSON, State#state{props_validated = true});
-validate_json([{additionalProperties, Additional} | T], JSON = {M}, State) ->
-    Props = plist:find(properties, T),
-    Patterns = plist:find(patternProperties, T),
-    validate_object(M, Props, Patterns, Additional, State),
-    validate_json(T, JSON, State#state{props_validated = true});
-validate_json([{properties, _} | T], JSON, State) ->
-    validate_json(T, JSON, State);
-validate_json([{patternProperties, _} | T], JSON, State) ->
-    validate_json(T, JSON, State);
-validate_json([{additionalProperties, _} | T], JSON, State) ->
-    validate_json(T, JSON, State);
-validate_json([{dependencies, {Deps}} | T], JSON = {_}, State) ->
-    validate_dependencies(Deps, JSON, State#state{props_validated = false}),
-    validate_json(T, JSON, State);
-validate_json([{dependencies, _} | T], JSON, State) ->
-    validate_json(T, JSON, State);
+    [true = lists:member(Req, Keys) || Req <- Reqs1];
+validate_prop(properties, _, _, #state{props_validated = true}) ->
+    true;
+validate_prop(patternProperties, _, _, #state{props_validated = true}) ->
+    true;
+validate_prop(additionalProperties, _, _, #state{props_validated = true}) ->
+   true;
+validate_prop(properties, Props, {M}, State) ->
+    Patterns = schema(patternProperties, State, undefined),
+    Additional = schema(additionalProperties, State, undefined),
+    validate_object(M, Props, Patterns, Additional, State);
+validate_prop(patternProperties, Patterns, {M}, State) ->
+    Props = schema(properties, State, undefined),
+    Additional = schema(additionalProperties, State, undefined),
+    validate_object(M, Props, Patterns, Additional, State);
+validate_prop(additionalProperties, Additional, {M}, State) ->
+    Props = schema(properties, State, undefined),
+    Patterns = schema(patternProperties, State, undefined),
+    validate_object(M, Props, Patterns, Additional, State);
+validate_prop(properties, _, _, _) ->
+    true;
+validate_prop(patternProperties, _, _, _) ->
+    true;
+validate_prop(additionalProperties, _, _, _) ->
+    true;
+validate_prop(dependencies, {Deps}, JSON = {_}, State) ->
+    validate_dependencies(Deps, JSON, State#state{props_validated = false});
+validate_prop(dependencies, _, _, _) ->
+    true;
 %%  Any type
-validate_json([{enum, Enums = [_|_]} | T], JSON, State) ->
-    validate_enum(Enums, JSON, State),
-    validate_json(T, JSON, State);
-validate_json([{type, <<"null">>} | T], null, State) ->
-    validate_json(T, null, State);
-validate_json([{type, <<"boolean">>} | T], true, State) ->
-    validate_json(T, true, State);
-validate_json([{type, <<"boolean">>} | T], false, State) ->
-    validate_json(T, false, State);
-validate_json([{type, <<"integer">>} | T], I, State) when is_integer(I) ->
-    validate_json(T, I, State);
-validate_json([{type, <<"number">>}|T],I,State) when is_integer(I);is_float(I) ->
-    validate_json(T, I, State);
-validate_json([{type, <<"string">>} | T], S, State) when is_binary(S) ->
-    validate_json(T, S, State);
-validate_json([{type, <<"array">>} | T], A, State) when is_list(A) ->
-    validate_json(T, A, State);
-validate_json([{type, <<"object">>} | T], JSON = {_}, State) ->
-    validate_json(T, JSON, State);
-validate_json([{type, Types} | T], JSON, State) when is_list(Types) ->
-    validate_type(Types, JSON, State),
-    validate_json(T, JSON, State);
-validate_json([{allOf, Schemas = [_ | _]} | T], JSON, State) ->
+validate_prop(enum, Enums = [_|_], JSON, State) ->
+    validate_enum(Enums, JSON, State);
+validate_prop(type, Type, JSON, State = #state{plain_string = Plain})
+  when is_binary(Type), Plain /= utf8 ->
+    Type1 = char_code(Type, Plain, utf8),
+    validate_prop(type, Type1, JSON, State#state{plain_string = utf8});
+validate_prop(type, <<"null">>, null, _) ->
+    true;
+validate_prop(type, <<"boolean">>, true, _) ->
+    true;
+validate_prop(type, <<"boolean">>, false, _) ->
+    true;
+validate_prop(type, <<"integer">>, I, _) when is_integer(I) ->
+    true;
+validate_prop(type, <<"number">>, I, _) when is_integer(I); is_float(I) ->
+    true;
+validate_prop(type, <<"string">>, String, _) when is_binary(String) ->
+    true;
+validate_prop(type, <<"array">>, Array, _) when is_list(Array) ->
+    true;
+validate_prop(type, <<"object">>, {_}, _) ->
+    true;
+validate_prop(type, Types, JSON, State) when is_list(Types) ->
+    validate_type(Types, JSON, State);
+validate_prop(allOf, Schemas = [_ | _], JSON, State) ->
     State1 = State#state{props_validated = false},
-    [validate_schema(Schema, JSON, State1) || Schema <- Schemas],
-    validate_json(T, JSON, State);
-validate_json([{anyOf, Schemas = [_ | _]} | T], JSON, State) ->
-    validate_anyof(Schemas, JSON, State#state{props_validated = false}),
-    validate_json(T, JSON, State);
-validate_json([{oneOf, Schemas = [_ | _]} | T], JSON, State) ->
-    validate_oneof(Schemas, JSON, false, State#state{props_validated = false}),
-    validate_json(T, JSON, State);
-validate_json([{'not', Schema = {_}} | T], JSON, State) ->
+    [validate_schema(Schema, JSON, State1) || Schema <- Schemas];
+validate_prop(anyOf, Schemas = [_ | _], JSON, State) ->
+    validate_anyof(Schemas, JSON, State#state{props_validated = false});
+validate_prop(oneOf, Schemas = [_ | _], JSON, State) ->
+    validate_oneof(Schemas, JSON, false, State#state{props_validated = false});
+validate_prop('not', Schema = {_}, JSON, State) ->
     try validate_schema(Schema, JSON, State#state{props_validated = false}) of
         _ -> erlang:throw(not_validated)
-    catch _:_ -> validate_json(T, JSON, State)
+    catch _:_ -> true
     end;
-validate_json([{definitions, {_}} | T], JSON, State) ->
-    validate_json(T, JSON, State);
+validate_prop(definitions, {_}, _, _) ->
+    true;
 %% Metadata
-validate_json([{title, Title} | T], JSON, State) when is_binary(Title) ->
-    validate_json(T, JSON, State);
-validate_json([{description, Desc} | T], JSON, State) when is_binary(Desc) ->
-    validate_json(T, JSON, State);
-validate_json([{default, _} | T], JSON, State) ->
-    validate_json(T, JSON, State);
+validate_prop(title, Title, _, _) when is_binary(Title) ->
+    true;
+validate_prop(description, Desc, _, _) when is_binary(Desc) ->
+    true;
+validate_prop(default, _, _, _) ->
+    true;
 %% Format
-validate_json([{format, Format} | T], JSON, State) when is_binary(Format) ->
-    validate_json(T, JSON, State);
-validate_json([{id, Id} | T], JSON, State) when is_binary(Id)->
-    validate_json(T, JSON, State);
-validate_json([{'$schema', Schema} | T], JSON, State) when is_binary(Schema) ->
-    validate_json(T, JSON, State);
+validate_prop(format, Format, _, _) when is_binary(Format) ->
+    true;
+validate_prop(id, Id, _, _) when is_binary(Id)->
+    true;
+validate_prop('$schema', Schema, _, _) when is_binary(Schema) ->
+    true;
 %% REFs not implemented yet
-validate_json([{'$ref', _} | T], JSON, State) ->
-    validate_json(T, JSON, State).
+validate_prop('$ref', _, _, _) ->
+    true.
+
+schema(Key, #state{atom_keys = true, schema = Schema}, Default) ->
+    plist:find(Key, Schema, Default);
+schema(Key, #state{existing_atom_keys = true, schema = Schema}, Default) ->
+    plist:find(Key, Schema, Default);
+schema(Key, #state{plain_string = Plain, schema = Schema}, Default) ->
+    plist:find(char_code(atom_to_binary(Key, utf8),utf8,Plain), Schema, Default).
 
 validate_array([], _, _, _) -> true;
 validate_array(_, [], true, _) -> true;
@@ -1504,7 +1506,7 @@ validate_array([JSON | T], [Schema | T1], AdditionalItems, State) ->
 
 validate_object([], _, _, _, _) -> true;
 validate_object([{Key, Prop} | T], Props, Patterns, Additional, State) ->
-    PropertySchema = select_property(Key, Props, State),
+    PropertySchema = select_property(Key, Props),
     PatternSchemas = select_patterns(Key, Patterns, State),
     Schemas = case {PropertySchema, PatternSchemas} of
                   {undefined, []} -> select_additional(Additional);
@@ -1514,28 +1516,27 @@ validate_object([{Key, Prop} | T], Props, Patterns, Additional, State) ->
     [validate_schema(S, Prop, State) || S <- Schemas],
     validate_object(T, Props, Patterns, Additional, State).
 
-select_property(_, undefined, _) -> undefined;
-select_property(Key, {Props}, #state{atom_keys = true}) ->
-    plist:find(Key, Props);
-select_property(Key, {Props}, #state{existing_atom_keys = true}) ->
-    plist:find(Key, Props);
-select_property(Key, {Props}, #state{plain_string = Plain}) ->
-    Key1 = binary_to_atom(char_code(Key, Plain, utf8), utf8),
-    plist:find(Key1, Props).
+select_property(_, undefined) -> undefined;
+select_property(Key, {Props}) -> plist:find(Key, Props).
 
 select_patterns(_, undefined, _) -> [];
 select_patterns(Key, {Patterns}, #state{atom_keys = true}) ->
-    select_patterns1(Patterns, atom_to_binary(Key, utf8), []);
+    select_patterns1(Patterns, atom_to_binary(Key, utf8), true, []);
 select_patterns(Key, {Patterns}, #state{existing_atom_keys = true}) ->
-    select_patterns1(Patterns, atom_to_binary(Key, utf8), []);
+    select_patterns1(Patterns, atom_to_binary(Key, utf8), true, []);
 select_patterns(Key, {Patterns}, #state{plain_string = Plain}) ->
-    select_patterns1(Patterns, char_code(Key, Plain, utf8), []).
+    select_patterns1(Patterns, char_code(Key, Plain, utf8), Plain, []).
 
-select_patterns1([], _, Acc) -> Acc;
-select_patterns1([{Pattern, Schema} | T], Key, Acc) ->
+select_patterns1([], _, _, Acc) -> Acc;
+select_patterns1([{Pattern, Schema} | T], Key, true, Acc) ->
     case re:run(Key, atom_to_binary(Pattern, utf8), [unicode]) of
-        nomatch -> select_patterns1(T, Key, Acc);
-        _ -> select_patterns1(T, Key, [Schema | Acc])
+        nomatch -> select_patterns1(T, Key, true, Acc);
+        _ -> select_patterns1(T, Key, true, [Schema | Acc])
+    end;
+select_patterns1([{Pattern, Schema} | T], Key, Plain, Acc) ->
+    case re:run(Key, char_code(Pattern, Plain, utf8), [unicode]) of
+        nomatch -> select_patterns1(T, Key, Plain, Acc);
+        _ -> select_patterns1(T, Key, Plain, [Schema | Acc])
     end.
 
 select_additional(undefined) -> [];
@@ -1544,46 +1545,29 @@ select_additional(true) -> [].
 
 validate_dependencies([], _, _) -> true;
 validate_dependencies([{Key, Keys} | T], JSON = {M}, State) when is_list(Keys) ->
-    Key1 = case State of
-               #state{atom_keys = true} -> Key;
-               #state{existing_atom_keys = true} -> Key;
-               #state{plain_string = Plain} ->
-                   char_code(atom_to_binary(Key, utf8), utf8, Plain)
-           end,
-    case plist:member(Key1, M) of
+    case plist:member(Key, M) of
         true -> [validate_dependency(K, M, State) || K <- Keys];
         _ -> true
     end,
     validate_dependencies(T, JSON, State);
 validate_dependencies([{Key, Schema} | T], JSON = {M}, State) ->
-    Key1 = case State of
-               #state{atom_keys = true} -> Key;
-               #state{existing_atom_keys = true} -> Key;
-               #state{plain_string = Plain} ->
-                   char_code(atom_to_binary(Key, utf8), utf8, Plain)
-           end,
-    case plist:member(Key1, M) of
+    case plist:member(Key, M) of
         true -> validate_schema(Schema, JSON, State);
         _ -> true
     end,
     validate_dependencies(T, JSON, State).
 
-validate_dependency(K, M, #state{atom_keys = true}) ->
-    true = plist:member(binary_to_atom(K, utf8), M);
-validate_dependency(K, M, #state{existing_atom_keys = true}) ->
-    true = plist:member(binary_to_atom(K, utf8), M);
-validate_dependency(K, M, #state{plain_string = Plain}) ->
-    true = plist:member(char_code(K, utf8, Plain), M).
+validate_dependency(K, M, #state{atom_keys = true, plain_string = P}) ->
+    true = plist:member(binary_to_atom(char_code(K, P, utf8), utf8), M);
+validate_dependency(K, M, #state{existing_atom_keys = true, plain_string = P}) ->
+    true = plist:member(binary_to_atom(char_code(K, P, utf8), utf8), M);
+validate_dependency(K, M, _) ->
+    true = plist:member(K, M).
 
 validate_enum([null | _], null, _) -> true;
 validate_enum([true | _], true, _) -> true;
 validate_enum([false | _], false, _) -> true;
-validate_enum([S | T], JSON, State) when is_binary(S), is_binary(JSON) ->
-    #state{plain_string = Plain} = State,
-    case char_code(S, utf8, Plain) of
-        JSON -> true;
-        _ -> validate_enum(T, JSON, State)
-    end;
+validate_enum([JSON | _], JSON, _) when is_binary(JSON) -> true;
 validate_enum([N | _], JSON, _) when is_number(N), is_number(JSON) ->
     true = N =:= JSON;
 validate_enum([Array | T], JSON, State) when is_list(Array), is_list(JSON) ->
@@ -1608,7 +1592,7 @@ validate_enum_prop({SKey, SVal}, {JKey, JVal}, State) ->
     validate_enum([SVal], JVal, State).
 
 validate_type([Type | Types], JSON, State) ->
-    try validate_json([{type, Type}], JSON, State)
+    try validate_prop(type, Type, JSON, State)
     catch _:_ -> validate_type(Types, JSON, State)
     end.
 
@@ -1629,8 +1613,10 @@ validate_oneof([Schema | Schemas], JSON, true, State) ->
     catch _: _ -> validate_oneof(Schemas, JSON, true, State)
     end.
 
-string_length(String, #state{plain_string = {utf16,_}}) -> byte_size(String) * 2;
-string_length(String, #state{plain_string = {utf32,_}}) -> byte_size(String) * 4;
+string_length(String, #state{plain_string = {utf16,_}}) ->
+    byte_size(String) div 2;
+string_length(String, #state{plain_string = {utf32,_}}) ->
+    byte_size(String)div 4;
 string_length(String, _) -> utf8_length(String, 0).
 
 utf8_length(<<>>, Acc) -> Acc;
