@@ -249,6 +249,7 @@ do_decode(IOData, Opts) ->
 
 decode_scheme(I, Acc, Opts) ->
     case next(I) of
+        eos -> #uri{path = [to_binary(Acc)]};
         {$:, T} ->
             URI = #uri{scheme = to_scheme(Acc, [])},
             decode_authority_or_path(T, [], URI, Opts);

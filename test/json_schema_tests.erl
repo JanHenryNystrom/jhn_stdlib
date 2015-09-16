@@ -38,7 +38,7 @@
 json_schema_test_() ->
     {ok, Schema} =
         file:read_file(
-          filename:join([code:priv_dir(jhn_stdlib), 'schema.json'])),
+          filename:join([code:priv_dir(jhn_stdlib), 'draft-04', 'schema.json'])),
     [{"schema.json", ?_test(?assertMatch({true, _}, json:validate(Schema)))}].
 
 all_schema_test_() ->

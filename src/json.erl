@@ -82,6 +82,7 @@
 -export_type([json/0, pointer/0, resolver/0]).
 
 %% Includes
+-include_lib("kernel/include/file.hrl").
 -include_lib("jhn_stdlib/include/uri.hrl").
 
 %% Types
@@ -121,13 +122,15 @@
           return_type = iolist :: iolist | binary,
           decode = false :: boolean(),
           encode = false :: boolean(),
-          resolver = {fun resolve_local_file/2,  code:priv_dir(jhn_stdlib)} ::
+          resolver = {fun resolve_local_file/2,
+                      #{base => code:priv_dir(jhn_stdlib)}} ::
                      {resolver(), plist:plist() | map()},
           %% Internal use
           step = 1 :: 1 | 2 | 4,
           pos = 0 :: integer(),
           top :: json(),
-          base = #uri{},
+          top_uri = #uri{} :: uri:uri(),
+          scope = #uri{} :: uri:uri(),
           schema :: json(),
           props_validated = false :: boolean(),
           orig_call
@@ -174,6 +177,9 @@
 %% Defines for float_to_binary/1.
 -define(BIG_POW, (1 bsl 52)).
 -define(MIN_EXP, (-1074)).
+
+-define(JSON_SCHEMA, {[{<<"$ref">>,
+                        <<"http://json-schema.org/draft-04/schema#">>}]}).
 
 %% ===================================================================
 %% Library functions.
@@ -355,8 +361,7 @@ eval(Pointer, Binary, Opts) ->
 %%--------------------------------------------------------------------
 -spec validate(json() | binary()) -> {true, json()} | false.
 %%--------------------------------------------------------------------
-validate(Schema) ->
-    validate(load_schema('schema.json'), Schema, [decode]).
+validate(Schema) -> validate(?JSON_SCHEMA, Schema, [decode]).
 
 %%--------------------------------------------------------------------
 %% Function: validate(JSONSchema, JSON) -> true | false.
@@ -1512,12 +1517,18 @@ validate_prop(default, _, _, _) ->
 validate_prop(format, Format, _, _) when is_binary(Format) ->
     true;
 validate_prop(id, Id, _, State = #state{plain_string=utf8}) when is_binary(Id)->
-    State#state{base = uri:decode(Id)};
+    validate_id(uri:decode(Id), State);
 validate_prop(id, Id, _, State = #state{plain_string=Plain}) when is_binary(Id)->
-    State#state{base = uri:decode(char_code(Id, Plain, utf8))};
-validate_prop('$schema', Schema, _, _) when is_binary(Schema) ->
+    validate_id(uri:decode(char_code(Id, Plain, utf8)), State);
+validate_prop('$schema', <<"http://json-schema.org/schema#">>, _, _)  ->
+    true;
+validate_prop('$schema', <<"http://json-schema.org/draft-04/schema#">>, _, _)  ->
     true;
 validate_prop('$ref', Ref, JSON, State) ->
+    file:write_file(huff,
+                    io_lib:format("Ref:~p top_uri:~p scope:~p ~n",
+                                  [Ref, State#state.top_uri, State#state.scope]),
+                    [append]),
     validate_ref(Ref, JSON, State);
 validate_prop(_, {_}, _, _) ->
     true.
@@ -1648,51 +1659,116 @@ validate_oneof([Schema | Schemas], JSON, true, State) ->
     catch _: _ -> validate_oneof(Schemas, JSON, true, State)
     end.
 
-validate_ref(Ref, JSON, State = #state{top = Top, base = Base,plain_string=P}) ->
-    Ref1 = case P of
+validate_id(#uri{scheme=undefined, path=[], fragment=F}, State) when F /= <<>> ->
+    #state{scope = URI} = State,
+    file:write_file(huff, io_lib:format("New frag:~p ~n", [F]), [append]),
+    State#state{scope = URI#uri{fragment = F}};
+validate_id(#uri{scheme = undefined, path = Path, fragment = Fragment}, State) ->
+    #state{scope = URI} = State,
+    file:write_file(huff,
+                    io_lib:format("New path:~p frag:~p => ~p~n",
+                                  [Path, Fragment, URI#uri{path = Path, fragment = Fragment}]),
+                    [append]),
+    State#state{scope = URI#uri{path = Path, fragment = Fragment}};
+validate_id(URI, State) ->
+    file:write_file(huff, io_lib:format("New id:~p ~n", [URI]), [append]),
+    State#state{scope = URI}.
+
+validate_ref(Ref, JSON, State = #state{scope = Scope, top_uri = TopURI})
+  when Scope == #uri{}; Scope == TopURI ->
+    #state{top = Top, plain_string = Plain} = State,
+    Ref1 = case Plain of
                utf8 -> Ref;
-               _ -> char_code(Ref, P, utf8)
+               _ -> char_code(Ref, Plain, utf8)
            end,
     State1 = State#state{props_validated = false},
     case uri:decode(Ref1) of
-        #uri{path = [], fragment = <<>>} -> validate_schema(Top, JSON, State1);
-        #uri{path = [], fragment = Pointer} ->
+        #uri{scheme = undefined, path = [], fragment = <<>>} ->
+            validate_schema(Top, JSON, State1);
+        #uri{scheme = undefined, path = [], fragment = Pointer} ->
             validate_schema(eval(Pointer, Top, State#state{decode = true}),
                             JSON,
                             State1);
-        URI ->
-            #uri{scheme = BS, host = BH, path = BP} = Base, 
-            case URI of
-                #uri{scheme = BS, host = BH, path = BP, fragment = <<>>} ->
-                    validate_schema(Top, JSON, State1);
-                #uri{scheme = BS, host = BH, path = BP, fragment=Pointer} ->
-                    Schema = eval(Pointer, Top, State#state{decode = true}),
-                    validate_schema(Schema, JSON, State1);
-                #uri{scheme = http,
-                     host = <<"json-schema.org">>,
-                     path = [<<"draft-04">>,<<"schema">>],
-                     fragment = <<>>} ->
-                    Schema = decode(load_schema('schema.json'), State),
-                    validate_schema(Schema, JSON, State1#state{top = Schema});
-                #uri{scheme = http,
-                     host = <<"json-schema.org">>,
-                     path = [<<"draft-04">>,<<"schema">>],
-                     fragment = Pointer} ->
-                    Schema =
-                        eval(Pointer,
-                             load_schema('schema.json'),
-                             State#state{decode = true}),
-                    validate_schema(Schema, JSON, State1#state{top = Schema});
-                #uri{fragment = <<>>} ->
-                    Schema = decode(resolve(URI, State), State),
-                    validate_schema(Schema, JSON, State1#state{top = Schema});
-                #uri{fragment = Pointer} ->
-                    SchemaTop = decode(resolve(URI, State), State),
-                    Schema =
-                        eval(Pointer, SchemaTop, State#state{decode = true}),
-                    validate_schema(Schema, JSON, State1#state{top = SchemaTop})
-                end
+        #uri{scheme = undefined, path = Path, fragment = <<>>} ->
+            TopURI1 = TopURI#uri{path = merge_paths(TopURI#uri.path, Path)},
+            Schema = decode(resolve(TopURI1, State), State),
+            State2 = State1#state{top = Schema,
+                                  top_uri = TopURI1,
+                                  scope = TopURI1},
+            validate_schema(Schema, JSON, State2);
+        #uri{scheme = undefined, path = Path, fragment = Pointer} ->
+            TopURI1 = TopURI#uri{path = merge_paths(TopURI#uri.path, Path)},
+            SchemaTop = decode(resolve(TopURI1, State), State),
+            Schema = eval(Pointer, SchemaTop, State#state{decode = true}),
+            State2 = State1#state{top = SchemaTop,
+                                  top_uri = TopURI1,
+                                  scope = TopURI1},
+            validate_schema(Schema, JSON, State2);
+        URI = #uri{fragment = <<>>} ->
+            Schema = decode(resolve(URI, State), State),
+            State2 = State1#state{top = Schema,
+                                  top_uri = URI,
+                                  scope = URI},
+            validate_schema(Schema, JSON, State2);
+        URI = #uri{fragment = Pointer} ->
+            SchemaTop = decode(resolve(URI, State), State),
+            Schema = eval(Pointer, SchemaTop, State#state{decode = true}),
+            State2 = State1#state{top = SchemaTop,
+                                  top_uri = URI,
+                                  scope = URI},
+            validate_schema(Schema, JSON, State2)
+    end;
+validate_ref(Ref, JSON, State) ->
+    #state{scope = Scope, plain_string = Plain} = State,
+    Ref1 = case Plain of
+               utf8 -> Ref;
+               _ -> char_code(Ref, Plain, utf8)
+           end,
+    State1 = State#state{props_validated = false},
+    case uri:decode(Ref1) of
+        #uri{scheme = undefined, path = [], fragment = <<>>} ->
+            Schema = decode(resolve(Scope, State), State),
+            State2 = State1#state{top = Schema, top_uri = Scope},
+            validate_schema(Schema, JSON, State2);
+        #uri{scheme = undefined, path = [], fragment = Pointer} ->
+            SchemaTop = decode(resolve(Scope, State), State),
+            Schema = eval(Pointer, SchemaTop, State#state{decode = true}),
+            State2 = State1#state{top = SchemaTop, top_uri = Scope},
+            validate_schema(Schema, JSON, State2);
+
+
+        #uri{scheme = undefined, path = Path, fragment = <<>>} ->
+            Scope1 = Scope#uri{path = merge_paths(Scope#uri.path, Path)},
+            Schema = decode(resolve(Scope1, State), State),
+            State2 = State1#state{top = Schema,
+                                  top_uri = Scope1,
+                                  scope = Scope1},
+            validate_schema(Schema, JSON, State2);
+        #uri{scheme = undefined, path = Path, fragment = Pointer} ->
+            Scope1 = Scope#uri{path = merge_paths(Scope#uri.path, Path)},
+            SchemaTop = decode(resolve(Scope1, State), State),
+            Schema = eval(Pointer, SchemaTop, State#state{decode = true}),
+            State2 = State1#state{top = SchemaTop,
+                                  top_uri = Scope1,
+                                  scope = Scope1},
+            validate_schema(Schema, JSON, State2);
+        URI = #uri{fragment = <<>>} ->
+            Schema = decode(resolve(URI, State), State),
+            State2 = State1#state{top = Schema,
+                                  top_uri = URI,
+                                  scope = URI},
+            validate_schema(Schema, JSON, State2);
+        URI = #uri{fragment = Pointer} ->
+            SchemaTop = decode(resolve(URI, State), State),
+            Schema = eval(Pointer, SchemaTop, State#state{decode = true}),
+            State2 = State1#state{top = SchemaTop,
+                                  top_uri = URI,
+                                  scope = URI},
+            validate_schema(Schema, JSON, State2)
     end.
+
+merge_paths([], Path) -> Path;
+merge_paths(Path1, Path2) -> hd(lists:reverse(Path1)) ++ Path2.
 
 resolve(URI, #state{resolver = {Fun, Conf}}) -> Fun(URI, Conf).
 
@@ -1715,9 +1791,12 @@ resolve_local_file(#uri{scheme = file, host = Host, path = Path}, Conf)  ->
         <<>> -> ok;
         <<"localhost">> -> ok
     end,
-    Path1 = binary_to_list(iolist_to_binary(Path)),
-    {ok, B} = file:read_file(filename:join([Base, Path1])),
-    B;
+    Path1 = filename:join([binary_to_list(S) || S <- Path]),
+    Path2 = case filename:extension(Path1) of
+                ".json" -> Path1;
+                _ -> Path1 ++ ".json"
+            end,
+    read_file(filename:join([Base, Path2]));
 resolve_local_file(#uri{scheme = http, host = Host, path = Path}, Conf)  ->
     Base = case Conf of
                _ when is_list(Conf) -> plist:find(base, Conf, <<>>);
@@ -1727,12 +1806,27 @@ resolve_local_file(#uri{scheme = http, host = Host, path = Path}, Conf)  ->
     case Host of
         <<>> -> ok;
         <<"localhost">> -> ok;
+        <<"json-schema.org">> -> ok;
         {127, 0, 0, 1} -> ok;
         {0, 0, 0, 0, 0, 0, 0, 1} -> ok
     end,
-    Path1 = binary_to_list(iolist_to_binary(Path)),
-    {ok, B} = file:read_file(filename:join([Base, Path1])),
-    B.
+    Path1 = filename:join([binary_to_list(S) || S <- Path]),
+    Path2 = case filename:extension(Path1) of
+                ".json" -> Path1;
+                _ -> Path1 ++ ".json"
+            end,
+    file:write_file(huff, io_lib:format("Base:~p Path:~p~n", [Base, Path2]), [append]),
+    read_file(filename:join([Base, Path2])).
+
+read_file(File) ->
+    case file:read_link_info(File) of
+        {ok, #file_info{type = regular}} ->
+            {ok, B} = file:read_file(File),
+            B;
+        {ok, #file_info{type = symlink}} ->
+            {ok, File1} = file:read_link(File),
+            read_file(File1)
+    end.
 
 %% ===================================================================
 %% Common parts
@@ -1838,11 +1932,6 @@ char_code(Text, ?UTF32L, ?UTF16L) ->
     << <<C/utf16-little>> || <<C/utf32-little>> <= Text >>;
 char_code(Text, ?UTF32L, ?UTF32B) ->
     << <<C/utf32-big>> || <<C/utf32-little>> <= Text >>.
-
-load_schema(Schema) ->
-    {ok, Bin} =
-        file:read_file(filename:join([code:priv_dir(jhn_stdlib), Schema])),
-    Bin.
 
 %%--------------------------------------------------------------------
 -spec badarg(#state{}) -> no_return().
