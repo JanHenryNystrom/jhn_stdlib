@@ -1329,7 +1329,10 @@ eval_json(X, _, Path, _) ->
 %% ===================================================================
 
 validate_schema({Schema}, JSON, State) ->
-    validate_json(Schema, JSON, State#state{schema = Schema}).
+    validate_json(Schema, JSON, State#state{schema = Schema});
+validate_schema(Schema, JSON, State) when is_map(Schema) ->
+    Schema1 = maps:to_list(Schema),
+    validate_json(Schema1, JSON, State#state{schema = Schema1}).
 
 validate_json([], _, _) -> true;
 validate_json([{K, V} | T], JSON, State = #state{atom_keys = true}) ->
@@ -1394,6 +1397,8 @@ validate_prop(items, _, JSON, _) when not is_list(JSON) ->
 validate_prop(items, Items = {_}, JSON, State) ->
     State1 = State#state{props_validated = false},
     [validate_schema(Items, J, State1) || J <- JSON];
+validate_prop(items, Items, JSON, State) when is_map(Items) ->
+    validate_prop(items, {maps:to_list(Items)}, JSON, State);
 validate_prop(items, Items, JSON, State) when is_list(Items) ->
     AdditionalItems = schema(additionalItems, State, true),
     validate_array(JSON, Items, AdditionalItems, State);
@@ -1415,15 +1420,17 @@ validate_prop(uniqueItems, true, JSON, _) ->
     Length = length(JSON),
     Length = length(lists:usort(JSON));
 %%  Objects
-validate_prop(maxProperties, _, JSON, _) when not is_tuple(JSON) ->
-    true;
 validate_prop(maxProperties, N, {M}, _) when is_integer(N), N > 0 ->
     true = length(M) =< N;
-validate_prop(minProperties, _, JSON, _) when not is_tuple(JSON) ->
+validate_prop(maxProperties, N, M, _) when is_integer(N), N > 0, is_map(M) ->
+    true = map_size(M) =< N;
+validate_prop(maxProperties, _, JSON, _) when not is_tuple(JSON) ->
     true;
 validate_prop(minProperties, N, {M}, _) when is_integer(N), N > 0 ->
     true = length(M) >= N;
-validate_prop(required, _, JSON, _) when not is_tuple(JSON) ->
+validate_prop(minProperties, N, M, _) when is_integer(N), N > 0, is_map(M) ->
+    true = map_size(M) >= N;
+validate_prop(minProperties, _, JSON, _) when not is_tuple(JSON) ->
     true;
 validate_prop(required, Reqs = [_ | _], {M}, State) ->
     #state{atom_keys = AtomKeys,
@@ -1437,6 +1444,10 @@ validate_prop(required, Reqs = [_ | _], {M}, State) ->
                         R <- Reqs]
             end,
     [true = lists:member(Req, Keys) || Req <- Reqs1];
+validate_prop(required, Reqs, M, State) when is_map(M) ->
+    validate_prop(required, Reqs, {maps:to_list(M)}, State);
+validate_prop(required, _, JSON, _) when not is_tuple(JSON) ->
+    true;
 validate_prop(properties, _, _, #state{props_validated = true}) ->
     true;
 validate_prop(patternProperties, _, _, #state{props_validated = true}) ->
@@ -1447,14 +1458,20 @@ validate_prop(properties, Props, {M}, State) ->
     Patterns = schema(patternProperties, State, undefined),
     Additional = schema(additionalProperties, State, undefined),
     validate_object(M, Props, Patterns, Additional, State);
+validate_prop(properties, Props, M, State) when is_map(M) ->
+    validate_prop(properties, Props, {maps:to_list(M)}, State);
 validate_prop(patternProperties, Patterns, {M}, State) ->
     Props = schema(properties, State, undefined),
     Additional = schema(additionalProperties, State, undefined),
     validate_object(M, Props, Patterns, Additional, State);
+validate_prop(patternProperties, Patterns, M, State) when is_map(M) ->
+    validate_prop(patternProperties, Patterns, {maps:to_list(M)}, State);
 validate_prop(additionalProperties, Additional, {M}, State) ->
     Props = schema(properties, State, undefined),
     Patterns = schema(patternProperties, State, undefined),
     validate_object(M, Props, Patterns, Additional, State);
+validate_prop(additionalProperties, Additional, M, State) when is_map(M) ->
+    validate_prop(additionalProperties, Additional, {maps:to_list(M)}, State);
 validate_prop(properties, _, _, _) ->
     true;
 validate_prop(patternProperties, _, _, _) ->
@@ -1463,6 +1480,10 @@ validate_prop(additionalProperties, _, _, _) ->
     true;
 validate_prop(dependencies, {Deps}, JSON = {_}, State) ->
     validate_dependencies(Deps, JSON, State#state{props_validated = false});
+validate_prop(dependencies, Deps, JSON, State) when is_map(Deps), is_map(JSON) ->
+    validate_dependencies(maps:to_list(Deps),
+                          {maps:to_list(JSON)},
+                          State#state{props_validated = false});
 validate_prop(dependencies, _, _, _) ->
     true;
 %%  Any type
@@ -1488,6 +1509,8 @@ validate_prop(type, <<"array">>, Array, _) when is_list(Array) ->
     true;
 validate_prop(type, <<"object">>, {_}, _) ->
     true;
+validate_prop(type, <<"object">>, Map, _) when is_map(Map) ->
+    true;
 validate_prop(type, Types, JSON, State) when is_list(Types) ->
     validate_type(Types, JSON, State);
 validate_prop(type, Type, _, _) ->
@@ -1504,7 +1527,14 @@ validate_prop('not', Schema = {_}, JSON, State) ->
         _ -> erlang:throw(not_validated)
     catch _:_ -> true
     end;
+validate_prop('not', Schema, JSON, State) when is_map(Schema) ->
+    try validate_schema(Schema, JSON, State#state{props_validated = false}) of
+        _ -> erlang:throw(not_validated)
+    catch _:_ -> true
+    end;
 validate_prop(definitions, {_}, _, _) ->
+    true;
+validate_prop(definitions, Map, _, _) when is_map(Map) ->
     true;
 %% Metadata
 validate_prop(title, Title, _, _) when is_binary(Title) ->
@@ -1531,6 +1561,8 @@ validate_prop('$schema', Schema, _, #state{plain_string = Plain})  ->
 validate_prop('$ref', Ref, JSON, State) ->
     validate_ref(Ref, JSON, State);
 validate_prop(_, {_}, _, _) ->
+    true;
+validate_prop(_, Map, _, _) when is_map(Map) ->
     true.
 
 schema(Key, #state{atom_keys = true, schema = Schema}, Default) ->
@@ -1545,6 +1577,8 @@ validate_array(_, [], true, _) -> true;
 validate_array(JSON, [], Schema = {_}, State) ->
     State1 = State#state{props_validated = false},
     [validate_schema(Schema, J, State1) || J <- JSON];
+validate_array(JSON, [], Schema, State) when is_map(Schema) ->
+    validate_array(JSON, [], {maps:to_list(Schema)}, State);
 validate_array([JSON | T], [Schema | T1], AdditionalItems, State) ->
     State1 = State#state{props_validated = false},
     validate_schema(Schema, JSON, State1),
@@ -1563,7 +1597,9 @@ validate_object([{Key, Prop} | T], Props, Patterns, Additional, State) ->
     validate_object(T, Props, Patterns, Additional, State).
 
 select_property(_, undefined) -> undefined;
-select_property(Key, {Props}) -> plist:find(Key, Props).
+select_property(Key, {Props}) -> plist:find(Key, Props);
+select_property(Key, Props) when is_map(Props) ->
+    select_property(Key, {maps:to_list(Props)}).
 
 select_patterns(_, undefined, _) -> [];
 select_patterns(Key, {Patterns}, #state{atom_keys = true}) ->
@@ -1571,7 +1607,9 @@ select_patterns(Key, {Patterns}, #state{atom_keys = true}) ->
 select_patterns(Key, {Patterns}, #state{existing_atom_keys = true}) ->
     select_patterns1(Patterns, atom_to_binary(Key, utf8), true, []);
 select_patterns(Key, {Patterns}, #state{plain_string = Plain}) ->
-    select_patterns1(Patterns, char_code(Key, Plain, utf8), Plain, []).
+    select_patterns1(Patterns, char_code(Key, Plain, utf8), Plain, []);
+select_patterns(Key, Patterns, State) when is_map(Patterns) ->
+    select_patterns(Key, {maps:to_list(Patterns)}, State).
 
 select_patterns1([], _, _, Acc) -> Acc;
 select_patterns1([{Pattern, Schema} | T], Key, true, Acc) ->
@@ -1587,6 +1625,7 @@ select_patterns1([{Pattern, Schema} | T], Key, Plain, Acc) ->
 
 select_additional(undefined) -> [];
 select_additional(Schema = {_}) -> [Schema];
+select_additional(Schema) when is_map(Schema) -> [Schema];
 select_additional(true) -> [].
 
 validate_dependencies([], _, _) -> true;
@@ -1601,7 +1640,9 @@ validate_dependencies([{Key, Schema} | T], JSON = {M}, State) ->
         true -> validate_schema(Schema, JSON, State);
         _ -> true
     end,
-    validate_dependencies(T, JSON, State).
+    validate_dependencies(T, JSON, State);
+validate_dependencies(Props, JSON, State) when is_map(JSON) ->
+    validate_dependencies(Props, {maps:to_list(JSON)}, State).
 
 validate_dependency(K, M, #state{atom_keys = true, plain_string = P}) ->
     true = plist:member(binary_to_atom(char_code(K, P, utf8), utf8), M);
@@ -1626,6 +1667,8 @@ validate_enum([{SProps} | T], JSON = {JProps}, State) ->
             {SProp, JProp} <- lists:zip(lists:sort(SProps), lists:sort(JProps))]
     catch _:_ -> validate_enum(T, JSON, State)
     end;
+validate_enum([SMap | T], JSON, State) when is_map(SMap), is_map(JSON) ->
+    validate_enum([{maps:to_list(SMap)} | T], {maps:to_list(JSON)}, State);
 validate_enum([_ | T], JSON, State) ->
     validate_enum(T, JSON, State).
                      
@@ -1758,7 +1801,6 @@ validate_ref(Ref, JSON, State) ->
                                   scope = URI},
             validate_schema(Schema, JSON, State2)
     end.
-
 
 merge_paths(Path1, []) -> Path1;
 merge_paths(_, [<<>>, <<>> | Path2]) -> Path2;

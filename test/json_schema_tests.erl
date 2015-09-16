@@ -243,13 +243,17 @@ suites(Name, Extra) ->
         Opts <- [
                  [],
                  [atom_keys],
+                 [maps],
+                 [atom_keys, maps],
                  [{plain_string, utf8}],
                  [{plain_string, {utf16, big}}],
                  [{plain_string, {utf16, little}}],
                  [{plain_string, {utf32, big}}],
                  [{plain_string, {utf32, little}}],
                  [atom_keys, {plain_string, {utf16, big}}],
-                 [atom_keys, {plain_string, {utf32, big}}]
+                 [atom_keys, {plain_string, {utf32, big}}],
+                 [atom_keys, maps, {plain_string, {utf16, big}}],
+                 [atom_keys, maps, {plain_string, {utf32, big}}]
                 ]
     ].
 
@@ -285,6 +289,7 @@ file(TestSuites) ->
                    atom_to_list(TestSuites) ++ ".json"
                   ]).
 
+find(Key, Map, Opts) when is_map(Map) -> find(Key, {maps:to_list(Map)}, Opts);
 find(Key, {Object}, Opts) ->
     Atom = lists:member(atom_keys,Opts) or lists:member(existing_atom_keys,Opts),
     case {Atom, plist:find(plain_string, Opts, utf8)} of
