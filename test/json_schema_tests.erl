@@ -206,8 +206,12 @@ ref_test_() -> suites(ref).
 %% refRemote
 %%--------------------------------------------------------------------
 
-%% refRemote_test_() ->
-%%     [gen_suite(Suite) || Suite <- load(refRemote)].
+refRemote_test_() ->
+    Base = filename:join([code:lib_dir(jhn_stdlib, deps),
+                          'JSON-Schema-Test-Suite',
+                          'remotes']),
+    Opts = #{base => Base},
+    suites(refRemote, [{resolver, fun json:resolve_local_file/2, Opts}]).
 
 %%--------------------------------------------------------------------
 %% required
@@ -232,18 +236,20 @@ uniqueItems_test_() -> suites(uniqueItems).
 %% Internal functions.
 %% ===================================================================
 
-suites(Name) ->
-    [[gen_suite(Suite, Opts) || Suite <- load(Name, Opts)] ||
+suites(Name) -> suites(Name, []).
+
+suites(Name, Extra) ->
+    [[gen_suite(Suite, Extra ++ Opts) || Suite <- load(Name, Extra ++ Opts)] ||
         Opts <- [
-                 [],
-                 [atom_keys],
-                 [{plain_string, utf8}],
-                 [{plain_string, {utf16, big}}],
-                 [{plain_string, {utf16, little}}],
-                 [{plain_string, {utf32, big}}],
-                 [{plain_string, {utf32, little}}],
-                 [atom_keys, {plain_string, {utf16, big}}],
-                 [atom_keys, {plain_string, {utf32, big}}]
+                 []%% ,
+                 %% [atom_keys],
+                 %% [{plain_string, utf8}],
+                 %% [{plain_string, {utf16, big}}],
+                 %% [{plain_string, {utf16, little}}],
+                 %% [{plain_string, {utf32, big}}],
+                 %% [{plain_string, {utf32, little}}],
+                 %% [atom_keys, {plain_string, {utf16, big}}],
+                 %% [atom_keys, {plain_string, {utf32, big}}]
                 ]
     ].
 

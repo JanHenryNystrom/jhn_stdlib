@@ -75,8 +75,11 @@
          validate/1, validate/2, validate/3
         ]).
 
+%% Resolvers for validation
+-export([resolve_local_file/2]).
+
 %% Exported types
--export_type([json/0, pointer/0]).
+-export_type([json/0, pointer/0, resolver/0]).
 
 %% Includes
 -include_lib("jhn_stdlib/include/uri.hrl").
@@ -100,6 +103,8 @@
 
 -type pointer() :: [binary() | atom() | '-' | pos_integer()].
 
+-type resolver() :: fun((uri:uri(), plist:plist() | map()) -> json()).
+
 %% Records
 -record(state,
         {
@@ -116,6 +121,8 @@
           return_type = iolist :: iolist | binary,
           decode = false :: boolean(),
           encode = false :: boolean(),
+          resolver = {fun resolve_local_file/2,  code:priv_dir(jhn_stdlib)} ::
+                     {resolver(), plist:plist() | map()},
           %% Internal use
           step = 1 :: 1 | 2 | 4,
           pos = 0 :: integer(),
@@ -369,6 +376,7 @@ validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 %%   Options are:
 %%     decode -> the JSON validated is decoded
 %%     bom -> the binary to decode has a UTF byte order mark
+%%     {resolver, Fun, Conf} -> a fun that will used to resolve non local refs
 %%   Options passed to decoding if enabled or the JSON decoded:
 %%     maps
 %%     {plain_string, Format}
@@ -1677,18 +1685,16 @@ validate_ref(Ref, JSON, State = #state{top = Top, base = Base,plain_string=P}) -
                     validate_schema(Schema, JSON, State1#state{top = Schema});
                 #uri{fragment = <<>>} ->
                     Schema = decode(resolve(URI, State), State),
-                    validate_schema(Schema, JSON, State1);
+                    validate_schema(Schema, JSON, State1#state{top = Schema});
                 #uri{fragment = Pointer} ->
+                    SchemaTop = decode(resolve(URI, State), State),
                     Schema =
-                        eval(Pointer,
-                             resolve(URI, State),
-                             State#state{decode = true}),
-                    validate_schema(Schema, JSON, State1)
+                        eval(Pointer, SchemaTop, State#state{decode = true}),
+                    validate_schema(Schema, JSON, State1#state{top = SchemaTop})
                 end
     end.
 
-resolve(_, _) -> erlang:error(tbd).
-
+resolve(URI, #state{resolver = {Fun, Conf}}) -> Fun(URI, Conf).
 
 string_length(String, #state{plain_string = {utf16,_}}) ->
     byte_size(String) div 2;
@@ -1698,6 +1704,35 @@ string_length(String, _) -> utf8_length(String, 0).
 
 utf8_length(<<>>, Acc) -> Acc;
 utf8_length(<<_/utf8, T/binary>>, Acc) -> utf8_length(T, Acc + 1).
+
+resolve_local_file(#uri{scheme = file, host = Host, path = Path}, Conf)  ->
+    Base = case Conf of
+               _ when is_list(Conf) -> plist:find(base, Conf, <<>>);
+               #{base := Base0} -> Base0;
+               #{} -> <<>>
+           end,
+    case Host of
+        <<>> -> ok;
+        <<"localhost">> -> ok
+    end,
+    Path1 = binary_to_list(iolist_to_binary(Path)),
+    {ok, B} = file:read_file(filename:join([Base, Path1])),
+    B;
+resolve_local_file(#uri{scheme = http, host = Host, path = Path}, Conf)  ->
+    Base = case Conf of
+               _ when is_list(Conf) -> plist:find(base, Conf, <<>>);
+               #{base := Base0} -> Base0;
+               #{} -> <<>>
+           end,
+    case Host of
+        <<>> -> ok;
+        <<"localhost">> -> ok;
+        {127, 0, 0, 1} -> ok;
+        {0, 0, 0, 0, 0, 0, 0, 1} -> ok
+    end,
+    Path1 = binary_to_list(iolist_to_binary(Path)),
+    {ok, B} = file:read_file(filename:join([Base, Path1])),
+    B.
 
 %% ===================================================================
 %% Common parts
@@ -1715,6 +1750,8 @@ parse_opt(binary, State) -> State#state{return_type = binary};
 parse_opt(iolist, State) -> State#state{return_type = iolist};
 parse_opt(bom, State) -> State#state{bom = true};
 parse_opt(decode, State) -> State#state{decode = true};
+parse_opt({resolver, Fun, Conf}, State) when is_function(Fun) ->
+    State#state{resolver = {Fun, Conf}};
 parse_opt({atom_strings, Bool}, State) when is_boolean(Bool)->
     State#state{atom_strings = Bool};
 parse_opt(atom_keys, State) ->
