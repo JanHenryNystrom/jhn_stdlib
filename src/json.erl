@@ -1490,8 +1490,8 @@ validate_prop(type, <<"object">>, {_}, _) ->
     true;
 validate_prop(type, Types, JSON, State) when is_list(Types) ->
     validate_type(Types, JSON, State);
-validate_prop(type, _, _, _) ->
-    erlang:throw(invalid_type);
+validate_prop(type, Type, _, _) ->
+    erlang:throw({invalid_type, Type});
 validate_prop(allOf, Schemas = [_ | _], JSON, State) ->
     State1 = State#state{props_validated = false},
     [validate_schema(Schema, JSON, State1) || Schema <- Schemas];
@@ -1520,15 +1520,15 @@ validate_prop(id, Id, _, State = #state{plain_string=utf8}) when is_binary(Id)->
     validate_id(uri:decode(Id), State);
 validate_prop(id, Id, _, State = #state{plain_string=Plain}) when is_binary(Id)->
     validate_id(uri:decode(char_code(Id, Plain, utf8)), State);
-validate_prop('$schema', <<"http://json-schema.org/schema#">>, _, _)  ->
-    true;
-validate_prop('$schema', <<"http://json-schema.org/draft-04/schema#">>, _, _)  ->
-    true;
+validate_prop('$schema', Schema, _, #state{plain_string = Plain})  ->
+    Schema1 = case Plain of
+                  utf8 -> Schema;
+                  _ -> char_code(Schema, Plain, utf8)
+              end,
+    true = lists:member(Schema1,
+                        [<<"http://json-schema.org/schema#">>,
+                         <<"http://json-schema.org/draft-04/schema#">>]);
 validate_prop('$ref', Ref, JSON, State) ->
-    file:write_file(huff,
-                    io_lib:format("Ref:~p top_uri:~p scope:~p ~n",
-                                  [Ref, State#state.top_uri, State#state.scope]),
-                    [append]),
     validate_ref(Ref, JSON, State);
 validate_prop(_, {_}, _, _) ->
     true.
@@ -1661,17 +1661,11 @@ validate_oneof([Schema | Schemas], JSON, true, State) ->
 
 validate_id(#uri{scheme=undefined, path=[], fragment=F}, State) when F /= <<>> ->
     #state{scope = URI} = State,
-    file:write_file(huff, io_lib:format("New frag:~p ~n", [F]), [append]),
     State#state{scope = URI#uri{fragment = F}};
 validate_id(#uri{scheme = undefined, path = Path, fragment = Fragment}, State) ->
     #state{scope = URI} = State,
-    file:write_file(huff,
-                    io_lib:format("New path:~p frag:~p => ~p~n",
-                                  [Path, Fragment, URI#uri{path = Path, fragment = Fragment}]),
-                    [append]),
     State#state{scope = URI#uri{path = Path, fragment = Fragment}};
 validate_id(URI, State) ->
-    file:write_file(huff, io_lib:format("New id:~p ~n", [URI]), [append]),
     State#state{scope = URI}.
 
 validate_ref(Ref, JSON, State = #state{scope = Scope, top_uri = TopURI})
@@ -1735,8 +1729,6 @@ validate_ref(Ref, JSON, State) ->
             Schema = eval(Pointer, SchemaTop, State#state{decode = true}),
             State2 = State1#state{top = SchemaTop, top_uri = Scope},
             validate_schema(Schema, JSON, State2);
-
-
         #uri{scheme = undefined, path = Path, fragment = <<>>} ->
             Scope1 = Scope#uri{path = merge_paths(Scope#uri.path, Path)},
             Schema = decode(resolve(Scope1, State), State),
@@ -1767,8 +1759,20 @@ validate_ref(Ref, JSON, State) ->
             validate_schema(Schema, JSON, State2)
     end.
 
-merge_paths([], Path) -> Path;
-merge_paths(Path1, Path2) -> hd(lists:reverse(Path1)) ++ Path2.
+
+merge_paths(Path1, []) -> Path1;
+merge_paths(_, [<<>>, <<>> | Path2]) -> Path2;
+merge_paths([], Path2) -> Path2;
+merge_paths([_], Path2) ->  Path2;
+merge_paths([A | _], [<<>> | Path2]) -> [A | Path2];
+merge_paths(Path1, Path2) -> merge_paths1(Path2, tl(lists:reverse(Path1))).
+
+merge_paths1([], Path1) -> lists:reverse(Path1);
+merge_paths1([<<".">> | T], Path1) -> merge_paths1(T, Path1);
+merge_paths1(Path2 = [<<"..">> | _], [<<>> | T1]) -> merge_paths1(Path2, T1);
+merge_paths1([<<"..">> | T], [_ | T1]) -> merge_paths1(T, [<<>> | T1]);
+merge_paths1(Path2, [<<>> | Path1]) -> merge_paths1(Path2, Path1);
+merge_paths1(Path2, Path1) -> lists:reverse(Path1) ++ Path2.
 
 resolve(URI, #state{resolver = {Fun, Conf}}) -> Fun(URI, Conf).
 
@@ -1815,7 +1819,6 @@ resolve_local_file(#uri{scheme = http, host = Host, path = Path}, Conf)  ->
                 ".json" -> Path1;
                 _ -> Path1 ++ ".json"
             end,
-    file:write_file(huff, io_lib:format("Base:~p Path:~p~n", [Base, Path2]), [append]),
     read_file(filename:join([Base, Path2])).
 
 read_file(File) ->
