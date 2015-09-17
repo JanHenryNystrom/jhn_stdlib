@@ -29,8 +29,13 @@ Features/Modules
     * blist -- drop in replacement for the lists module in stdlib
     * bstring -- drop in replacement for the string module in stdlib
   * Protocols
-    * Encoding/decoding JSON/Erlang  -- json [rfc4627][6]
-    * MessagePack -- msgpack [MessagePack][7]/Erlang
+    * Encoding/decoding JSON/Erlang  -- json [rfc4627][6], [rfc7159][7]
+    * Encoding/decoding/evaluation JSON Pointer/Erlang  -- json [rfc6901][8]
+    * Validation JSON schema -- json [draft-zyp-json-schema-04][10]
+                                     [draft-fge-json-schema-validation-00][11]
+    * MessagePack -- msgpack [MessagePack][12]/Erlang
+  * Standards
+    * Encoding/decoding URI/Erlang -- uri [rfc3986][13]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
   * Data structures
@@ -41,8 +46,8 @@ Features/Modules
 Build
 -----
 
-meck requires [rebar][1] to build, but provides make support to download and
-install rebar. To build jhn_stdlib, go to the jhn_stdlib directory and type:
+jhn_stdlib requires [rebar][1] to build, but provides make support to download
+and install rebar. To build jhn_stdlib, go to the jhn_stdlib directory and type:
 
 ```sh
 make
@@ -103,5 +108,16 @@ I know I really should.
        "Software release life cycle"
   [6]: http://www.ietf.org/rfc/rfc4627.txt
        "The application/json Media Type for JavaScript Object Notation (JSON)"
-  [7]: http://msgpack.org/
+  [7]: http://www.ietf.org/rfc/rfc7159.txt
+       "The JavaScript Object Notation (JSON) Data Interchange Format"
+  [8]: http://www.ietf.org/rfc/rfc6901.txt
+       "JavaScript Object Notation (JSON) Pointer"
+  [10]: http://tools.ietf.org/id/draft-zyp-json-schema-04.txt
+       "JSON Schema: core definitions and terminology"
+  [11]: http://tools.ietf.org/id/draft-fge-json-schema-validation-00.txt
+       "JSON Schema: interactive and non interactive validation"
+  [12]: http://msgpack.org/
        "An efficient binary serialization format"
+  [13]: http://www.ietf.org/rfc/rfc3986.txt
+       "Uniform Resource Identifier (URI): Generic Syntax"
+

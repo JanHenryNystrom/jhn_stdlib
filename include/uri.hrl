@@ -1,6 +1,6 @@
 %% -*-erlang-*-
 %%==============================================================================
-%% Copyright 2013-2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -15,23 +15,15 @@
 %% limitations under the License.
 %%==============================================================================
 
-%%%-------------------------------------------------------------------
-%%% @doc
-%%%   This is like the stdlib a mix of lib modules, in this case a few
-%%%   of my thought experiments made solid as code.
-%%% @end
-%%%
-%% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%%%-------------------------------------------------------------------
-{application, jhn_stdlib,
- [
-  {description, "Jan Henry Nystrom's standard library"},
-  {vsn, "2.0"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib
-                 ]},
-  {env, []}
- ]}.
+%% Types
+-type scheme() :: http | https | file.
+
+%% Records
+-record(uri, {scheme  :: undefined | scheme(),
+              userinfo = [] :: [binary()],
+              host :: undefined | binary() | inet:ip_address(),
+              port :: undefined | inet:port_number(),
+              path = [] :: [binary()],
+              query = <<>> :: binary(),
+              fragment = <<>> :: binary()
+             }).
