@@ -31,7 +31,6 @@ Features/Modules
   * Protocols
     * Encoding/decoding JSON/Erlang  -- json [rfc4627][6], [rfc7159][7]
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- json [rfc6901][8]
-    * Evaluation JSON Patch -- json [rfc6902][9]
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10]
                                      [draft-fge-json-schema-validation-00][11]
     * MessagePack -- msgpack [MessagePack][12]/Erlang
@@ -113,8 +112,6 @@ I know I really should.
        "The JavaScript Object Notation (JSON) Data Interchange Format"
   [8]: http://www.ietf.org/rfc/rfc6901.txt
        "JavaScript Object Notation (JSON) Pointer"
-  [9]: http://www.ietf.org/rfc/rfc6902.txt
-       "JavaScript Object Notation (JSON) Patch"
   [10]: http://tools.ietf.org/id/draft-zyp-json-schema-04.txt
        "JSON Schema: core definitions and terminology"
   [11]: http://tools.ietf.org/id/draft-fge-json-schema-validation-00.txt

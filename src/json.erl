@@ -21,7 +21,6 @@
 %%%                                                                    (rfc4627)
 %%%    The JavaScript Object Notation (JSON) Data Interchange Format   (rfc7159)
 %%%    JavaScript Object Notation (JSON) Pointer                       (rfc6901)
-%%%    JavaScript Object Notation (JSON) Patch                         (rfc6902)
 %%%    JSON Reference                             (draft-pbryan-zyp-json-ref-03)
 %%%    JSON Schema: core definitions and terminology  (draft-zyp-json-schema-04)
 %%     JSON Schema: interactive and non interactive validation 
@@ -31,6 +30,8 @@
 %%%
 %%%  text          : value
 %%%  rfc4627_text  : object | array (rfc4627 compability mode)
+%%%  pointer       : [integer | string | '-']
+%%%  schema        : object
 %%%  
 %%%  value         : true | false | null | object | array | number | string
 %%%
@@ -53,6 +54,25 @@
 %%%
 %%%  When converting Erlang terms to JSON iolists are generated but
 %%%  it can generate a binary if so instructed.
+%%%
+%%%  Objects can be represented directly as maps but that does not allow
+%%%  for duplicate keys so a safe  option is provided for decoding.
+%%%  This will change in later realeases where the two object formats
+%%%   will be separated and the slightly more complex maps one will be safe.
+%%%
+%%%  When encoding pointers a pointer flag must be given since they  cannot be
+%%%  automatically recognised. Pointer evaluation deviates from standard in
+%%%  objects with duplicate keys, they are not checked, this will be provided
+%%%  in coming releases as a strict flag.
+%%%
+%%%  When validating a JSON the flags to the validation has to be the same
+%%%  has to be the same as used when decoding either the JSON or schema.
+%%%  When a JSON should be decoded by the validation that has to be indicated
+%%%  by the decode flag.
+%%%  
+%%%  Only one URI resolver is provided for now and that is against jhn_stdlib's
+%%%  priv dir, is another is provided and validation of schemas is used
+%%%  it has to be abe to resolve http://json-schema.org/draft-04/schema#.
 %%%
 %%%  UTF formats are defined in Unicode 5.0 (ISBN 0-321-48091-0).
 %%%
@@ -209,7 +229,7 @@ encode(Term) ->
 %%     {maps, Bool} -> if true maps is a valid representation for objects,
 %%                     default false.
 %%     binary -> a binary is returned
-%%     iolist -> an iolist is returned
+%%     iolist -> an iolist is returned (default)
 %%     bom -> a UTF byte order mark is added at the head of the encoding
 %%     {atom_strings, Bool} -> determines if atoms for strings are allowed
 %%     {plain_string, Format} -> what format the strings are encoded in
@@ -320,7 +340,7 @@ eval(Pointer, JSON) ->
 %%   Selects and optionally decodes a Fragment of a JSON document based on
 %%%  the Pointer.
 %%   Select will give an exception if the binary is not well formed JSON,
-%%   the pointer not well formed json_string.
+%%   the pointer not well formed JSON Pointer.
 %%   Options are:
 %%     decode -> the JSON selected(value) is decoded
 %%     bom -> the binary to decode has a UTF byte order mark
@@ -378,6 +398,10 @@ validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 %% Function: validate(JSONSchema, JSON, Options) -> true, {true, Term} | false.
 %% @doc
 %%   Validates a JSON document, and optionally decodes, based on the Schema
+%%    
+%%   If either the schema or the json is already decode they have to be decoded
+%%   with the same flags and thos provided to the validation.
+%%    
 %%   Options are:
 %%     decode -> the JSON validated is decoded
 %%     bom -> the binary to decode has a UTF byte order mark
