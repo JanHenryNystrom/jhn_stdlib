@@ -46,8 +46,8 @@ Features/Modules
 Build
 -----
 
-meck requires [rebar][1] to build, but provides make support to download and
-install rebar. To build jhn_stdlib, go to the jhn_stdlib directory and type:
+jhn_stdlib requires [rebar][1] to build, but provides make support to download
+and install rebar. To build jhn_stdlib, go to the jhn_stdlib directory and type:
 
 ```sh
 make
