@@ -53,7 +53,7 @@
 %%%      For HTTPS requires the ssl OTP lib which is not included in the
 %%%      application resource file.
 %%%
-%%% Only supports R17 and later.
+%%% Only supports R18 and later.
 %%%
 %%% @end
 %%%
