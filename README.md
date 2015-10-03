@@ -31,11 +31,15 @@ Features/Modules
   * Protocols
     * Encoding/decoding JSON/Erlang  -- json [rfc4627][6], [rfc7159][7]
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- json [rfc6901][8]
-    * Validation JSON schema -- json [draft-zyp-json-schema-04][10]
+    * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
                                      [draft-fge-json-schema-validation-00][11]
     * MessagePack -- msgpack [MessagePack][12]/Erlang
   * Standards
     * Encoding/decoding URI/Erlang -- uri [rfc3986][13]
+  * Clients
+    * A simple HTTP client -- shttpc [rfc7230][14], [rfc7231][15],
+                                     [rfc7538][16], [rfc5789][17],
+                                     [rfc2818][18]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
   * Data structures
@@ -120,4 +124,13 @@ I know I really should.
        "An efficient binary serialization format"
   [13]: http://www.ietf.org/rfc/rfc3986.txt
        "Uniform Resource Identifier (URI): Generic Syntax"
-
+  [14]: http://www.ietf.org/rfc/rfc7230.txt
+       "Hypertext Transfer Protocol (HTTP/1.1): Message Syntax and Routing"
+  [15]: http://www.ietf.org/rfc/rfc7231.txt
+       "Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content"
+  [16]: http://www.ietf.org/rfc/rfc7538.txt
+       "The Hypertext Transfer Protocol Status Code 308 (Permanent Redirect)"
+  [17]: http://www.ietf.org/rfc/rfc5789.txt
+       "PATCH Method for HTTP"
+  [18]: http://www.ietf.org/rfc/rfc2818.txt
+       "HTTP Over TLS (rfc2818)"
