@@ -25,13 +25,9 @@
 %% @copyright (C) 2013-2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 {application, jhn_stdlib,
- [
-  {description, "Jan Henry Nystrom's standard library"},
-  {vsn, "2.0"},
+ [{description, "Jan Henry Nystrom's standard library"},
+  {vsn, "2.1"},
   {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib
-                 ]},
+  {applications, [kernel, stdlib]},
   {env, []}
  ]}.
