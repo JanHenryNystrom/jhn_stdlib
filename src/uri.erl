@@ -536,8 +536,8 @@ next({[], [H | T]}) -> next({H, T});
 next({<<>>, [H | T]}) -> next({H, T});
 next({[H | T], Stack}) when is_integer(H) -> {H, {T, Stack}};
 next({<<H, T/binary>>, Stack}) -> {H, {T, Stack}};
-next({[L | T], Stack}) when is_list(L) -> next({T, [L | Stack]});
-next({[B | T], Stack}) when is_binary(B) -> next({T, [B | Stack]}).
+next({[L | T], Stack}) when is_list(L) -> next({L, [T | Stack]});
+next({[B | T], Stack}) when is_binary(B) -> next({B, [T | Stack]}).
 
 to_scheme([], Acc) -> list_to_atom(Acc);
 to_scheme([C | T], Acc) when C >= $A, C =< $Z ->  to_scheme(T, [C + 32 | Acc]);
