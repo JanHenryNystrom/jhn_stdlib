@@ -454,7 +454,7 @@ encode_object(Object = #{}, State) ->
                      [encode_value(Value, State), Colon,
                       encode_string(Name, State), Comma | Acc]
              end,
-    case maps:fold(Encode, [], Object) of
+    case lists:reverse(maps:fold(Encode, [], Object)) of
         [] -> encode_chars(<<"{}">>, State);
         [_ | Members] ->
             [encode_char(${, State), Members, encode_char($}, State)]
@@ -490,7 +490,7 @@ encode_array(_, _, State) ->
 encode_value(true, State) -> encode_chars(<<"true">>, State);
 encode_value(false, State) -> encode_chars(<<"false">>, State);
 encode_value(null, State) -> encode_chars(<<"null">>, State);
-encode_value(String, State) when is_atom(String) -> encode_string(String, State);
+encode_value(String, State) when is_atom(String) -> encode_string(String,State);
 encode_value({Object}, State)  -> encode_object(Object, State);
 encode_value(Object = #{}, State = #state{maps = true}) ->
     encode_object(Object, State);
