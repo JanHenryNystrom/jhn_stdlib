@@ -852,7 +852,7 @@ format_request(State) ->
                  end,
     Query1 = case Query of
                  <<>> -> <<>>;
-                 Query -> [$?, Fragment]
+                 _ -> [$?, Query]
              end,
     [atom_to_binary(Method, utf8), " ", format_path(Path), Fragment1, Query1, 
      " HTTP/1.1\r\n", format_headers(Headers2), "\r\n", Body].
