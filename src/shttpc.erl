@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2015-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%%    Hypertext Transfer Protocol (HTTP/1.1): Message Syntax and Routing
 %%%                                                                    (rfc7230)
 %%%    Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content (rfc7231)
-%%%    The Hypertext Transfer Protocol Status Code 308 (Permanent Redirect) 
+%%%    The Hypertext Transfer Protocol Status Code 308 (Permanent Redirect)
 %%%                                                                    (rfc7538)
 %%%    PATCH Method for HTTP (rfc5789)
 %%%    HTTP Over TLS (rfc2818)
@@ -31,7 +31,7 @@
 %%%    headers -> a map of HTTP headers where the headers name can be an
 %%%               atom or binary and the value a binary
 %%%    options -> options to the transport's (tcp or ssl) connection function
-%%%    redirect -> a boolean that determines if redirect are automatically 
+%%%    redirect -> a boolean that determines if redirect are automatically
 %%%                followed for status codes 301, 302, 303, 307, 308 and in the
 %%%                case of 303 use the GET as the method
 %%%    close -> a boolean that determines if the connection should be closed by
@@ -58,7 +58,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2015-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(shttpc).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -423,7 +423,7 @@ patch(URL, Body, Opts) ->
 %%--------------------------------------------------------------------
 %% Function: delete(URL) -> ServerResponse | Error.
 %% @doc
-%%  Performs the DELETE HTTP method 
+%%  Performs the DELETE HTTP method
 %% @end
 %%--------------------------------------------------------------------
 -spec delete(iodata()) -> map() | {error, _}.
@@ -637,7 +637,7 @@ decode(URI, Req = #{method := Method}) ->
 port(_, Port) when is_integer(Port) -> Port;
 port(http, _) -> 80;
 port(https, _) -> 443.
-    
+
 normalize_headers(Map) -> maps:fold(fun normalize_header/3, [], Map).
 
 normalize_header(Key, Value, Acc) ->
@@ -693,9 +693,9 @@ ipv6_host(Host) ->
 %%------------------------------------------------------------------------------
 
 header_normalized(Header, Headers) ->  header_normalized(Header, Headers, <<>>).
-    
+
 header_normalized(Header, Headers, Default) ->
-    bstring:to_lower(plist:find(Header, Headers, Default)).    
+    bstring:to_lower(plist:find(Header, Headers, Default)).
 
 %%------------------------------------------------------------------------------
 %% Transport
@@ -854,7 +854,7 @@ format_request(State) ->
                  <<>> -> <<>>;
                  _ -> [$?, Query]
              end,
-    [atom_to_binary(Method, utf8), " ", format_path(Path), Fragment1, Query1, 
+    [atom_to_binary(Method, utf8), " ", format_path(Path), Fragment1, Query1,
      " HTTP/1.1\r\n", format_headers(Headers2), "\r\n", Body].
 
 format_headers(Headers) ->
@@ -914,15 +914,15 @@ read_response(State, Vsn, Status = {Code, _}, Headers) ->
         {ok, http_eoh} when Code >= 100, Code =< 199 ->
             read_response(State, undefined, {undefined, undefined}, []);
         {ok, http_eoh} when Code == 301, State#state.redirect ->
-            redirect(State, Headers);            
+            redirect(State, Headers);
         {ok, http_eoh} when Code == 302, State#state.redirect ->
-            redirect(State, Headers);  
+            redirect(State, Headers);
         {ok, http_eoh} when Code == 303, State#state.redirect ->
-            redirect(State#state{method = 'GET'}, Headers);  
+            redirect(State#state{method = 'GET'}, Headers);
         {ok, http_eoh} when Code == 307, State#state.redirect ->
-            redirect(State, Headers);            
+            redirect(State, Headers);
         {ok, http_eoh} when Code == 308, State#state.redirect ->
-            redirect(State, Headers);            
+            redirect(State, Headers);
         {ok, http_eoh} ->
             setopts(State, [{packet, raw}]),
             {Body, Trailers} = response_body(State, Vsn, Status, Headers),

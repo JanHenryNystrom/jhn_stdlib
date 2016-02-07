@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2015-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2015-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(uri).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -40,8 +40,7 @@
 
 %% Records
 -record(opts, {ipv4 = false :: boolean(),
-               return_type = iolist :: iolist | binary,
-               orig_call}).
+               return_type = iolist :: iolist | binary}).
 
 %% Types
 -type uri() :: #uri{}.
@@ -94,8 +93,7 @@
 %%--------------------------------------------------------------------
 -spec encode(uri()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Term) ->
-    encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
+encode(Term) -> encode(Term, #opts{}).
 
 %%--------------------------------------------------------------------
 %% Function: encode(Term, Options) -> URI
@@ -113,9 +111,7 @@ encode(Term) ->
 %%--------------------------------------------------------------------
 encode(Term, Opts = #opts{}) -> do_encode(Term, Opts);
 encode(Term, Opts) ->
-    Line = ?LINE,
-    ParsedOpts =
-        parse_opts(Opts, #opts{orig_call = {encode, [Term, Opts], Line}}),
+    ParsedOpts = parse_opts(Opts, #opts{}),
     case ParsedOpts#opts.return_type of
         iolist-> do_encode(Term, ParsedOpts);
         binary -> iolist_to_binary(do_encode(Term, ParsedOpts))
@@ -130,9 +126,7 @@ encode(Term, Opts) ->
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> uri().
 %%--------------------------------------------------------------------
-decode(Binary) ->
-    Line = ?LINE,
-    decode(Binary, #opts{orig_call = {decode, [Binary], Line}}).
+decode(Binary) -> decode(Binary, #opts{}).
 
 %%--------------------------------------------------------------------
 %% Function: decode(Binary, Options) -> URI.
@@ -146,9 +140,7 @@ decode(Binary) ->
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) ->
-    Line = ?LINE,
-    ParsedOpts =
-        parse_opts(Opts, #opts{orig_call = {decode, [Binary, Opts], Line}}),
+    ParsedOpts = parse_opts(Opts, #opts{}),
     do_decode(Binary, ParsedOpts).
 
 %% ===================================================================
@@ -219,7 +211,8 @@ encode_host({A, B, C, D, E, F, G, H}, Opts = #opts{ipv4 = true}) ->
     <<A1:8/unsigned-integer,
       B1:8/unsigned-integer,
       C1:8/unsigned-integer,
-      D1:8/unsigned-integer>> = <<G:16/unsigned-integer, H:16/unsigned-integer>>,
+      D1:8/unsigned-integer>> =
+        <<G:16/unsigned-integer, H:16/unsigned-integer>>,
     IPv4 = encode_host({A1, B1, C1, D1}, Opts),
     [join([integer_to_binary(I) || I <- [A, B, C, D, E, F]], $:), $:, IPv4];
 encode_host(IPv6 = {_, _, _, _, _, _, _, _}, _) ->
@@ -244,7 +237,8 @@ do_decode(IOData, Opts) ->
             decode_scheme(T, [C], Opts);
         {C, T} when ?IS_NC(C) ->
             decode_nc(T, [C], Opts);
-        _ -> badarg(Opts)
+        _ ->
+            erlang:error(badarg)
     end.
 
 decode_scheme(I, Acc, Opts) ->
@@ -263,7 +257,7 @@ decode_scheme(I, Acc, Opts) ->
         {C, T} when ?IS_NC(C) ->
             decode_nc(T, [C| Acc], Opts);
         _ ->
-            badarg(Opts)
+            erlang:error(badarg)
     end.
 
 decode_nc(I, Acc, Opts) ->
@@ -278,9 +272,9 @@ decode_nc(I, Acc, Opts) ->
         {H, T} when ?IS_NC(H) ->
             decode_nc(T, [H | Acc], Opts);
         _ ->
-            badarg(Opts)
+            erlang:error(badarg)
     end.
-            
+
 decode_authority_or_path(I, Acc, URI, Opts) ->
     case {next(I), Acc} of
         {eos, _} -> URI#uri{path = to_binary(Acc)};
@@ -292,7 +286,7 @@ decode_authority_or_path(I, Acc, URI, Opts) ->
         {{H, T}, _} when ?IS_PCHAR(H) ->
             decode_path(T, [H], [], URI, Opts);
         _ ->
-            badarg(Opts)
+            erlang:error(badarg)
     end.
 
 decode_authority(I, Acc, URI, Opts) ->
@@ -321,7 +315,7 @@ decode_authority(I, Acc, URI, Opts) ->
         {H, T} when ?IS_UNRESERVED_DELIM(H) ->
             decode_authority(T, [H | Acc], URI, Opts);
         _ ->
-            badarg(Opts)
+            erlang:error(badarg)
     end.
 
 decode_userinfo(I, Acc, Components, URI, Opts) ->
@@ -357,7 +351,7 @@ decode_userinfo(I, Acc, Components, URI, Opts) ->
         {H, T} when ?IS_UNRESERVED_DELIM(H) ->
             decode_userinfo(T, [H | Acc], Components, URI, Opts);
         _ ->
-            badarg(Opts)
+            erlang:error(badarg)
     end.
 
 decode_host(I, Acc, URI, Opts) ->
@@ -374,7 +368,7 @@ decode_host(I, Acc, URI, Opts) ->
         {H, T} when ?IS_UNRESERVED_DELIM(H) ->
             decode_host(T, [H | Acc], URI, Opts);
         _ ->
-            badarg(Opts)
+            erlang:error(badarg)
     end.
 
 decode_port(I, Acc, URI, Opts) ->
@@ -384,8 +378,7 @@ decode_port(I, Acc, URI, Opts) ->
         {$?, T} -> decode_query(T, [], URI#uri{port = to_integer(Acc)}, Opts);
         {$#, T} -> decode_fragment(T, [], URI#uri{port =to_integer(Acc)},Opts);
         {H, T} when ?IS_INT(H) -> decode_port(T, [H | Acc], URI, Opts);
-        _ ->
-            badarg(Opts)
+        _ -> erlang:error(badarg)
     end.
 
 decode_ipv6(I, Acc, Components, URI, Opts) ->
@@ -394,7 +387,7 @@ decode_ipv6(I, Acc, Components, URI, Opts) ->
             decode_ipv6(T, [], [to_binary(Acc) | Components], URI, Opts);
         {$], T} ->
             IPv6 =
-                decode_ipv6_host([to_binary(Acc) | Components], Opts),
+                decode_ipv6_host([to_binary(Acc) | Components]),
             URI1 = URI#uri{host = IPv6},
             case next(T) of
                 eos -> URI1;
@@ -402,16 +395,16 @@ decode_ipv6(I, Acc, Components, URI, Opts) ->
                 {$?, T1} -> decode_query(T1, [], URI1, Opts);
                 {$#, T1} -> decode_fragment(T1, [], URI1,Opts);
                 {$:, T1} -> decode_port(T1, [], URI1, Opts);
-                _ -> badarg(Opts)
+                _ -> erlang:error(badarg)
             end;
         {H, T} when ?IS_HEX(H) ->
             decode_ipv6(T, [H | Acc], Components, URI, Opts);
         _ ->
-            badarg(Opts)
+            erlang:error(badarg)
     end.
 
 
-decode_ipv6_host([H | T], Opts)  when byte_size(H) > 4 ->
+decode_ipv6_host([H | T])  when byte_size(H) > 4 ->
     {A, B , C, D} = decode_ipv4(H, [], []),
     <<H7:16/unsigned-integer, H8:16/unsigned-integer>> =
         <<A:8/unsigned-integer,
@@ -420,41 +413,37 @@ decode_ipv6_host([H | T], Opts)  when byte_size(H) > 4 ->
           D:8/unsigned-integer>>,
     case [decode_hex(E) || E <- lists:reverse(T)] of
         Decoded when length(Decoded) == 6 ->
-            list_to_tuple(ensure_non_empty(Decoded ++ [H7, H8], Opts));
+            list_to_tuple(ensure_non_empty(Decoded ++ [H7, H8]));
         [empty, empty | Decoded] ->
             Pad = lists:duplicate(6 - length(Decoded), 0),
-            list_to_tuple(ensure_non_empty(Pad ++ Decoded ++ [H7, H8], Opts));
+            list_to_tuple(ensure_non_empty(Pad ++ Decoded ++ [H7, H8]));
         Decoded ->
-            list_to_tuple(ipv6_fill(Decoded ++ [H7, H8], 6 - length(Decoded),
-                                    Opts))
+            list_to_tuple(ipv6_fill(Decoded ++ [H7, H8], 6 - length(Decoded)))
     end;
-decode_ipv6_host(L, Opts) ->
+decode_ipv6_host(L) ->
     case [decode_hex(E) || E <- lists:reverse(L)] of
         [empty, empty, empty] -> {0, 0, 0, 0, 0, 0, 0, 0};
         [empty, empty | Decoded] ->
             Pad = lists:duplicate(8 - length(Decoded), 0),
-            list_to_tuple(ensure_non_empty(Pad ++ Decoded, Opts));
+            list_to_tuple(ensure_non_empty(Pad ++ Decoded));
         Decoded ->
-            list_to_tuple(ipv6_fill(Decoded, 8 - length(Decoded), Opts))
+            list_to_tuple(ipv6_fill(Decoded, 8 - length(Decoded)))
     end.
 
-ipv6_fill(L, 0, Opts) -> ensure_non_empty(L, Opts);
-ipv6_fill([empty, empty], N, Opts) ->
-    ensure_non_empty(lists:duplicate(N + 2, 0), Opts);
-ipv6_fill([empty | T], N, Opts) ->
-    ensure_non_empty(lists:duplicate(N + 1, 0) ++ T, Opts);
-ipv6_fill([H | T], N, Opts) when H /= empty ->
-    [H | ipv6_fill(T, N, Opts)].
+ipv6_fill(L, 0) -> ensure_non_empty(L);
+ipv6_fill([empty, empty], N) -> ensure_non_empty(lists:duplicate(N + 2, 0));
+ipv6_fill([empty | T], N) -> ensure_non_empty(lists:duplicate(N + 1, 0) ++ T);
+ipv6_fill([H | T], N) when H /= empty -> [H | ipv6_fill(T, N)].
 
-ensure_non_empty(E, Opts) ->
+ensure_non_empty(E) ->
     case lists:any(fun(empty) -> true; (_) -> false end, E) of
-        true -> badarg(Opts);
+        true -> erlang:error(badarg);
         false -> E
     end.
-            
+
 decode_hex(<<>>) -> empty;
 decode_hex(Hex) ->
-    <<Value:16/unsigned-integer>> = 
+    <<Value:16/unsigned-integer>> =
         case [unhex(C) || <<C>> <= Hex] of
             [D] -> <<0:12, D:4/unsigned-integer>>;
             [C, D] -> <<0:8, C:4/unsigned-integer, D:4/unsigned-integer>>;
@@ -499,7 +488,7 @@ decode_path(I, Acc, Components, URI, Opts) ->
         {H, T} when ?IS_PCHAR(H) ->
             decode_path(T, [H | Acc], Components, URI, Opts);
         _ ->
-            badarg(Opts)
+            erlang:error(badarg)
     end.
 
 decode_query(I, Acc, URI, Opts) ->
@@ -587,13 +576,4 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(ipv4, Opts) -> Opts#opts{ipv4 = true};
-parse_opt(_, Opts) -> badarg(Opts).
-
-%%--------------------------------------------------------------------
--spec badarg(#opts{}) -> no_return().
-%%--------------------------------------------------------------------
-badarg(#opts{orig_call = {Funcion, Args, Line}}) ->
-    Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line - 1}]} |
-             lists:dropwhile(fun(T) -> element(1, T) == ?MODULE end,
-                             erlang:get_stacktrace())],
-    exit({badarg, Trace}).
+parse_opt(_, _) -> erlang:error(badarg).
