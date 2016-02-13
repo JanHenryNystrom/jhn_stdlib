@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(t_tree).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -39,11 +39,12 @@
          first/1, first/2,
          last/1, last/2,
          indices/1, values/1,
-         replace/3, replace/4
+         replace/3, replace/4,
+         to_list/1, from_list/1
         ]).
 
 %% Records
--record(node, {depth     = 0   :: pos_integer(),
+-record(node, {depth     = 1   :: pos_integer(),
                size      = 1   :: pos_integer(),
                glb             :: index(),
                lub             :: index(),
@@ -211,13 +212,22 @@ adds(Pairs, Tree) -> adds(Pairs, Tree, nocheck).
 %%--------------------------------------------------------------------
 -spec adds([{index(), value()}], t_tree(), flag()) -> t_tree().
 %%--------------------------------------------------------------------
-adds(Pairs, Tree, Flag) ->
-    balance(
-      lists:foldr(fun({Index, Value}, Acc = #t_tree{root = Root}) ->
-                          Acc#t_tree{root = add(Index, Value, Root, Acc, Flag)}
-                  end,
-                  Tree,
-                  Pairs)).
+adds(Pairs, Tree = #t_tree{min = Min, max = Max}, nocheck) ->
+    Pairs1 = lists:keymerge(1, lists:keysort(1, Pairs), to_list(Tree)),
+    Size = Min + (Max - Min) div 2,
+    #t_tree{min = Min,
+            max = Max,
+            root = element(1, from_list(Pairs1, length(Pairs1), Size))};
+adds(Pairs, Tree = #t_tree{min = Min, max = Max}, check) ->
+    case lists:any(fun({I, _}) -> member(I, Tree) end, Pairs) of
+        true -> erlang:error(badarg);
+        false ->
+            Pairs1 = lists:keymerge(1, lists:keysort(1, Pairs), to_list(Tree)),
+            Size = Min + (Max - Min) div 2,
+            #t_tree{min = Min,
+                    max = Max,
+                    root = element(1, from_list(Pairs1, length(Pairs1), Size))}
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: delete(Index, Tree) -> Tree.
@@ -307,13 +317,28 @@ deletes(Indices, Tree) -> deletes(Indices, Tree, nocheck).
 %%--------------------------------------------------------------------
 -spec deletes([index()], t_tree(), flag()) -> t_tree().
 %%--------------------------------------------------------------------
-deletes(Indices, Tree = #t_tree{root = Root}, Flag) ->
-    balance(
-      Tree#t_tree{root = lists:foldr(fun(Index, Node) ->
-                                             delete1(Index, Node, Tree, Flag)
-                                     end,
-                                     Root,
-                                     Indices)}).
+deletes(Indices, Tree = #t_tree{min = Min, max = Max}, nocheck) ->
+    Size = Min + (Max - Min) div 2,
+    Pairs =
+        lists:foldr(fun(Index, Acc) -> lists:keydelete(Index, 1, Acc) end,
+                    to_list(Tree),
+                    Indices),
+    #t_tree{min = Min,
+            max = Max,
+            root = element(1, from_list(Pairs, length(Pairs), Size))};
+deletes(Indices, Tree = #t_tree{min = Min, max = Max}, check) ->
+    case lists:all(fun({I, _}) -> member(I, Tree) end, Indices) of
+        false -> erlang:error(badarg);
+        true ->
+            Size = Min + (Max - Min) div 2,
+            Pairs =
+                lists:foldr(fun(Index, Acc) -> lists:keydelete(Index,1,Acc) end,
+                            to_list(Tree),
+                            Indices),
+            #t_tree{min = Min,
+                    max = Max,
+                    root = element(1, from_list(Pairs, length(Pairs), Size))}
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: member(Index, Tree) -> Boolean.
@@ -584,6 +609,48 @@ replace1(Index, Value, Node = #node{occupants = Os}) ->
         true -> Node#node{occupants = inner_replace(Index, Value, Os)}
     end.
 
+%%--------------------------------------------------------------------
+%% Function: to_list(Tree) -> Pairs.
+%% @doc
+%%    From a T-tree a list of {Index, Value} pairs.
+%% @end
+%%--------------------------------------------------------------------
+-spec to_list(t_tree()) -> [{index(), value()}].
+%%--------------------------------------------------------------------
+to_list(#t_tree{root = nil}) -> [];
+to_list(#t_tree{root = #node{occupants = Occupants, left=Left, right=Right}}) ->
+    to_list(Left, Occupants ++ to_list(Right, [])).
+
+%%--------------------------------------------------------------------
+%% Function: from_list(Pairs) -> Tree.
+%% @doc
+%%   For each {Index, Value} pair in Pairs the value is stored under the
+%%   index in the Tree. Equivalent to from_list(Pairs, []).
+%% @end
+%%--------------------------------------------------------------------
+-spec from_list([{index(), value()}]) -> t_tree().
+%%--------------------------------------------------------------------
+from_list(Pairs) -> from_list(Pairs, []).
+
+%%--------------------------------------------------------------------
+%% Function: from_list(Pairs, Opts) -> Tree.
+%% @doc
+%%   For each {Index, Value} pair in Pairs the value is stored under the
+%%   index in the Tree.
+%% @end
+%%--------------------------------------------------------------------
+-spec from_list([{index(), value()}], [opt()]) -> t_tree().
+%%--------------------------------------------------------------------
+from_list(Pairs, Opts) ->
+    #opts{min = Min, max = Max} = parse_opts(Opts, #opts{}),
+    Size = Min + (Max - Min) div 2,
+    #t_tree{min = Min,
+            max = Max,
+            root = element(1,
+                           from_list(lists:keysort(1, Pairs),
+                                     length(Pairs),
+                                     Size))}.
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
@@ -620,18 +687,16 @@ inner_greatest_lower_bound(Index, [_, H = {Index1,_}|T]) when Index >= Index1 ->
 inner_greatest_lower_bound(_, [{_, Value} | _]) ->
     Value.
 
-balance(X) -> X.
-
 steal(lub, Node = #node{lub = Index, right = nil, occupants = Os}, Tree) ->
     {lists:last(Os), delete1(Index, Node, Tree, nocheck)};
 steal(lub, Node = #node{right = Right}, Tree) ->
     {Elt, Right1} = steal(lub, Right, Tree),
-    {Elt, Node#node{right = Right1}};
+    {Elt, recalc_depth(Node#node{right = Right1})};
 steal(glb, Node = #node{glb = Index, left = nil, occupants = [H | _]}, Tree) ->
     {H, delete1(Index, Node, Tree, nocheck)};
 steal(glb, Node = #node{left = Left}, Tree) ->
     {Elt, Left1} = steal(lub, Left, Tree),
-    {Elt, Node#node{left = Left1}}.
+    {Elt, recalc_depth(Node#node{left = Left1})}.
 
 recalc_boundary(Index, Node = #node{glb = Index, occupants = [{GLB, _} | _]}) ->
     Node#node{glb = GLB};
@@ -648,3 +713,69 @@ recalc_depth(Node = #node{left = #node{depth = D}, right = nil}) ->
     Node#node{depth = D + 1};
 recalc_depth(Node = #node{left = #node{depth=D1}, right = #node{depth=D2}}) ->
     Node#node{depth = max(D1, D2) + 1}.
+
+balance(Tree = #t_tree{min = Min, max = Max, root = Root}) ->
+    case balanced(Root) of
+        true -> Tree;
+        false ->
+            Pairs = to_list(Tree),
+            Size = Min + (Max - Min) div 2,
+            #t_tree{min = Min,
+                    max = Max,
+                    root = element(1, from_list(Pairs, length(Pairs), Size))}
+    end.
+
+balanced(nil) -> true;
+balanced(#node{left = nil, right = nil}) -> true;
+balanced(#node{left = #node{depth = 1}, right = nil}) -> true;
+balanced(#node{left = nil, right = #node{depth = 1}}) -> true;
+balanced(#node{left = L = #node{depth = D}, right = R = #node{depth = D}}) ->
+    balanced(L) andalso balanced(R);
+balanced(#node{left= L = #node{depth = LD},right = R = #node{depth = RD}})
+  when abs(LD - RD) < 2->
+    balanced(L) andalso balanced(R);
+balanced(_) ->
+    false.
+
+to_list(nil, Acc) -> Acc;
+to_list(#node{occupants = Occupants, left=Left, right=Right}, Acc) ->
+    to_list(Left, Occupants ++ to_list(Right, Acc)).
+
+from_list([], _, _) -> {nil, []};
+from_list(T, 0, _) -> {nil, T};
+from_list(Pairs, Size, Occupants) when Size =< Occupants ->
+    {Pick, T} = pick(Pairs, Size, []),
+    {#node{depth = 1,
+           size = Size,
+           glb = element(1, hd(Pick)),
+           lub = element(1, lists:last(Pick)),
+           occupants = Pick},
+     T};
+from_list(Pairs, Size, Occupants) ->
+    RightHalf = (Size - Occupants) div 2,
+    LeftHalf = Size - Occupants - RightHalf,
+    {Left = #node{depth = LD}, Pairs1} = from_list(Pairs, LeftHalf, Occupants),
+    {Pick, T1} = pick(Pairs1, Occupants, []),
+    case from_list(T1, RightHalf, Occupants) of
+        {nil, T1} ->
+            {#node{depth = LD + 1,
+                   size = Occupants,
+                   glb =  element(1, hd(Pick)),
+                   lub = element(1, lists:last(Pick)),
+                   left = Left,
+                   occupants = Pick},
+             T1};
+        {Right = #node{depth = RD}, T2} ->
+            {#node{depth = max(LD, RD) + 1,
+                   size = Occupants,
+                   glb =  element(1, hd(Pick)),
+                   lub = element(1, lists:last(Pick)),
+                   left = Left,
+                   right = Right,
+                   occupants = Pick},
+             T2}
+    end.
+
+pick([], _, Acc) -> {lists:reverse(Acc), []};
+pick(T, 0, Acc) -> {lists:reverse(Acc), T};
+pick([H | T], N, Acc) -> pick(T, N - 1, [H | Acc]).
