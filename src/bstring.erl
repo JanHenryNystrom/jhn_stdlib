@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(bstring).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -449,7 +449,7 @@ strip(<<H, T/binary>>, _, _, Char, Acc, RightSofar) ->
 %% Function: left(String, Number) -> Left
 %% @doc
 %%   Returns the String with the length adjusted in accordance with Number.
-%%   The left margin is fixed. If the length(String) < Number,
+%%   The left margin is fixed. If the `length(String) < Number',
 %%   String is padded with blanks.
 %% @end
 %%--------------------------------------------------------------------
@@ -461,7 +461,7 @@ left(Binary, Length) -> left(Binary, Length, $\s).
 %% Function: left(String, Number, Character) -> Left
 %% @doc
 %%   Returns the String with the length adjusted in accordance with Number.
-%%   The left margin is fixed. If the length(String) < Number,
+%%   The left margin is fixed. If the `length(String) < Number',
 %%   String is padded with Characters.
 %% @end
 %%--------------------------------------------------------------------
@@ -483,7 +483,7 @@ left(Binary, Length, Char)
 %% Function: right(String, Number) -> Right.
 %% @doc
 %%   Returns the String with the length adjusted in accordance with Number.
-%%   The right margin is fixed. If the length of (String) < Number,
+%%   The right margin is fixed. If the length of `(String) < Number',
 %%   String is padded with blanks.
 %% @end
 %%--------------------------------------------------------------------
@@ -495,7 +495,7 @@ right(Binary, Length) -> right(Binary, Length, $\s).
 %% Function: right(String, Number, Character) -> Right
 %% @doc
 %%   Returns the String with the length adjusted in accordance with Number.
-%%   The right margin is fixed. If the length of (String) < Number,
+%%   The right margin is fixed. If the length of `(String) < Number',
 %%   String is padded with Characters.
 %% @end
 %%--------------------------------------------------------------------
@@ -624,20 +624,18 @@ to_integer(Binary) when is_binary(Binary) -> to_integer(Binary, "");
 to_integer(_) -> {error, not_a_binary}.
 
 to_integer(<<>>, Acc) ->
-    case catch list_to_integer(lists:reverse(Acc)) of
-        Integer when is_integer(Integer) ->
-            {Integer, <<>>};
-        _ ->
-            {error, no_integer}
+    try list_to_integer(lists:reverse(Acc)) of
+        Integer -> {Integer, <<>>}
+    catch
+        _:_ -> {error, no_integer}
     end;
 to_integer(<<H, T/binary>>, Acc) when ?IS_DIGIT(H) ->
     to_integer(T, [H | Acc]);
 to_integer(Binary, Acc) ->
-    case catch list_to_integer(lists:reverse(Acc)) of
-        Integer when is_integer(Integer) ->
-            {Integer, Binary};
-        _ ->
-            {error, no_integer}
+    try list_to_integer(lists:reverse(Acc)) of
+        Integer  -> {Integer, Binary}
+    catch
+        _:_ -> {error, no_integer}
     end.
 
 %%--------------------------------------------------------------------

@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(lazy).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -277,13 +277,13 @@ tcp_to_data(HostName, Port, Timeout, OptionsIn) ->
 -spec tcp_socket_to_data(inet:socket()) -> data(binary()).
 %%--------------------------------------------------------------------
 tcp_socket_to_data(Socket) ->
-    Promise = fun(eol) -> tcp:close(Socket), eol;
+    Promise = fun(eol) -> gen_tcp:close(Socket), eol;
                  (Timeout) ->
                       case gen_tcp:recv(Socket, 0, Timeout) of
                           {ok, Packet} -> Packet;
                           {error, timeout} -> <<>>;
                           {error, closed} -> eol;
-                          {error, _} -> tcp:close(Socket), eol
+                          {error, _} -> gen_tcp:close(Socket), eol
                       end
               end,
     create(Promise).

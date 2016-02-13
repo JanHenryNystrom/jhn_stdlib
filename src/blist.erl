@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(blist).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -1328,7 +1328,7 @@ zip3_1(<<H1, T1/binary>>, <<H2, T2/binary>>, <<H3, T3/binary>>, Acc) ->
 %%   For each pair X, Y of binary octets from the two binarys, the binary
 %%   in the result binary will be Combine(X, Y).
 %%
-%%   zipwith(fun(X, Y) -> <<X, Y>> end, Binary1, Binary2) is equivalent
+%%   `zipwith(fun(X, Y) -> <<X, Y>> end, Binary1, Binary2)' is equivalent
 %%   to zip(Binary1, Binary2).
 %% @end
 %%--------------------------------------------------------------------
@@ -1349,7 +1349,7 @@ zipwith1(Fun, <<H1, T1/binary>>,<<H2, T2/binary>>, Acc) ->
 %%   For each triple X, Y, Z of binary octets from the thre binarys, the binary
 %%   in the result binary will be Combine(X, Y, Z).
 %%
-%%   zipwith(fun(X, Y, Z) -> <<X, Y, Z>> end, Binary1, Binary2, Binary3) is
+%%   `zipwith(fun(X, Y, Z) -> <<X, Y, Z>> end, Binary1, Binary2, Binary3)' is
 %%   equivalent to zip(Binary1, Binary2. Binary3).
 %% @end
 %%--------------------------------------------------------------------

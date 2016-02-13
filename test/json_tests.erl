@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -30,6 +30,31 @@
 
 %% Defines
 -define(BASE,
+        [{<<"true">>, true},
+         {<<"false">>, false},
+         {<<"null">>, null},
+         {<<"1">>, 1},
+         {<<"1.0">>, 1.0},
+         {<<"\"Foo\"">>, <<"Foo">>},
+         {<<"{}">>, {[]}},
+         {<<"{\"empty\":[]}">>, {[{<<"empty">>, []}]}},
+         {<<"{\"empty\":{}}">>, {[{<<"empty">>, {[]}}]}},
+         {<<"[]">>, []},
+         {<<"[[]]">>, [[]]},
+         {<<"[{}]">>, [{[]}]},
+         {<<"{\"one\":1}">>, {[{<<"one">>, 1}]}},
+         {<<"{\"one\":1,\"two\":2}">>, {[{<<"one">>, 1}, {<<"two">>, 2}]}},
+         {<<"{\"one\":1.0}">>, {[{<<"one">>, 1.0}]}},
+         {<<"{\"one\":0.1,\"two\":2.2}">>,
+          {[{<<"one">>, 0.1}, {<<"two">>, 2.2}]}},
+         {<<"{\"one\":null}">>, {[{<<"one">>, null}]}},
+         {<<"{\"one\":true}">>, {[{<<"one">>, true}]}},
+         {<<"{\"one\":false}">>, {[{<<"one">>, false}]}},
+         {<<"[null,true,false]">>, [null, true, false]},
+         {<<"[1,-1,1.0,-1.0]">>, [1, -1, 1.0, -1.0]}
+        ]).
+
+-define(BASE_RFC4627,
         [{<<"{}">>, {[]}},
          {<<"{\"empty\":[]}">>, {[{<<"empty">>, []}]}},
          {<<"{\"empty\":{}}">>, {[{<<"empty">>, {[]}}]}},
@@ -119,8 +144,8 @@
                    non_option
                   ]).
 
--define(BAD_JSON, [true, false, null, foo, 1, 1.0, <<"Foo">>,
-                   {[true]}, {[<<"Foo">>]}, {[{<<"one">>, 1} | true]},
+%% true, false, null, foo, 1, 1.0, <<"Foo">>,
+-define(BAD_JSON, [{[true]}, {[<<"Foo">>]}, {[{<<"one">>, 1} | true]},
                    [1 | 1],
                    {[{1, 1}]},
                    [{foo, bar}]
@@ -133,7 +158,8 @@
                   {<<"[\"\\0\\a\\v\\s\\q\"]">>, [<<0, 7, 11, 32, $\\, $q>>]}
                  ]).
 
--define(BAD_BINARY, [<<"true">>, <<"false">>, <<"null">>, <<"1">>, <<"1.0">>,
+%% <<"true">>, <<"false">>, <<"null">>, <<"1">>, <<"1.0">>,
+-define(BAD_BINARY, [
                      <<"<true>">>, <<"{\"one\":1]">>, <<"{\"one\":1">>,
                      <<"{\"one\":1 \"two\":2}">>, <<"{\"one\":1,\"two\":2,}">>,
                      <<"{,\"one\":1,\"two\":2}">>,
@@ -147,8 +173,24 @@
                    ]).
 
 -define(EXISTING_ATOM_KEYS, [{<<"{}">>, {[]}},
-                    {<<"{\"one\":1}">>, {[{one, 1}]}}
-                   ]).
+                             {<<"{\"one\":1}">>, {[{one, 1}]}}
+                            ]).
+
+-define(POINTERS, [{<<"">>, []},
+                   {<<"/foo">>, [<<"foo">>]},
+                   {<<"/foo">>, [foo]},
+                   {<<"/foo/0">>, [foo, 0]},
+                   {<<"/">>, [<<"">>]},
+                   {<<"/a~1b">>, [<<"a/b">>]},
+                   {<<"/c%d">>, [<<"c%d">>]},
+                   {<<"/e^f">>, [<<"e^f">>]},
+                   {<<"/g|h">>, [<<"g|h">>]},
+                   {<<"/i\\\\j">>, [<<"i\\\\j">>]},
+                   {<<"/k\"l">>, [<<"k\"l">>]},
+                   {<<"/ ">>, [<<" ">>]},
+                   {<<"/m~0n">>, [<<"m~n">>]},
+                   {<<"/-">>, ['-']}
+                  ]).
 
 -define(IS_BADARG(X), ?assertMatch({'EXIT', {badarg, _}}, catch X)).
 
@@ -199,7 +241,7 @@ encode_2_iolist_test_() ->
 %% encode/2 with different encodings
 %%--------------------------------------------------------------------
 encode_2_encodings_test_() ->
-    [?_test(?assertEqual(utf(Result, latin1, Encoding),
+    [?_test(?assertEqual(utf(Result, utf8, Encoding),
                          iolist_to_binary(
                            json:encode(Term, [{encoding, Encoding}])))) ||
         {Result, Term} <- ?REVERSIBLE,
@@ -211,7 +253,7 @@ encode_2_encodings_test_() ->
 %%--------------------------------------------------------------------
 encode_2_encodings_bom_test_() ->
     [?_test(?assertEqual(<<(unicode:encoding_to_bom(Encoding))/binary,
-                           (utf(Result, latin1, Encoding))/binary>>,
+                           (utf(Result, utf8, Encoding))/binary>>,
                          iolist_to_binary(
                            json:encode(Term, [bom, {encoding, Encoding}])))) ||
         {Result, Term} <- ?REVERSIBLE,
@@ -223,7 +265,7 @@ encode_2_encodings_bom_test_() ->
 %%--------------------------------------------------------------------
 encode_2_encodings_bom_binary_test_() ->
     [?_test(?assertEqual(<<(unicode:encoding_to_bom(Encoding))/binary,
-                           (utf(Result, latin1, Encoding))/binary>>,
+                           (utf(Result, utf8, Encoding))/binary>>,
                          json:encode(Term,
                                      [bom,
                                       binary,
@@ -236,7 +278,7 @@ encode_2_encodings_bom_binary_test_() ->
 %% encode/2 with atom strings
 %%--------------------------------------------------------------------
 encode_2_atoms_test_() ->
-    [?_test(?assertEqual(utf(Result, latin1, Encoding),
+    [?_test(?assertEqual(utf(Result, utf8, Encoding),
                          iolist_to_binary(
                            json:encode(Term, [{encoding, Encoding}])))) ||
         {Result, Term} <- ?ATOM_STRINGS,
@@ -247,7 +289,7 @@ encode_2_atoms_test_() ->
 %% encode/2 with atom strings and the flags set
 %%--------------------------------------------------------------------
 encode_2_atoms_strings_test_() ->
-    [?_test(?assertEqual(utf(Result, latin1, Encoding),
+    [?_test(?assertEqual(utf(Result, utf8, Encoding),
                          iolist_to_binary(
                            json:encode(Term, [{encoding, Encoding},
                                               {atom_strings, true}
@@ -261,9 +303,9 @@ encode_2_atoms_strings_test_() ->
 %%--------------------------------------------------------------------
 encode_2_encodings_plains_test_() ->
     [
-     ?_test(?assertEqual(utf(Result, latin1, Encoding),
+     ?_test(?assertEqual(utf(Result, utf8, Encoding),
                          iolist_to_binary(
-                           json:encode([utf(String, latin1, Plain)],
+                           json:encode([utf(String, utf8, Plain)],
                                        [{encoding, Encoding},
                                         {plain_string, Plain}])))) ||
         {Result, [String]} <- ?STRING_ESCAPE,
@@ -302,7 +344,7 @@ encode_2_bad_json_test_() ->
 %% decode/1
 %%--------------------------------------------------------------------
 decode_1_test_() ->
-    [?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding)))) ||
+    [?_test(?assertEqual(Term, json:decode(utf(JSON, utf8, Encoding)))) ||
         {JSON, Term} <- ?REVERSIBLE,
         Encoding <- ?ENCODINGS
     ].
@@ -311,7 +353,7 @@ decode_1_test_() ->
 %% decode/2
 %%--------------------------------------------------------------------
 decode_2_test_() ->
-    [?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding), []))) ||
+    [?_test(?assertEqual(Term, json:decode(utf(JSON, utf8, Encoding), []))) ||
         {JSON, Term} <- ?REVERSIBLE,
         Encoding <- ?ENCODINGS
     ].
@@ -323,7 +365,7 @@ decode_2_bom_test_() ->
     [?_test(
         ?assertEqual(Term,
                      json:decode(<<(unicode:encoding_to_bom(Encoding))/binary,
-                                   (utf(JSON, latin1, Encoding))/binary>>,
+                                   (utf(JSON, utf8, Encoding))/binary>>,
                                  [bom]))) ||
         {JSON, Term} <- ?REVERSIBLE,
         Encoding <- ?ENCODINGS
@@ -334,7 +376,7 @@ decode_2_bom_test_() ->
 %%--------------------------------------------------------------------
 decode_2_atom_keys_test_() ->
     [?_test(?assertEqual(Term,
-                         json:decode(utf(JSON, latin1, Encoding),
+                         json:decode(utf(JSON, utf8, Encoding),
                                      [{atom_keys, true}]))) ||
         {JSON, Term} <- ?ATOM_KEYS,
         Encoding <- ?ENCODINGS
@@ -345,7 +387,7 @@ decode_2_atom_keys_test_() ->
 %%--------------------------------------------------------------------
 decode_2_existing_atom_keys_test_() ->
     [?_test(?assertEqual(Term,
-                         json:decode(utf(JSON, latin1, Encoding),
+                         json:decode(utf(JSON, utf8, Encoding),
                                      [{existing_atom_keys, true}]))) ||
         {JSON, Term} <- ?ATOM_KEYS,
         Encoding <- ?ENCODINGS
@@ -356,8 +398,8 @@ decode_2_existing_atom_keys_test_() ->
 %%--------------------------------------------------------------------
 decode_2_encodings_plains_test_() ->
     [
-     ?_test(?assertEqual([utf(String, latin1, Plain)],
-                         json:decode(utf(JSON, latin1, Encoding),
+     ?_test(?assertEqual([utf(String, utf8, Plain)],
+                         json:decode(utf(JSON, utf8, Encoding),
                                      [{plain_string, Plain}]))) ||
         {JSON, [String]} <- ?STRING_ESCAPE,
         Plain <- ?PLAIN_FORMATS,
@@ -383,7 +425,7 @@ decode_2_encodings_non_latin_plains_test_() ->
 %%--------------------------------------------------------------------
 decode_1_ws_encodings_test_() ->
     [
-     ?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding)))) ||
+     ?_test(?assertEqual(Term, json:decode(utf(JSON, utf8, Encoding)))) ||
         {JSON, Term} <- ?WS_JSON,
         Encoding <- ?ENCODINGS
     ].
@@ -393,21 +435,68 @@ decode_1_ws_encodings_test_() ->
 %%--------------------------------------------------------------------
 decode_2_ws_encodings_test_() ->
     [
-     ?_test(?assertEqual(Term, json:decode(utf(JSON, latin1, Encoding), []))) ||
+     ?_test(?assertEqual(Term, json:decode(utf(JSON, utf8, Encoding), []))) ||
         {JSON, Term} <- ?WS_JSON,
         Encoding <- ?ENCODINGS
     ].
+
 
 %% ===================================================================
 %% Bad BINARY
 %% ===================================================================
 decode_1_binary_test_() ->
-    [?_test(?IS_BADARG(json:decode(utf(B, latin1, Encoding)))) ||
+    [?_test(?IS_BADARG(json:decode(utf(B, utf8, Encoding)))) ||
         B <- ?BAD_BINARY, Encoding <- ?ENCODINGS].
 
 decode_2_binary_test_() ->
-    [?_test(?IS_BADARG(json:decode(utf(B, latin1, Encoding), [binary]))) ||
+    [?_test(?IS_BADARG(json:decode(utf(B, utf8, Encoding), [binary]))) ||
         B <- ?BAD_BINARY, Encoding <- ?ENCODINGS].
+
+%% ===================================================================
+%% Pointer encoding
+%% ===================================================================
+
+%%--------------------------------------------------------------------
+%% pointer/2
+%%--------------------------------------------------------------------
+pointer_2_test_() ->
+    [
+     ?_test(?assertEqual(Pointer,
+                         iolist_to_binary(json:encode(Term, [pointer]))))
+     || {Pointer, Term} <- ?POINTERS
+    ].
+
+%%--------------------------------------------------------------------
+%% pointer/2 with binary
+%%--------------------------------------------------------------------
+pointer_2_binary_test_() ->
+    [
+     ?_test(
+        ?assertEqual(Pointer, json:encode(Term, [pointer, binary])))
+     || {Pointer, Term} <- ?POINTERS
+    ].
+
+%%--------------------------------------------------------------------
+%% pointer/2 with different plain and encoding
+%%--------------------------------------------------------------------
+pointer_2_encodings_plains_test_() ->
+    [
+     ?_test(?assertEqual(utf(Pointer, utf8, Encoding),
+                         iolist_to_binary(
+                           json:encode(pointer_term_to_encoding(Term, Plain),
+                                        [pointer,
+                                         {encoding, Encoding},
+                                         {plain_string, Plain}])))) ||
+        {Pointer, Term} <- ?POINTERS,
+        Plain <- ?PLAIN_FORMATS,
+        Encoding <- ?ENCODINGS
+    ].
+
+pointer_term_to_encoding([], _) -> [];
+pointer_term_to_encoding([H | T], Plain) when is_binary(H) ->
+    [utf(H, utf8, Plain) | pointer_term_to_encoding(T, Plain)];
+pointer_term_to_encoding([H | T], Plain) ->
+    [H | pointer_term_to_encoding(T, Plain)].
 
 %% ===================================================================
 %% Bad options

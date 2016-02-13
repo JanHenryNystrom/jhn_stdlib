@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(msgpack).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -49,9 +49,9 @@
 %% Types
 -type opt() :: {atom_strings, boolean()} | binary | iolist.
 
--type msgpack()       :: map() | msgpack_array() | integers() | floats() |
-                         boolean() | raw().
--type map()           :: {[msgpack()]}.
+-type msgpack()       :: msgpack_map() | msgpack_array() |
+                         integers() | floats() | boolean() | raw().
+-type msgpack_map()   :: {[msgpack()]}.
 -type msgpack_array() :: [msgpack()].
 -type integers()      :: integer() | {integer_type(), integer()}.
 -type integer_type()  :: pos_fixnum | neg_fixnum |
@@ -63,7 +63,6 @@
 
 %% Records
 -record(opts, {return_type = iolist :: iolist | binary,
-               orig_call,
                number_types = false :: boolean()
               }).
 
@@ -131,7 +130,7 @@
 %%--------------------------------------------------------------------
 -spec encode(msgpack()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
+encode(Term) -> encode(Term, #opts{}).
 
 %%--------------------------------------------------------------------
 %% Function: encode(Term, Options) -> MSGPACK.
@@ -143,13 +142,12 @@ encode(Term) -> encode(Term, #opts{orig_call = {encode, [Term], ?LINE}}).
 %%     iolist -> a iolist is returned
 %% @end
 %%--------------------------------------------------------------------
--spec encode(msgpack(), [opt()]) -> iolist() | binary().
+-spec encode(msgpack(), [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
 encode(Term, Opts = #opts{}) ->
     encode_msgpack(Term, Opts);
-encode(Term, Opts) -> Line = ?LINE,
-    #opts{return_type = Return} = ParsedOpts =
-        parse_opts(Opts, #opts{orig_call = {encode, [Term, Opts], Line}}),
+encode(Term, Opts) ->
+    #opts{return_type = Return} = ParsedOpts = parse_opts(Opts, #opts{}),
     case Return of
         iolist -> encode_msgpack(Term, ParsedOpts);
         binary -> iolist_to_binary(encode_msgpack(Term, ParsedOpts))
@@ -164,8 +162,7 @@ encode(Term, Opts) -> Line = ?LINE,
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> msgpack().
 %%--------------------------------------------------------------------
-decode(Binary) -> Line = ?LINE,
-    decode(Binary, #opts{orig_call = {decode, [Binary], Line}}).
+decode(Binary) -> decode(Binary, #opts{}).
 
 %%--------------------------------------------------------------------
 %% Function: decode(MSGPACK, Options) -> Term.
@@ -176,14 +173,13 @@ decode(Binary) -> Line = ?LINE,
 %%     number_types -> decode into {Type, Value} for number types.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), [opt()]) -> msgpack().
+-spec decode(binary(), [opt()] | #opts{}) -> msgpack().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) ->
     {Decoded, _Rest} = decode_msgpack(Binary, Opts),
     Decoded;
-decode(Binary, Opts) -> Line = ?LINE,
-    OptsRec = parse_opts(Opts,
-                         #opts{orig_call = {decode, [Binary, Opts], Line}}),
+decode(Binary, Opts) ->
+    OptsRec = parse_opts(Opts, #opts{}),
     {Decoded, _Rest} = decode_msgpack(Binary, OptsRec),
     Decoded.
 
@@ -203,18 +199,18 @@ encode_msgpack(Float, Opts) when is_float(Float)-> encode_float(Float, Opts);
 encode_msgpack(nil, _) -> <<?NIL>>;
 encode_msgpack(true, _) -> <<?TRUE>>;
 encode_msgpack(false, _) -> <<?FALSE>>;
-encode_msgpack(Raw, Opts) when is_binary(Raw) -> encode_raw(Raw, Opts);
+encode_msgpack(Raw, _) when is_binary(Raw) -> encode_raw(Raw);
 encode_msgpack(X = {Type, _}, Opts) when is_atom(Type) ->
     case lists:member(Type, ?FLOAT_TYPES) of
         true -> encode_float(X, Opts);
         false ->
             case lists:member(Type, ?INTEGER_TYPES) of
                 true -> encode_integer(X, Opts);
-                false -> badarg(Opts)
+                false -> erlang:error(badarg)
             end
     end;
-encode_msgpack(_, Opts) ->
-    badarg(Opts).
+encode_msgpack(_, _) ->
+    erlang:error(badarg).
 
 encode_integer({pos_fixnum, I}, _)
   when I >= ?POS_FIXNUM_MIN, I =< ?POS_FIXNUM_MAX ->
@@ -258,19 +254,19 @@ encode_integer(I, _) when I < ?INT16_MIN, I >= ?INT32_MIN ->
     <<?INT32, I:32/signed>>;
 encode_integer(I, _) when I < ?INT32_MIN, I >= ?INT64_MIN ->
     <<?INT64, I:64/signed>>;
-encode_integer(_, Opts) ->
-    badarg(Opts).
+encode_integer(_, _) ->
+    erlang:error(badarg).
 
 encode_float({float, Float}, _) -> <<?FLOAT, Float:32/float>>;
 encode_float({double, Float}, _) -> <<?DOUBLE, Float:64/float>>;
 encode_float(Float, _) -> <<?DOUBLE, Float:64/float>>.
 
-encode_raw(Raw, Opts) ->
+encode_raw(Raw) ->
     case byte_size(Raw) of
         Size when Size < 32 -> [<<?FIX_RAW, Size:5>>, Raw];
         Size when Size =< ?UINT16_MAX -> [<<?RAW16, Size:16>>, Raw];
         Size when Size =< ?UINT32_MAX -> [<<?RAW32, Size:32>>, Raw];
-        _ -> badarg(Opts)
+        _ -> erlang:error(badarg)
     end.
 
 encode_array(Array, Opts) ->
@@ -278,7 +274,7 @@ encode_array(Array, Opts) ->
               L  when L < 16 -> <<?FIX_ARRAY, L:4>>;
               L when L =< ?UINT16_MAX -> <<?ARRAY16, L:16>>;
               L when L =< ?UINT32_MAX -> <<?ARRAY32, L:32>>;
-              _ -> badarg(Opts)
+              _ -> erlang:error(badarg)
           end,
     [Tag | [encode_msgpack(Elt, Opts) || Elt <- Array]].
 
@@ -287,7 +283,7 @@ encode_map(Map, Opts) ->
               L  when L < 16 -> <<?FIX_MAP, L:4>>;
               L when L =< ?UINT16_MAX -> <<?MAP16, L:16>>;
               L when L =< ?UINT32_MAX -> <<?MAP32, L:32>>;
-              _ -> badarg(Opts)
+              _ -> erlang:error(badarg)
           end,
     [Tag |
      [[encode_msgpack(Key, Opts), encode_msgpack(Value, Opts)] ||
@@ -366,8 +362,8 @@ decode_msgpack(<<?MAP16, L:16, T/binary>>, Opts) ->
     decode_map(L, T, [], Opts);
 decode_msgpack(<<?MAP32, L:32, T/binary>>, Opts) ->
     decode_map(L, T, [], Opts);
-decode_msgpack(_, Opts) ->
-    badarg(Opts).
+decode_msgpack(_, _) ->
+    erlang:error(badarg).
 
 
 decode_array(0, T, Acc, _) -> {lists:reverse(Acc), T};
@@ -392,10 +388,4 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(number_types, Opts) -> Opts#opts{number_types = true};
-parse_opt(_, Rec) -> badarg(Rec).
-
-badarg(#opts{orig_call = {Funcion, Args, Line}}) ->
-    Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line}]} |
-             lists:dropwhile(fun(T) -> element(1, T) == ?MODULE end,
-                             erlang:get_stacktrace())],
-    exit({badarg, Trace}).
+parse_opt(_, _) -> erlang:error(badarg).
