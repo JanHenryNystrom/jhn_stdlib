@@ -16,7 +16,7 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%   Implements T-tress extended with an notion of least upp and greatest
+%%   Implements T-trees extended with an notion of least upp and greatest
 %%   lower bounds. For more information on T-Trees see:
 %%   A Study of Index Structures for Main Memory Database Management Systems.
 %%   by Tobin J. Lehman and Michael J. Carey, VLDB 1986.
