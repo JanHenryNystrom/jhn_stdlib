@@ -44,6 +44,7 @@ Features/Modules
     * lazy -- abstracts different data sources as uniform lazy data
   * Data structures
     * Property lists -- plist
+    * T-trees -- t_tree
 
 <a name='build'>
 
