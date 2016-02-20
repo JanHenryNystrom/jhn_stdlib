@@ -214,9 +214,9 @@ encode_host({A, B, C, D, E, F, G, H}, Opts = #opts{ipv4 = true}) ->
       D1:8/unsigned-integer>> =
         <<G:16/unsigned-integer, H:16/unsigned-integer>>,
     IPv4 = encode_host({A1, B1, C1, D1}, Opts),
-    [join([integer_to_binary(I) || I <- [A, B, C, D, E, F]], $:), $:, IPv4];
+    [join([integer_to_binary(I, 16) || I <- [A, B, C, D, E, F]], $:), $:, IPv4];
 encode_host(IPv6 = {_, _, _, _, _, _, _, _}, _) ->
-    join([integer_to_binary(I) || I <- tuple_to_list(IPv6)], $:).
+    join([integer_to_binary(I, 16) || I <- tuple_to_list(IPv6)], $:).
 
 join([], _) -> [];
 join([H | T], Sep) -> [H | [[Sep, E] || E <- T]].
