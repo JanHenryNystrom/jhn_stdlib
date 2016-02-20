@@ -37,11 +37,20 @@
                ipv6ipv4 = false :: boolean(),
                continue = false :: boolean(),
                range = false :: boolean(),
+               compact = false :: boolean(),
                return_type = iolist :: iolist | list | binary}).
 
 %% Types
 -type opt() :: _.
--type ip() :: _.
+-type ip() :: ipv4() | ipv6().
+-type ipv4() :: integer() | {integer(), integer(), integer(), integer()}.
+-type ipv6() :: integer() |
+                {integer(), integer(), integer(), integer(),
+                 integer(), integer(), integer(), integer()} |
+                {integer(), integer(), integer(), integer(),
+                 integer(), integer(),
+                 {integer(), integer(), integer(), integer()}}.
+-type range() :: integer().
 
 
 %% Defines
@@ -81,6 +90,7 @@ encode(Term) -> encode(Term, #opts{}).
 %%     ipv6 -> an ipv6 address is encoded when the Term is an integer
 %%     ipv6ipv4 -> encoded IPv6 host address has the two least sigificant
 %%                 segments repesented in IPv4 address format
+%%     compact -> the most compact encoding of IPv6 used (collapsed zeros)
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(ip(), [opt()] | #opts{}) -> iolist() | binary().
@@ -101,7 +111,7 @@ encode(Term, Opts) ->
 %%   Equivalent of decode(IOData, []) -> Integer.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(iodata()) -> integer().
+-spec decode(iodata()) -> ip() | {ip(), iodata()}.
 %%--------------------------------------------------------------------
 decode(Binary) -> decode(Binary, #opts{}).
 
@@ -113,9 +123,15 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%   Options are:
 %%     integer -> an integer is returned (Default)
 %%     tuple -> a tuple of integers is returned
+%%     ipv6ipv4 -> with tuple the two last parts are returned as an IPv4 tuple
+%%     range -> a IP range is being decoded
+%%     continue -> all remaining indata is returned
 %% @end
 %%--------------------------------------------------------------------
--spec decode(iodata(), [opt()] | #opts{}) -> integer() | tuple().
+-spec decode(iodata(), [opt()] | #opts{}) -> ip() |
+                                             {ip(), range()} |
+                                             {ip(), iodata()} |
+                                             {ip(), range(), iodata()}.
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) ->
@@ -368,4 +384,5 @@ parse_opt(ipv6, Opts) -> Opts#opts{format = ipv6};
 parse_opt(ipv6ipv4, Opts) -> Opts#opts{ipv6ipv4 = true};
 parse_opt(continue, Opts) -> Opts#opts{continue = true};
 parse_opt(range, Opts) -> Opts#opts{range = true};
+parse_opt(compact, Opts) -> Opts#opts{compact = true};
 parse_opt(_, _) -> erlang:error(badarg).
