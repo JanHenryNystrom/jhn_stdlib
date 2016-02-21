@@ -18,13 +18,14 @@
 %%% @doc
 %%%  A IP library based on:
 %%%    IP Version 6 Addressing Architecture                            (rfc4291)
+%%%    A Recommendation for IPv6 Address Text Representation           (rfc5952)
 %%%
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(ip).
+-module(ip_addr).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% Library functions
@@ -172,7 +173,7 @@ do_encode(I, Opts = #opts{format = ipv6}) ->
 compact(IPv6, #opts{compact = false}) -> IPv6;
 compact(IPv6, #opts{ipv6ipv4 = IPv6IPv4}) ->
     case longest_zeros(IPv6, 0, 0, 0, start, 0) of
-        {_, 0} -> join([integer_to_binary(I, 16) || I <- IPv6], $:);
+        {_, 0} -> join([hex(I) || I <- IPv6], $:);
         {0, _} -> [$:, drop_zeros(IPv6, IPv6IPv4)];
         {Start, _} -> drop_zeros(IPv6, 0, Start, IPv6IPv4)
     end.
@@ -189,12 +190,14 @@ longest_zeros([_ | T], N, Start, Length, _, _) ->
 
 drop_zeros([_ | T], Start, Start, IPv6IPv4) -> drop_zeros(T, IPv6IPv4);
 drop_zeros([H | T], N, Start, IPv6IPv4) ->
-    [integer_to_binary(H, 16), $: | drop_zeros(T, N + 1, Start, IPv6IPv4)].
+    [hex(H), $: | drop_zeros(T, N + 1, Start, IPv6IPv4)].
 
 drop_zeros([], true) -> [];
 drop_zeros([], false) -> [$:];
 drop_zeros([0 | T], IPv6IPv4) -> drop_zeros(T, IPv6IPv4);
-drop_zeros(T, _) -> [$: | join([integer_to_binary(I, 16) || I <- T], $:)].
+drop_zeros(T, _) -> [$: | join([hex(I) || I <- T], $:)].
+
+hex(I) -> bstring:to_lower(integer_to_binary(I, 16)).
 
 join([], _) -> [];
 join([H | T], Sep) -> [H | [[Sep, E] || E <- T]].

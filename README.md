@@ -36,10 +36,12 @@ Features/Modules
     * MessagePack -- msgpack [MessagePack][12]/Erlang
   * Standards
     * Encoding/decoding URI/Erlang -- uri [rfc3986][13]
+    * Encoding/decoding IP addresses/Erlang -- ip_addr [rfc4291][14],
+                                                       [rfc5952][x]
   * Clients
-    * A simple HTTP client -- shttpc [rfc7230][14], [rfc7231][15],
-                                     [rfc7538][16], [rfc5789][17],
-                                     [rfc2818][18]
+    * A simple HTTP client -- shttpc [rfc7230][15], [rfc7231][16],
+                                     [rfc7538][17], [rfc5789][18],
+                                     [rfc2818][19]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
   * Data structures
@@ -125,13 +127,22 @@ I know I really should.
        "An efficient binary serialization format"
   [13]: http://www.ietf.org/rfc/rfc3986.txt
        "Uniform Resource Identifier (URI): Generic Syntax"
-  [14]: http://www.ietf.org/rfc/rfc7230.txt
+
+
+  [14]: http://www.ietf.org/rfc/rfc4291.txt
+       "IP Version 6 Addressing Architecture"
+  [x]: http://www.ietf.org/rfc/rfc5952.txt
+       "A Recommendation for IPv6 Address Text Representation"
+
+
+
+  [15]: http://www.ietf.org/rfc/rfc7230.txt
        "Hypertext Transfer Protocol (HTTP/1.1): Message Syntax and Routing"
-  [15]: http://www.ietf.org/rfc/rfc7231.txt
+  [16]: http://www.ietf.org/rfc/rfc7231.txt
        "Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content"
-  [16]: http://www.ietf.org/rfc/rfc7538.txt
+  [17]: http://www.ietf.org/rfc/rfc7538.txt
        "The Hypertext Transfer Protocol Status Code 308 (Permanent Redirect)"
-  [17]: http://www.ietf.org/rfc/rfc5789.txt
+  [18]: http://www.ietf.org/rfc/rfc5789.txt
        "PATCH Method for HTTP"
-  [18]: http://www.ietf.org/rfc/rfc2818.txt
+  [19]: http://www.ietf.org/rfc/rfc2818.txt
        "HTTP Over TLS (rfc2818)"
