@@ -212,13 +212,8 @@ do_encode(URI = #uri{}, Opts) ->
     [S, I, encode_host(Host, Opts), Po, Pa, Q, F].
 
 encode_host(Bin, _) when is_binary(Bin) -> Bin;
-encode_host(IP, Opts) ->
-    #opts{format = Format,
-          ipv6ipv4 = IPv6IPv4,
-          return_type = ReturnType,
-          compact = Compact} = Opts,
-    Opts1 =
-        flags([{ipv6ipv4, IPv6IPv4}, {compact, Compact}], [Format, ReturnType]),
+encode_host(IP, #opts{format = Format, ipv6ipv4 = IPv6IPv4, compact=Compact}) ->
+    Opts1 = flags([{ipv6ipv4, IPv6IPv4}, {compact, Compact}], [Format]),
     ip_addr:encode(IP, Opts1).
 
 flags([], Acc) -> Acc;
