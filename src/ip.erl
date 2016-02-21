@@ -152,13 +152,13 @@ do_encode(IPv4 = {_, _, _, _}, _) ->
     join([integer_to_binary(I) || I <- tuple_to_list(IPv4)], $.);
 do_encode({A, B, C, D, E, F, IP = {_, _, _, _}}, Opts) ->
     IPv4 = do_encode(IP, Opts),
-    [join([integer_to_binary(I, 16) || I <- [A, B, C, D, E, F]], $:), $:, IPv4];
+    [compact([A, B, C, D, E, F], Opts), $:, IPv4];
 do_encode({A, B, C, D, E, F, G, H}, Opts = #opts{ipv6ipv4 = true}) ->
     <<A1, B1, C1, D1>> = <<G:16, H:16>>,
     IPv4 = do_encode({A1, B1, C1, D1}, Opts),
-    [join([integer_to_binary(I, 16) || I <- [A, B, C, D, E, F]], $:), $:, IPv4];
-do_encode(IPv6 = {_, _, _, _, _, _, _, _}, _) ->
-    join([integer_to_binary(I, 16) || I <- tuple_to_list(IPv6)], $:);
+    [compact([A, B, C, D, E, F], Opts), $:, IPv4];
+do_encode(IPv6 = {_, _, _, _, _, _, _, _}, Opts) ->
+    compact(tuple_to_list(IPv6), Opts);
 do_encode(I, Opts) when I > 4294967295 ->
     do_encode(list_to_tuple([X || <<X:16>> <= <<I:128>>]), Opts);
 do_encode(I, Opts = #opts{format = ipv4}) ->
@@ -168,6 +168,33 @@ do_encode(I, Opts = #opts{format = ipv6, ipv6ipv4 = true}) ->
     do_encode({A, B, C, D, E, F, {A1, B1, C1, D1}}, Opts);
 do_encode(I, Opts = #opts{format = ipv6}) ->
     do_encode(list_to_tuple([X || <<X:16>> <= <<I:128>>]), Opts).
+
+compact(IPv6, #opts{compact = false}) -> IPv6;
+compact(IPv6, #opts{ipv6ipv4 = IPv6IPv4}) ->
+    case longest_zeros(IPv6, 0, 0, 0, start, 0) of
+        {_, 0} -> join([integer_to_binary(I, 16) || I <- IPv6], $:);
+        {0, _} -> [$:, drop_zeros(IPv6, IPv6IPv4)];
+        {Start, _} -> drop_zeros(IPv6, 0, Start, IPv6IPv4)
+    end.
+
+longest_zeros([], _, Start, Length, _, _) -> {Start, Length};
+longest_zeros([0 | T], N, _, Length, Start1, Length1) when Length1 > Length->
+    longest_zeros(T, N + 1, Start1, Length1 + 1, Start1, Length1 + 1);
+longest_zeros([0 | T], N, Start, Length, start, _) ->
+    longest_zeros(T, N + 1, Start, Length, N, 1);
+longest_zeros([0 | T], N, Start, Length, Start1, Length1) ->
+    longest_zeros(T, N + 1, Start, Length, Start1, Length1 + 1);
+longest_zeros([_ | T], N, Start, Length, _, _) ->
+    longest_zeros(T, N + 1, Start, Length, start, 0).
+
+drop_zeros([_ | T], Start, Start, IPv6IPv4) -> drop_zeros(T, IPv6IPv4);
+drop_zeros([H | T], N, Start, IPv6IPv4) ->
+    [integer_to_binary(H, 16), $: | drop_zeros(T, N + 1, Start, IPv6IPv4)].
+
+drop_zeros([], true) -> [];
+drop_zeros([], false) -> [$:];
+drop_zeros([0 | T], IPv6IPv4) -> drop_zeros(T, IPv6IPv4);
+drop_zeros(T, _) -> [$: | join([integer_to_binary(I, 16) || I <- T], $:)].
 
 join([], _) -> [];
 join([H | T], Sep) -> [H | [[Sep, E] || E <- T]].
