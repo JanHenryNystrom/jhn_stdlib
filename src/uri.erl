@@ -39,7 +39,9 @@
 -include_lib("jhn_stdlib/include/uri.hrl").
 
 %% Records
--record(opts, {ipv4 = false :: boolean(),
+-record(opts, {format = ipv4 :: ipv4 | ipv6,
+               ipv6ipv4 = false :: boolean(),
+               compact = false :: boolean(),
                return_type = iolist :: iolist | binary}).
 
 %% Types
@@ -102,9 +104,13 @@ encode(Term) -> encode(Term, #opts{}).
 %%   Encode will give an exception if the erlang term is not well formed.
 %%   Options are:
 %%     binary -> a binary is returned
+%%     list -> a flat list is returned
 %%     iolist -> a iolist is returned
-%%     ipv4 -> encoded IPv6 host address has the two least sigificant
-%%             segments repesented in IPv4 address format
+%%     ipv4 -> an ipv4 address is encoded when the Host is an integer
+%%     ipv6 -> an ipv6 address is encoded when the Host is an integer
+%%     ipv6ipv4 -> encoded IPv6 host address has the two least sigificant
+%%                 segments repesented in IPv4 address format
+%%     compact -> the most compact encoding of IPv6 used (collapsed zeros)
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(uri(), [opt()] | #opts{}) -> iolist() | binary().
@@ -114,7 +120,8 @@ encode(Term, Opts) ->
     ParsedOpts = parse_opts(Opts, #opts{}),
     case ParsedOpts#opts.return_type of
         iolist-> do_encode(Term, ParsedOpts);
-        binary -> iolist_to_binary(do_encode(Term, ParsedOpts))
+        binary -> iolist_to_binary(do_encode(Term, ParsedOpts));
+        list -> binary_to_list(iolist_to_binary(do_encode(Term, ParsedOpts)))
     end.
 
 %%--------------------------------------------------------------------
@@ -205,20 +212,18 @@ do_encode(URI = #uri{}, Opts) ->
     [S, I, encode_host(Host, Opts), Po, Pa, Q, F].
 
 encode_host(Bin, _) when is_binary(Bin) -> Bin;
-encode_host(IPv4 = {_, _, _, _}, _) ->
-    join([integer_to_binary(I) || I <- tuple_to_list(IPv4)], $.);
-encode_host({A, B, C, D, E, F, G, H}, Opts = #opts{ipv4 = true}) ->
-    <<A1:8/unsigned-integer,
-      B1:8/unsigned-integer,
-      C1:8/unsigned-integer,
-      D1:8/unsigned-integer>> =
-        <<G:16/unsigned-integer, H:16/unsigned-integer>>,
-    IPv4 = encode_host({A1, B1, C1, D1}, Opts),
-    [join([hex(I) || I <- [A, B, C, D, E, F]], $:), $:, IPv4];
-encode_host(IPv6 = {_, _, _, _, _, _, _, _}, _) ->
-    join([hex(I) || I <- tuple_to_list(IPv6)], $:).
+encode_host(IP, Opts) ->
+    #opts{format = Format,
+          ipv6ipv4 = IPv6IPv4,
+          return_type = ReturnType,
+          compact = Compact} = Opts,
+    Opts1 =
+        flags([{ipv6ipv4, IPv6IPv4}, {compact, Compact}], [Format, ReturnType]),
+    ip_addr:encode(IP, Opts1).
 
-hex(I) -> bstring:to_lower(integer_to_binary(I, 16)).
+flags([], Acc) -> Acc;
+flags([{Flag, true} | T], Acc) -> flags(T, [Flag | Acc]);
+flags([{_, false} | T], Acc) -> flags(T, Acc).
 
 join([], _) -> [];
 join([H | T], Sep) -> [H | [[Sep, E] || E <- T]].
@@ -503,6 +508,10 @@ parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
+parse_opt(list, Opts) -> Opts#opts{return_type = list};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
-parse_opt(ipv4, Opts) -> Opts#opts{ipv4 = true};
+parse_opt(ipv4, Opts) -> Opts#opts{format = ipv4};
+parse_opt(ipv6, Opts) -> Opts#opts{format = ipv6};
+parse_opt(ipv6ipv4, Opts) -> Opts#opts{ipv6ipv4 = true};
+parse_opt(compact, Opts) -> Opts#opts{compact = true};
 parse_opt(_, _) -> erlang:error(badarg).
