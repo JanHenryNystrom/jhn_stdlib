@@ -133,8 +133,7 @@ I know I really should.
   [15]: http://www.ietf.org/rfc/rfc5952.txt
        "A Recommendation for IPv6 Address Text Representation"
   [16]: http://www.ietf.org/rfc/rfc4632.txt
-       "Classless Inter-domain Routing (CIDR):
-          The Internet Address Assignment and Aggregation Plan"
+       "Classless Inter-domain Routing (CIDR): The Internet Address Assignment and Aggregation Plan"
   [17]: http://www.ietf.org/rfc/rfc7230.txt
        "Hypertext Transfer Protocol (HTTP/1.1): Message Syntax and Routing"
   [18]: http://www.ietf.org/rfc/rfc7231.txt
