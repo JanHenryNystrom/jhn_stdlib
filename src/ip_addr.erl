@@ -135,9 +135,7 @@ decode(Binary) -> decode(Binary, #opts{}).
                                              {ip(), range(), iodata()}.
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
-decode(Binary, Opts) ->
-    ParsedOpts = parse_opts(Opts, #opts{}),
-    do_decode(Binary, ParsedOpts).
+decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
 
 %% ===================================================================
 %% Internal functions.
@@ -160,6 +158,9 @@ do_encode({A, B, C, D, E, F, G, H}, Opts = #opts{ipv6ipv4 = true}) ->
     [compact([A, B, C, D, E, F], Opts), $:, IPv4];
 do_encode(IPv6 = {_, _, _, _, _, _, _, _}, Opts) ->
     compact(tuple_to_list(IPv6), Opts);
+do_encode(I, Opts = #opts{ipv6ipv4 = true}) when I > 4294967295 ->
+    <<A:16, B:16, C:16, D:16, E:16, F:16, A1, B1, C1, D1>> = <<I:128>>,
+    do_encode({A, B, C, D, E, F, {A1, B1, C1, D1}}, Opts);
 do_encode(I, Opts) when I > 4294967295 ->
     do_encode(list_to_tuple([X || <<X:16>> <= <<I:128>>]), Opts);
 do_encode(I, Opts = #opts{format = ipv4}) ->
@@ -170,7 +171,7 @@ do_encode(I, Opts = #opts{format = ipv6, ipv6ipv4 = true}) ->
 do_encode(I, Opts = #opts{format = ipv6}) ->
     do_encode(list_to_tuple([X || <<X:16>> <= <<I:128>>]), Opts).
 
-compact(IPv6, #opts{compact = false}) -> IPv6;
+compact(IPv6, #opts{compact = false}) -> join([hex(I) || I <- IPv6], $:);
 compact(IPv6, #opts{ipv6ipv4 = IPv6IPv4}) ->
     case longest_zeros(IPv6, 0, 0, 0, start, 0) of
         {_, 0} -> join([hex(I) || I <- IPv6], $:);
