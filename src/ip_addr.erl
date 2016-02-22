@@ -19,6 +19,8 @@
 %%%  A IP library based on:
 %%%    IP Version 6 Addressing Architecture                            (rfc4291)
 %%%    A Recommendation for IPv6 Address Text Representation           (rfc5952)
+%%%    Classless Inter-domain Routing (CIDR):                          (rfc4632)
+%%%          The Internet Address Assignment and Aggregation Plan
 %%%
 %%% @end
 %%%
