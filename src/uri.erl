@@ -39,7 +39,9 @@
 -include_lib("jhn_stdlib/include/uri.hrl").
 
 %% Records
--record(opts, {ipv4 = false :: boolean(),
+-record(opts, {format = ipv4 :: ipv4 | ipv6,
+               ipv6ipv4 = false :: boolean(),
+               compact = false :: boolean(),
                return_type = iolist :: iolist | binary}).
 
 %% Types
@@ -102,9 +104,13 @@ encode(Term) -> encode(Term, #opts{}).
 %%   Encode will give an exception if the erlang term is not well formed.
 %%   Options are:
 %%     binary -> a binary is returned
+%%     list -> a flat list is returned
 %%     iolist -> a iolist is returned
-%%     ipv4 -> encoded IPv6 host address has the two least sigificant
-%%             segments repesented in IPv4 address format
+%%     ipv4 -> an ipv4 address is encoded when the Host is an integer
+%%     ipv6 -> an ipv6 address is encoded when the Host is an integer
+%%     ipv6ipv4 -> encoded IPv6 host address has the two least sigificant
+%%                 segments repesented in IPv4 address format
+%%     compact -> the most compact encoding of IPv6 used (collapsed zeros)
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(uri(), [opt()] | #opts{}) -> iolist() | binary().
@@ -114,7 +120,8 @@ encode(Term, Opts) ->
     ParsedOpts = parse_opts(Opts, #opts{}),
     case ParsedOpts#opts.return_type of
         iolist-> do_encode(Term, ParsedOpts);
-        binary -> iolist_to_binary(do_encode(Term, ParsedOpts))
+        binary -> iolist_to_binary(do_encode(Term, ParsedOpts));
+        list -> binary_to_list(iolist_to_binary(do_encode(Term, ParsedOpts)))
     end.
 
 %%--------------------------------------------------------------------
@@ -205,18 +212,13 @@ do_encode(URI = #uri{}, Opts) ->
     [S, I, encode_host(Host, Opts), Po, Pa, Q, F].
 
 encode_host(Bin, _) when is_binary(Bin) -> Bin;
-encode_host(IPv4 = {_, _, _, _}, _) ->
-    join([integer_to_binary(I) || I <- tuple_to_list(IPv4)], $.);
-encode_host({A, B, C, D, E, F, G, H}, Opts = #opts{ipv4 = true}) ->
-    <<A1:8/unsigned-integer,
-      B1:8/unsigned-integer,
-      C1:8/unsigned-integer,
-      D1:8/unsigned-integer>> =
-        <<G:16/unsigned-integer, H:16/unsigned-integer>>,
-    IPv4 = encode_host({A1, B1, C1, D1}, Opts),
-    [join([integer_to_binary(I) || I <- [A, B, C, D, E, F]], $:), $:, IPv4];
-encode_host(IPv6 = {_, _, _, _, _, _, _, _}, _) ->
-    join([integer_to_binary(I) || I <- tuple_to_list(IPv6)], $:).
+encode_host(IP, #opts{format = Format, ipv6ipv4 = IPv6IPv4, compact=Compact}) ->
+    Opts1 = flags([{ipv6ipv4, IPv6IPv4}, {compact, Compact}], [Format]),
+    ip_addr:encode(IP, Opts1).
+
+flags([], Acc) -> Acc;
+flags([{Flag, true} | T], Acc) -> flags(T, [Flag | Acc]);
+flags([{_, false} | T], Acc) -> flags(T, Acc).
 
 join([], _) -> [];
 join([H | T], Sep) -> [H | [[Sep, E] || E <- T]].
@@ -308,7 +310,7 @@ decode_authority(I, Acc, URI, Opts) ->
             URI1 = URI#uri{userinfo = [to_binary(Acc)]},
             decode_host(T, [], URI1, Opts);
         {$[, T} ->
-            decode_ipv6(T, [], [], URI, Opts);
+            decode_ipv6(T, URI, Opts);
         {$%, T} ->
             {H, T1} = decode_escaped(T),
             decode_authority(T1, [H | Acc], URI, Opts);
@@ -361,7 +363,7 @@ decode_host(I, Acc, URI, Opts) ->
         {$?, T} -> decode_query(T, [], URI#uri{host = to_binary(Acc)}, Opts);
         {$#, T} -> decode_fragment(T, [], URI#uri{host = to_binary(Acc)},Opts);
         {$:, T} -> decode_port(T, [], URI#uri{host = to_binary(Acc)}, Opts);
-        {$[, T} when Acc == [] -> decode_ipv6(T, [], [], URI, Opts);
+        {$[, T} when Acc == [] -> decode_ipv6(T, URI, Opts);
         {$%, T} ->
             {H, T1} = decode_escaped(T),
             decode_host(T1, [H | Acc], URI, Opts);
@@ -381,14 +383,11 @@ decode_port(I, Acc, URI, Opts) ->
         _ -> erlang:error(badarg)
     end.
 
-decode_ipv6(I, Acc, Components, URI, Opts) ->
-    case next(I) of
-        {$:, T} ->
-            decode_ipv6(T, [], [to_binary(Acc) | Components], URI, Opts);
+decode_ipv6(I, URI, Opts) ->
+    {IPv6, T0} = ip_addr:decode(I, [tuple, continue]),
+    URI1 = URI#uri{host = IPv6},
+    case next(T0) of
         {$], T} ->
-            IPv6 =
-                decode_ipv6_host([to_binary(Acc) | Components]),
-            URI1 = URI#uri{host = IPv6},
             case next(T) of
                 eos -> URI1;
                 {$/, T1} -> decode_path(T1, [], [], URI1, Opts);
@@ -397,79 +396,9 @@ decode_ipv6(I, Acc, Components, URI, Opts) ->
                 {$:, T1} -> decode_port(T1, [], URI1, Opts);
                 _ -> erlang:error(badarg)
             end;
-        {H, T} when ?IS_HEX(H) ->
-            decode_ipv6(T, [H | Acc], Components, URI, Opts);
-        _ ->
+        _  ->
             erlang:error(badarg)
     end.
-
-
-decode_ipv6_host([H | T])  when byte_size(H) > 4 ->
-    {A, B , C, D} = decode_ipv4(H, [], []),
-    <<H7:16/unsigned-integer, H8:16/unsigned-integer>> =
-        <<A:8/unsigned-integer,
-          B:8/unsigned-integer,
-          C:8/unsigned-integer,
-          D:8/unsigned-integer>>,
-    case [decode_hex(E) || E <- lists:reverse(T)] of
-        Decoded when length(Decoded) == 6 ->
-            list_to_tuple(ensure_non_empty(Decoded ++ [H7, H8]));
-        [empty, empty | Decoded] ->
-            Pad = lists:duplicate(6 - length(Decoded), 0),
-            list_to_tuple(ensure_non_empty(Pad ++ Decoded ++ [H7, H8]));
-        Decoded ->
-            list_to_tuple(ipv6_fill(Decoded ++ [H7, H8], 6 - length(Decoded)))
-    end;
-decode_ipv6_host(L) ->
-    case [decode_hex(E) || E <- lists:reverse(L)] of
-        [empty, empty, empty] -> {0, 0, 0, 0, 0, 0, 0, 0};
-        [empty, empty | Decoded] ->
-            Pad = lists:duplicate(8 - length(Decoded), 0),
-            list_to_tuple(ensure_non_empty(Pad ++ Decoded));
-        Decoded ->
-            list_to_tuple(ipv6_fill(Decoded, 8 - length(Decoded)))
-    end.
-
-ipv6_fill(L, 0) -> ensure_non_empty(L);
-ipv6_fill([empty, empty], N) -> ensure_non_empty(lists:duplicate(N + 2, 0));
-ipv6_fill([empty | T], N) -> ensure_non_empty(lists:duplicate(N + 1, 0) ++ T);
-ipv6_fill([H | T], N) when H /= empty -> [H | ipv6_fill(T, N)].
-
-ensure_non_empty(E) ->
-    case lists:any(fun(empty) -> true; (_) -> false end, E) of
-        true -> erlang:error(badarg);
-        false -> E
-    end.
-
-decode_hex(<<>>) -> empty;
-decode_hex(Hex) ->
-    <<Value:16/unsigned-integer>> =
-        case [unhex(C) || <<C>> <= Hex] of
-            [D] -> <<0:12, D:4/unsigned-integer>>;
-            [C, D] -> <<0:8, C:4/unsigned-integer, D:4/unsigned-integer>>;
-            [B, C, D] ->
-                <<0:4/unsigned-integer,
-                  B:4/unsigned-integer,
-                  C:4/unsigned-integer,
-                  D:4/unsigned-integer>>;
-            [A, B, C, D] ->
-                <<A:4/unsigned-integer,
-                  B:4/unsigned-integer,
-                  C:4/unsigned-integer,
-                  D:4/unsigned-integer>>
-    end,
-    Value.
-
-decode_ipv4(<<>>, Acc, Components) ->
-    list_to_tuple([binary_to_integer(I) ||
-                      I <- lists:reverse([to_binary(Acc) | Components])]);
-decode_ipv4(<<$., T/binary>>, Acc, Components) ->
-    decode_ipv4(T, [], [to_binary(Acc) | Components]);
-decode_ipv4(<<H, T/binary>>, Acc, Components) when ?IS_INT(H) ->
-    decode_ipv4(T, [H | Acc], Components);
-decode_ipv4(_, _, _) ->
-    false.
-
 
 decode_path(I, Acc, Components, URI, Opts) ->
     case next(I) of
@@ -574,6 +503,10 @@ parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
+parse_opt(list, Opts) -> Opts#opts{return_type = list};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
-parse_opt(ipv4, Opts) -> Opts#opts{ipv4 = true};
+parse_opt(ipv4, Opts) -> Opts#opts{format = ipv4};
+parse_opt(ipv6, Opts) -> Opts#opts{format = ipv6};
+parse_opt(ipv6ipv4, Opts) -> Opts#opts{ipv6ipv4 = true};
+parse_opt(compact, Opts) -> Opts#opts{compact = true};
 parse_opt(_, _) -> erlang:error(badarg).
