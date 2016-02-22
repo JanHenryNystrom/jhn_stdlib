@@ -30,7 +30,8 @@
 
 %% Library functions
 -export([encode/1, encode/2,
-         decode/1, decode/2
+         decode/1, decode/2,
+         bounds/1, bounds/2
         ]).
 
 %% Records
@@ -55,6 +56,7 @@
 
 
 %% Defines
+-define(UINT32_MAX, 4294967295).
 
 %% Decode macros
 -define(IS_INT(C), C>=$0, C=<$9).
@@ -137,6 +139,33 @@ decode(Binary) -> decode(Binary, #opts{}).
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
 
+%%--------------------------------------------------------------------
+%% Function: bounds(Range) -> {LowerIP, UpperIP}.
+%% @doc
+%%   Determines the IP bounds for a range
+%%   Equivalent of bounds(IOData, []).
+%% @end
+%%--------------------------------------------------------------------
+-spec bounds(iodata() | {ip(), range()}) -> {integer(), integer()}.
+%%--------------------------------------------------------------------
+bounds(Range) -> bounds(Range, #opts{}).
+
+%%--------------------------------------------------------------------
+%% Function: bounds(Range, Options) -> {LowerIP, UpperIP}.
+%% @doc
+%%   Determines the IP bounds for a range
+%%   Bounds will give an exception if the binary is not well formed IP.
+%%   Options are:
+%%     integer -> an integer is returned (Default)
+%%     tuple -> a tuple of integers is returned
+%%     ipv6ipv4 -> with tuple the two last parts are returned as an IPv4 tuple
+%% @end
+%%--------------------------------------------------------------------
+-spec bounds(iodata() | {ip(), range()}, [opt()] | #opts{}) -> {ip(), ip()}.
+%%--------------------------------------------------------------------
+bounds(Binary, Opts = #opts{}) -> do_bounds(Binary, Opts);
+bounds(Binary, Opts) -> do_bounds(Binary, parse_opts(Opts, #opts{})).
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
@@ -158,10 +187,10 @@ do_encode({A, B, C, D, E, F, G, H}, Opts = #opts{ipv6ipv4 = true}) ->
     [compact([A, B, C, D, E, F], Opts), $:, IPv4];
 do_encode(IPv6 = {_, _, _, _, _, _, _, _}, Opts) ->
     compact(tuple_to_list(IPv6), Opts);
-do_encode(I, Opts = #opts{ipv6ipv4 = true}) when I > 4294967295 ->
+do_encode(I, Opts = #opts{ipv6ipv4 = true}) when I > ?UINT32_MAX ->
     <<A:16, B:16, C:16, D:16, E:16, F:16, A1, B1, C1, D1>> = <<I:128>>,
     do_encode({A, B, C, D, E, F, {A1, B1, C1, D1}}, Opts);
-do_encode(I, Opts) when I > 4294967295 ->
+do_encode(I, Opts) when I > ?UINT32_MAX ->
     do_encode(list_to_tuple([X || <<X:16>> <= <<I:128>>]), Opts);
 do_encode(I, Opts = #opts{format = ipv4}) ->
     do_encode(list_to_tuple([X || <<X:8>> <= <<I:32>>]), Opts);
@@ -397,6 +426,53 @@ unhex($c) -> 12;
 unhex($d) -> 13;
 unhex($e) -> 14;
 unhex($f) -> 15.
+
+%% ===================================================================
+%% Encoding
+%% ===================================================================
+
+do_bounds({IP, Range}, Opts) when is_integer(IP) ->
+    calculate_bounds(IP, Range, Opts);
+do_bounds({IP, Range}, Opts) ->
+    calculate_bounds(decode(encode(IP)), Range, Opts);
+do_bounds(IOData, Opts) ->
+    do_bounds(decode(IOData, [range]), Opts).
+
+calculate_bounds(IP, Range, Opts=#opts{format = ipv4}) when IP < ?UINT32_MAX ->
+    calculate_bounds_ipv4(IP, Range, Opts);
+calculate_bounds(IP, Range, Opts) ->
+    calculate_bounds_ipv6(IP, Range, Opts).
+
+calculate_bounds_ipv4(IP, Range, #opts{return_type = tuple}) ->
+    Mask = mask_ipv4(Range),
+    <<L3, L2, L1, L0>> = <<(IP band Mask):32>>,
+    <<H3, H2, H1, H0>> = <<(IP bor bnot Mask):32>>,
+    {{L3, L2, L1, L0}, {H3, H2, H1, H0}};
+calculate_bounds_ipv4(IP, Range, _) ->
+    Mask = mask_ipv4(Range),
+    <<H:32>> = <<(IP bor bnot Mask):32>>,
+    {IP band Mask, H}.
+
+mask_ipv4(N) when N =< 32 -> 16#FFFFFFFF bsl (32 - N).
+
+calculate_bounds_ipv6(IP, Range, #opts{return_type = tuple, ipv6ipv4 = true}) ->
+    Mask = mask_ipv6(Range),
+    <<L0:12/binary, L43, L42, L41, L40>> = <<(IP band Mask):128>>,
+    L = list_to_tuple([X || <<X:16>> <= L0] ++  [{L43, L42, L41, L40}]),
+    <<R0:12/binary, R43, R42, R41, R40>> = <<(IP bor bnot Mask):128>>,
+    R = list_to_tuple([X || <<X:16>> <= R0] ++  [{R43, R42, R41, R40}]),
+    {L, R};
+calculate_bounds_ipv6(IP, Range, #opts{return_type = tuple}) ->
+    Mask = mask_ipv6(Range),
+    L = list_to_tuple([X || <<X:16>> <= <<(IP band Mask):128>>]),
+    R = list_to_tuple([X || <<X:16>> <= <<(IP bor bnot Mask):128>>]),
+    {L, R};
+calculate_bounds_ipv6(IP, Range, _) ->
+    Mask = mask_ipv6(Range),
+    <<H:128>> = <<(IP bor bnot Mask):128>>,
+    {IP band Mask, H}.
+
+mask_ipv6(N) when N =< 128 -> 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF bsl (128 - N).
 
 %% ===================================================================
 %% Common parts
