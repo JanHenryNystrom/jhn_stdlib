@@ -37,7 +37,8 @@
         ]).
 
 %% Records
--record(r_node, {range         :: range(),
+-record(r_node, {low           :: value(),
+                 high          :: value(),
                  left  = r_nil :: r_tree(),
                  right = r_nil :: r_tree(),
                  value         :: value()}).
@@ -47,7 +48,6 @@
 -opaque r_tree()   :: #r_node{} | r_nil.
 -type   index()    :: [_].
 -type   range()    :: {value(), value()}.
--type   prefix()   :: [_].
 -type   value()    :: _.
 -type   default()  :: _.
 -type   flag()     :: check | nocheck.
@@ -116,14 +116,14 @@ add(Range, Value, Tree) -> add(Range, Value, Tree, nocheck).
 %%   if nocheck the value is replaced.
 %% @end
 %%--------------------------------------------------------------------
--spec add(prefix(), value(), r_tree(), flag()) -> r_tree().
+-spec add(range(), value(), r_tree(), flag()) -> r_tree().
 %%--------------------------------------------------------------------
-add(Range, Value, r_nil, _) -> #r_node{range = Range, value = Value};
-add(Range, Value, Tree = #r_node{range = Range}, nocheck) ->
+add({L, H}, Value, r_nil, _) -> #r_node{low = L, high = H, value = Value};
+add({L, H}, Value, Tree = #r_node{low = L, high = H}, nocheck) ->
     Tree#r_node{value = Value};
-add(R = {_,H}, Value, Tree=#r_node{range={L,_},left=Left},Flag) when H < L ->
+add(R = {_,H}, Value, Tree=#r_node{low = L,left=Left},Flag) when H < L ->
     Tree#r_node{left = add(R, Value, Left, Flag)};
-add(R = {L,_}, Value, Tree=#r_node{range={_,H},right=Right},Flag) when L > H ->
+add(R = {L,_}, Value, Tree=#r_node{high = H,right=Right},Flag) when L > H ->
     Tree#r_node{right = add(R, Value, Right, Flag)}.
 
 %%--------------------------------------------------------------------
@@ -184,14 +184,14 @@ delete(Range, Tree) -> delete(Range, Tree, nocheck).
 %%--------------------------------------------------------------------
 delete(_, r_nil, check) -> erlang:error(badarg);
 delete(_, r_nil, nocheck) -> r_nil;
-delete(R, #r_node{range = R, left = r_nil, right = r_nil}, _) -> r_nil;
-delete(R, #r_node{range = R, left = Left, right = r_nil}, _) -> Left;
-delete(R, #r_node{range = R, left = r_nil, right = Right}, _) -> Right;
-delete(R, #r_node{range = R, left = Left, right = Right}, _) ->
+delete({L,H}, #r_node{low=L, high=H, left = r_nil, right = r_nil}, _) -> r_nil;
+delete({L,H}, #r_node{low = L, high=H, left = Left, right = r_nil}, _) -> Left;
+delete({L,H}, #r_node{low=L, high=H, left = r_nil, right = Right}, _) -> Right;
+delete({L,H}, #r_node{low = L, high = H, left = Left, right = Right}, _) ->
     build(to_list(Left, to_list(Right)));
-delete(R = {_, H}, #r_node{range = {L, _}, left = Left}, Flag) when H < L ->
+delete(R = {_, H}, #r_node{low = L, left = Left}, Flag) when H < L ->
     delete(R, Left, Flag);
-delete(R = {L, _}, #r_node{range = {_, H}, right = Right}, Flag) when L > H ->
+delete(R = {L, _}, #r_node{high = H, right = Right}, Flag) when L > H ->
     delete(R, Right, Flag).
 
 %%--------------------------------------------------------------------
@@ -242,10 +242,9 @@ deletes1(I, [_ | T]) -> deletes1(I, T).
 -spec member(range(), r_tree()) -> boolean().
 %%--------------------------------------------------------------------
 member(_, r_nil) -> false;
-member(R, #r_node{range = R}) -> true;
-member(R = {_, H}, #r_node{range = {L, _}, left = Left}) when H < L ->
-    member(R, Left);
-member(R = {L, _}, #r_node{range = {_, H}, right = Right}) when L > H ->
+member({L, H}, #r_node{low = L, high = H}) -> true;
+member(R = {_, H}, #r_node{low = L, left = Left}) when H < L -> member(R, Left);
+member(R = {L, _}, #r_node{high = H, right = Right}) when L > H ->
     member(R, Right).
 
 %%--------------------------------------------------------------------
@@ -270,9 +269,9 @@ find(Index, Tree) -> find(Index, Tree, undefined).
 -spec find(index(), r_tree(), default()) -> value() | default().
 %%--------------------------------------------------------------------
 find(_, r_nil, Default) -> Default;
-find(I, #r_node{range = {L, _}, left = Left}, Default) when I < L ->
+find(I, #r_node{low = L, left = Left}, Default) when I < L ->
     find(I, Left, Default);
-find(I, #r_node{range = {_, H}, right = Right}, Default) when I > H ->
+find(I, #r_node{high = H, right = Right}, Default) when I > H ->
     find(I, Right, Default);
 find(_, #r_node{value = Value}, _) ->
     Value.
@@ -288,8 +287,8 @@ find(_, #r_node{value = Value}, _) ->
 ranges(Tree) -> ranges(Tree, []).
 
 ranges(r_nil, Acc) -> Acc;
-ranges(#r_node{range = Range, left = Left, right = Right}, Acc) ->
-    ranges(Left, [Range | ranges(Right, Acc)]).
+ranges(#r_node{low = L, high = H, left = Left, right = Right}, Acc) ->
+    ranges(Left, [{L, H} | ranges(Right, Acc)]).
 
 %%--------------------------------------------------------------------
 %% Function: values(Tree) -> Values.
@@ -332,10 +331,10 @@ replace(Range, Value, Tree, nocheck) -> add(Range, Value, Tree, nocheck);
 replace(Range, Value, Tree, check) -> replace_check(Range, Value, Tree).
 
 replace_check(_, _, r_nil) -> erlang:error(badarg);
-replace_check(R, V, T = #r_node{range = R}) -> T#r_node{value = V};
-replace_check(R ={_, H}, V, T=#r_node{range = {L, _}, left=Left}) when H < L ->
+replace_check({L, H}, V, T = #r_node{low = L, high = H}) -> T#r_node{value = V};
+replace_check(R = {_, H}, V, T = #r_node{low = L, left = Left}) when H < L ->
     T#r_node{left = replace_check(R, V, Left)};
-replace_check(R = {L, _}, V, T=#r_node{range={_, H}, right=Right}) when L > H ->
+replace_check(R = {L, _}, V, T = #r_node{high = H, right=Right}) when L > H ->
     T#r_node{right = replace_check(R, V, Right)}.
 
 %%--------------------------------------------------------------------
@@ -349,8 +348,8 @@ replace_check(R = {L, _}, V, T=#r_node{range={_, H}, right=Right}) when L > H ->
 to_list(Tree) -> to_list(Tree, []).
 
 to_list(r_nil, Acc) -> Acc;
-to_list(#r_node{range = R, left = Left, right = Right, value = V}, Acc) ->
-    to_list(Left, [{R, V} | to_list(Right, Acc)]).
+to_list(#r_node{low = L, high = H, left = Left, right = Right, value=V}, Acc) ->
+    to_list(Left, [{{L, H}, V} | to_list(Right, Acc)]).
 
 %%--------------------------------------------------------------------
 %% Function: from_list(Pairs) -> Tree.
@@ -372,10 +371,10 @@ build(L) ->
     Tree.
 
 build(0, L) -> {r_nil, L};
-build(1, [{{L, H}, V} | T]) -> {#r_node{range = {L, H}, value = V}, T};
+build(1, [{{L, H}, V} | T]) -> {#r_node{low = L, high = H, value = V}, T};
 build(Size, List) ->
     RightHalf = (Size - 1) div 2,
     LeftHalf = Size - 1 - RightHalf,
-    {Left, [{{Low, High}, V} | T1]} = build(LeftHalf, List),
+    {Left, [{{L, H}, V} | T1]} = build(LeftHalf, List),
     {Right, T2} = build(RightHalf, T1),
-    {#r_node{range = {Low, High}, value = V, left = Left, right = Right}, T2}.
+    {#r_node{low = L, high = H, value = V, left = Left, right = Right}, T2}.
