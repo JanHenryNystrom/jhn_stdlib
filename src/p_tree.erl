@@ -37,16 +37,19 @@
         ]).
 
 %% Records
--record(bucket, {prefix, rest = [], values = []}).
--record(p_node, {pivot       :: value(),
-                 left = nil  :: p_tree(),
-                 next = nil  :: p_tree(),
-                 right = nil :: p_tree(),
-                 value       :: value()}).
+-record(bucket, {pivot       :: value(),
+                 rest   = [] :: {value(), value()},
+                 values = [] :: [value()]}).
+
+-record(p_node, {pivot         :: value(),
+                 left  = p_nil :: p_tree(),
+                 next  = p_nil :: p_tree(),
+                 right = p_nil :: p_tree(),
+                 value         :: value()}).
 
 
 %% Types
--opaque p_tree()   :: #p_node{} | nil.
+-opaque p_tree()   :: #p_node{} | p_nil.
 -type   index()    :: [_].
 -type   prefix()   :: [_].
 -type   value()    :: _.
@@ -70,7 +73,7 @@
 %%--------------------------------------------------------------------
 -spec new() -> p_tree().
 %%--------------------------------------------------------------------
-new() -> nil.
+new() -> p_nil.
 
 %%--------------------------------------------------------------------
 %% Function: is_p_tree(X) -> Boolean().
@@ -80,7 +83,7 @@ new() -> nil.
 %%--------------------------------------------------------------------
 -spec is_p_tree(_) -> boolean().
 %%--------------------------------------------------------------------
-is_p_tree(nil) -> true;
+is_p_tree(p_nil) -> true;
 is_p_tree(#p_node{}) -> true;
 is_p_tree(_) -> false.
 
@@ -92,7 +95,7 @@ is_p_tree(_) -> false.
 %%--------------------------------------------------------------------
 -spec is_empty(_) -> boolean().
 %%--------------------------------------------------------------------
-is_empty(nil) -> true;
+is_empty(p_nil) -> true;
 is_empty(_) -> false.
 
 %%--------------------------------------------------------------------
@@ -119,9 +122,9 @@ add(Index, Value, Tree) -> add(Index, Value, Tree, nocheck).
 %%--------------------------------------------------------------------
 -spec add(prefix(), value(), p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
-add([H], Value, nil, _) -> #p_node{pivot = H, value = Value};
-add([H | T], Value, nil, _) ->
-    #p_node{pivot = H, next = add(T, Value, nil, nocheck)};
+add([H], Value, p_nil, _) -> #p_node{pivot = H, value = Value};
+add([H | T], Value, p_nil, _) ->
+    #p_node{pivot = H, next = add(T, Value, p_nil, nocheck)};
 add([H], Value, Tree = #p_node{pivot = H}, nocheck) ->
     Tree#p_node{value = Value};
 add([H], Value, Tree = #p_node{pivot = H, value = undefined}, _) ->
@@ -190,15 +193,15 @@ delete(Index, Tree) -> delete(Index, Tree, nocheck).
 %%--------------------------------------------------------------------
 -spec delete(index(), p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
-delete(_, nil, check) -> erlang:error(badarg);
-delete(_, nil, nocheck) -> nil;
+delete(_, p_nil, check) -> erlang:error(badarg);
+delete(_, p_nil, nocheck) -> p_nil;
 delete([H], #p_node{pivot = H, value = undefined}, check) ->
     erlang:error(badarg);
-delete([H], #p_node{pivot = H, left = nil, next = nil, right = nil}, _) ->
-    nil;
-delete([H], #p_node{pivot = H, left = Left, next = nil, right = nil}, _) ->
+delete([H], #p_node{pivot = H, left = p_nil, next = p_nil, right = p_nil}, _) ->
+    p_nil;
+delete([H], #p_node{pivot = H, left = Left, next = p_nil, right = p_nil}, _) ->
     Left;
-delete([H], #p_node{pivot = H, left = nil, next = nil, right = Right}, _) ->
+delete([H], #p_node{pivot = H, left = p_nil, next = p_nil, right = Right}, _) ->
     Right;
 delete([H], Tree = #p_node{pivot = H}, _) ->
     Tree#p_node{value = undefined};
@@ -256,7 +259,7 @@ deletes1(I, [_ | T]) -> deletes1(I, T).
 %%--------------------------------------------------------------------
 -spec member(index(), p_tree()) -> boolean().
 %%--------------------------------------------------------------------
-member(_, nil) -> false;
+member(_, p_nil) -> false;
 member([H], #p_node{pivot = H, value = Value}) -> Value /= undefined;
 member([H | T], #p_node{pivot = H, next = Next}) -> member(T, Next);
 member(I = [H | _], #p_node{pivot = P, left = L}) when H < P -> member(I, L);
@@ -283,7 +286,7 @@ find(Index, Tree) -> find(Index, Tree, undefined).
 %%--------------------------------------------------------------------
 -spec find(index(), p_tree(), default()) -> value() | default().
 %%--------------------------------------------------------------------
-find(_, nil, Prev) -> Prev;
+find(_, p_nil, Prev) -> Prev;
 find([H], #p_node{pivot = H, value = V}, Prev) -> update(V, Prev);
 find([H | T], #p_node{pivot = H, next = Next, value = V}, Prev) ->
     find(T, Next, update(V, Prev));
@@ -305,7 +308,7 @@ update(New, _) -> New.
 %%--------------------------------------------------------------------
 indices(Tree) -> indices(Tree, [], []).
 
-indices(nil, _, Acc) -> Acc;
+indices(p_nil, _, Acc) -> Acc;
 indices(#p_node{pivot = P, left=L,next=N,right=R,value=undefined},Xiferp,Acc) ->
     Xiferp1 = [P | Xiferp],
     indices(L, Xiferp, indices(N, Xiferp1, indices(R, Xiferp, Acc)));
@@ -326,7 +329,7 @@ indices(#p_node{pivot = P, left=L, next=N, right=R}, Xiferp, Acc) ->
 %%--------------------------------------------------------------------
 values(Tree) -> values(Tree, []).
 
-values(nil, Acc) -> Acc;
+values(p_nil, Acc) -> Acc;
 values(#p_node{left = L, next = N, right = R, value = undefined}, Acc) ->
     values(L, values(N, values(R, Acc)));
 values(#p_node{left = L, next = N, right = R, value = V}, Acc) ->
@@ -358,7 +361,7 @@ replace(Index, Value, Tree) -> replace(Index, Value, Tree, nocheck).
 replace(Index, Value, Tree, nocheck) -> add(Index, Value, Tree, nocheck);
 replace(Index, Value, Tree, check) -> replace_check(Index, Value, Tree).
 
-replace_check(_, _, nil) -> erlang:error(badarg);
+replace_check(_, _, p_nil) -> erlang:error(badarg);
 replace_check([H], _, #p_node{pivot = H, value = undefined}) ->
     erlang:error(badarg);
 replace_check([H], Value, Tree = #p_node{pivot = H}) ->
@@ -380,7 +383,7 @@ replace_check(I, Value, Tree = #p_node{right = Right}) ->
 %%--------------------------------------------------------------------
 to_list(Tree) -> to_list(Tree, [], []).
 
-to_list(nil, _, Acc) -> Acc;
+to_list(p_nil, _, Acc) -> Acc;
 to_list(#p_node{pivot = P, left=L,next=N,right=R,value=undefined},Xiferp,Acc) ->
     Xiferp1 = [P | Xiferp],
     to_list(L, Xiferp, to_list(N, Xiferp1, to_list(R, Xiferp, Acc)));
@@ -412,36 +415,36 @@ bucket_sort([], []) -> [];
 bucket_sort([], [B = #bucket{rest = R} | Acc]) ->
     lists:reverse([B#bucket{rest = bucket_sort(lists:reverse(R))} | Acc]);
 bucket_sort([{[H], V} | T], []) ->
-    bucket_sort(T, [#bucket{prefix = H, values = [V]}]);
+    bucket_sort(T, [#bucket{pivot = H, values = [V]}]);
 bucket_sort([{[H | P], V} | T], []) ->
-    bucket_sort(T, [#bucket{prefix = H, rest = [{P, V}]}]);
-bucket_sort([{[H], V} | T], [B = #bucket{prefix = H, values = Vs} | Acc]) ->
+    bucket_sort(T, [#bucket{pivot = H, rest = [{P, V}]}]);
+bucket_sort([{[H], V} | T], [B = #bucket{pivot = H, values = Vs} | Acc]) ->
     bucket_sort(T, [B#bucket{values = [V | Vs]} | Acc]);
-bucket_sort([{[H | P], V} | T], [B = #bucket{prefix = H, rest = T1} |Acc]) ->
+bucket_sort([{[H | P], V} | T], [B = #bucket{pivot = H, rest = T1} |Acc]) ->
     bucket_sort(T, [B#bucket{rest = [{P, V} | T1]} | Acc]);
 bucket_sort([{[H], V} | T], [B = #bucket{rest = R} | Acc]) ->
-    bucket_sort(T, [#bucket{prefix = H, values = [V]},
+    bucket_sort(T, [#bucket{pivot = H, values = [V]},
                     B#bucket{rest = bucket_sort(lists:reverse(R))} | Acc]);
 bucket_sort([{[H | P], V} | T], [B = #bucket{rest = R} | Acc]) ->
-    bucket_sort(T, [#bucket{prefix = H, rest = [{P, V}]},
+    bucket_sort(T, [#bucket{pivot = H, rest = [{P, V}]},
                     B#bucket{rest = bucket_sort(lists:reverse(R))} | Acc]).
 
-build([]) -> nil;
-build([#bucket{prefix = P, rest = R, values = [V]}]) ->
+build([]) -> p_nil;
+build([#bucket{pivot = P, rest = R, values = [V]}]) ->
     #p_node{pivot = P, next = build(R), value = V};
-build([#bucket{prefix = P1, rest = R1, values = [V1]},
-       #bucket{prefix = P2, rest = R2, values = [V2]}]) ->
+build([#bucket{pivot = P1, rest = R1, values = [V1]},
+       #bucket{pivot = P2, rest = R2, values = [V2]}]) ->
     #p_node{pivot = P1, next = build(R1), value = V1,
             right = #p_node{pivot = P2, next = build(R2), value = V2}};
 build(Bs) ->
     Size = length(Bs),
     case split(Size - 1 - ((Size - 1) div 2), Bs, []) of
-        {Left, #bucket{prefix = P, rest = Rest, values = []}, Right} ->
+        {Left, #bucket{pivot = P, rest = Rest, values = []}, Right} ->
             #p_node{pivot = P,
                     next = build(Rest),
                     left = build(Left),
                     right = build(Right)};
-        {Left, #bucket{prefix = P, rest = Rest, values = [V]}, Right} ->
+        {Left, #bucket{pivot = P, rest = Rest, values = [V]}, Right} ->
             #p_node{pivot = P,
                     next = build(Rest),
                     left = build(Left),
