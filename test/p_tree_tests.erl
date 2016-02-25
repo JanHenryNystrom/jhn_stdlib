@@ -29,7 +29,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% Defines
--define(INDICES, ["1", "1201", "4670", "459340"]).
+-define(KEYS, ["1", "1201", "4670", "459340"]).
 -define(NUMBERS, ["1", "1201", "46706661875", "4618142404"]).
 -define(COUNTRIES,
         ["USA", "USA - New Jersey", "Sweden - Mobile - Telia ", "Sweden"]).
@@ -73,7 +73,7 @@ is_empty_1_test_() ->
 add_3_test_() ->
     load_plist(),
     Countries = get(countries),
-    Indices = get(indices),
+    Keys = get(keys),
     Values = get(values),
     [{"Add",
       [?_test(
@@ -91,7 +91,7 @@ add_3_test_() ->
                              fun({I, V}, Acc) -> p_tree:add(I, V, Acc) end,
                              p_tree:new(),
                              Countries),
-                           Indices))))]},
+                           Keys))))]},
      {"Add/Delete reverse",
       [?_test(
           ?assert(
@@ -101,21 +101,21 @@ add_3_test_() ->
                              fun({I, V}, Acc) -> p_tree:add(I, V, Acc) end,
                              p_tree:new(),
                              Countries),
-                           lists:reverse(Indices)))))]},
-     {"Add and check the indices",
+                           lists:reverse(Keys)))))]},
+     {"Add and check the keys",
       [?_test(
           ?assertEqual(
-             Indices,
-             p_tree:indices(
+             Keys,
+             p_tree:keys(
                lists:foldl(fun({I, V}, Acc) -> p_tree:add(I, V, Acc) end,
                            p_tree:new(),
                            Countries))))
       ]},
-     {"Add reverse and check the indices",
+     {"Add reverse and check the keys",
       [?_test(
           ?assertEqual(
-             Indices,
-             p_tree:indices(
+             Keys,
+             p_tree:keys(
                lists:foldl(fun({I, V}, Acc) -> p_tree:add(I, V, Acc) end,
                            p_tree:new(),
                            lists:reverse(Countries)))))
@@ -164,21 +164,21 @@ add_4_test_() ->
 adds_2_test_() ->
     load_plist(),
     Countries = get(countries),
-    Indices = get(indices),
+    Keys = get(keys),
     [{"Add",
       ?_test(?assert(p_tree:is_p_tree(p_tree:adds(Countries, p_tree:new()))))},
      {"Add/Delete",
       ?_test(
           ?assert(
              p_tree:is_empty(
-               p_tree:deletes(lists:reverse(Indices),
+               p_tree:deletes(lists:reverse(Keys),
                               p_tree:adds(Countries, p_tree:new()),
                               check))))
      },
-     {"Add and check the indices",
+     {"Add and check the keys",
       ?_test(
-          ?assertEqual(Indices,
-                       p_tree:indices(p_tree:adds(Countries, p_tree:new()))))}
+          ?assertEqual(Keys,
+                       p_tree:keys(p_tree:adds(Countries, p_tree:new()))))}
     ].
 
 %%--------------------------------------------------------------------
@@ -187,7 +187,7 @@ adds_2_test_() ->
 adds_3_test_() ->
     load_plist(),
     Countries = get(countries),
-    Indices = get(indices),
+    Keys = get(keys),
     [{"Add with check success",
       ?_test(
          ?assert(p_tree:is_p_tree(p_tree:adds(Countries, p_tree:new(), check))))
@@ -200,7 +200,7 @@ adds_3_test_() ->
                            p_tree:adds([{"a", b}, {I, d}, {"e", f}],
                                        Tree,
                                        check)) ||
-                 I <- Indices]
+                 I <- Keys]
          end)}
     ].
 
@@ -234,12 +234,12 @@ delete_3_test_() ->
 member_2_test_() ->
     load_plist(),
     Countries = get(countries),
-    Indices = get(indices),
+    Keys = get(keys),
     Tree = p_tree:from_list(Countries),
     [{"Member with check success",
       ?_test(
          ?assert(
-            lists:all(fun(Y) -> p_tree:member(Y, Tree) end, Indices)))},
+            lists:all(fun(Y) -> p_tree:member(Y, Tree) end, Keys)))},
      {"Member without check success",
       ?_test(
          ?assert(
@@ -284,12 +284,12 @@ replace_3_test_() ->
     [{"Replace existing",
       [?_test(?assertEqual(I,
                            p_tree:find(I, p_tree:replace(I, I, Tree)))) ||
-          I <- ?INDICES]},
+          I <- ?KEYS]},
      {"Replace not existing",
       [?_test(?assertEqual(I,
                            p_tree:find(I ++ "a",
                                        p_tree:replace(I ++ "a", I, Tree)))) ||
-          I <- ?INDICES]}
+          I <- ?KEYS]}
     ].
 
 %%--------------------------------------------------------------------
@@ -300,10 +300,10 @@ replace_4_test_() ->
     Tree = p_tree:from_list(get(countries)),
     [{"Replace existing success",
       [?_test(?assertEqual(I, p_tree:find(I,p_tree:replace(I,I,Tree,check)))) ||
-          I <- ?INDICES]},
+          I <- ?KEYS]},
      {"Replace not existing",
        [?_test(?assertError(badarg, p_tree:replace(I ++ "a", I, Tree,check))) ||
-          I <- ?INDICES]}
+          I <- ?KEYS]}
     ].
 
 %% ===================================================================
@@ -321,7 +321,7 @@ load_plist() ->
         undefined ->
             Countries = plist("countries.txt"),
             put(countries, Countries),
-            put(indices, [I || {I, _} <- Countries]),
+            put(keys, [I || {I, _} <- Countries]),
             put(values, [V || {_, V} <- Countries]);
         _ ->
             ok

@@ -16,7 +16,8 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%   Implements Prefix trees
+%%   Implements Prefix trees that allows you to find a value associated
+%%   with the longest prefix of the key used. All keys are lists of terms.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -31,7 +32,7 @@
          add/3, add/4, adds/2, adds/3,
          delete/2, delete/3, deletes/2, deletes/3,
          member/2, find/2, find/3,
-         indices/1, values/1,
+         keys/1, values/1,
          replace/3, replace/4,
          to_list/1, from_list/1
         ]).
@@ -50,8 +51,7 @@
 
 %% Types
 -opaque p_tree()   :: #p_node{} | p_nil.
--type   index()    :: [_].
--type   prefix()   :: [_].
+-type   key()    :: [_].
 -type   value()    :: _.
 -type   default()  :: _.
 -type   flag()     :: check | nocheck.
@@ -78,7 +78,7 @@ new() -> p_nil.
 %%--------------------------------------------------------------------
 %% Function: is_p_tree(X) -> Boolean().
 %% @doc
-%%   Returns true if X is a p_tree, false otherwise.
+%%   Returns true if X is a P-tree, false otherwise.
 %% @end
 %%--------------------------------------------------------------------
 -spec is_p_tree(_) -> boolean().
@@ -99,28 +99,26 @@ is_empty(p_nil) -> true;
 is_empty(_) -> false.
 
 %%--------------------------------------------------------------------
-%% Function: add(Index, Value, Tree) -> Tree.
+%% Function: add(Key, Value, Tree) -> Tree.
 %% @doc
-%%   The Value is saved under the longet Prefix of the Index in the Tree,
-%%   if that prefix is present the value associated with the prefix is
-%%   replaced by Value.
-%%   add(Index, Value, Tree) is equivalent to add(Index, Value, Tree,nocheck).
+%%   The Value is saved in Tree under the Key, if that key is present the
+%%   value associated with the key is replaced by Value.
+%%   add(Key, Value, Tree) is equivalent to add(Key, Value, Tree,nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec add(prefix(), value(), p_tree()) -> p_tree().
+-spec add(key(), value(), p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
-add(Index, Value, Tree) -> add(Index, Value, Tree, nocheck).
+add(Key, Value, Tree) -> add(Key, Value, Tree, nocheck).
 
 %%--------------------------------------------------------------------
 %% Function: add(Prefix, Value, Tree, Flag) -> Tree.
 %% @doc
-%%   The Value is saved under the Prefix in the Tree, the Flag determines
-%%   what should happen if that prefix already has a value associated with
-%%   in the Tree. If the flag is check an exception is generated and
-%%   if nocheck the value is replaced.
+%%   The Value is saved in Tree under the Key, if that key is present the
+%%   value associated with the key is replaced by Value. If the flag is
+%%   check an exception is generated and if nocheck the value is replaced.
 %% @end
 %%--------------------------------------------------------------------
--spec add(prefix(), value(), p_tree(), flag()) -> p_tree().
+-spec add(key(), value(), p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
 add([H], Value, p_nil, _) -> #p_node{pivot = H, value = Value};
 add([H | T], Value, p_nil, _) ->
@@ -139,26 +137,26 @@ add(I, Value, Tree = #p_node{right = Right}, Flag) ->
 %%--------------------------------------------------------------------
 %% Function: adds(Pairs, Tree) -> Tree.
 %% @doc<
-%%   For each {Index, Value} pair in Pairs the value is stored under the
-%%   index in the Tree. The adds(Pairs, Tree) call is equivalent to
+%%   For each {Key, Value} pair in Pairs the value is stored under the
+%%   key in the Tree. The adds(Pairs, Tree) call is equivalent to
 %%   adds(Pairs, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec adds([{index(), value()}], p_tree()) -> p_tree().
+-spec adds([{key(), value()}], p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
 adds(Pairs, Tree) -> adds(Pairs, Tree, nocheck).
 
 %%--------------------------------------------------------------------
 %% Function: adds(Pairs, Tree, Flag) -> Tree.
 %% @doc
-%%   For each {Index, Value} pair in Pairs the value is stored under the
-%%   index in the Tree. If an index already has a value associated with
+%%   For each {Key, Value} pair in Pairs the value is stored under the
+%%   key in the Tree. If an key already has a value associated with
 %%   in the Tree the flag determines what happens. If the flag is check
-%%   an exception is generated if a index has a value associated with it,
+%%   an exception is generated if a key has a value associated with it,
 %%   if the flag is nocheck the values will be replaced.
 %% @end
 %%--------------------------------------------------------------------
--spec adds([{index(), value()}], p_tree(), flag()) -> p_tree().
+-spec adds([{key(), value()}], p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
 adds(Pairs, Tree, nocheck) ->
     Pairs1 = lists:keymerge(1, lists:keysort(1, Pairs), to_list(Tree)),
@@ -170,28 +168,28 @@ adds(Pairs, Tree, check) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: delete(Index, Tree) -> Tree.
+%% Function: delete(Key, Tree) -> Tree.
 %% @doc
-%%   If a value is associated the Index the Tree returned has that
-%%   association removed. The call delete(Index, Tree) is equivalent
-%%   to delete(Index, Tree, nocheck).
+%%   If a value is associated the Key the Tree returned has that
+%%   association removed. The call delete(Key, Tree) is equivalent
+%%   to delete(Key, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec delete(index(), p_tree()) -> p_tree().
+-spec delete(key(), p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
-delete(Index, Tree) -> delete(Index, Tree, nocheck).
+delete(Key, Tree) -> delete(Key, Tree, nocheck).
 
 %%--------------------------------------------------------------------
-%% Function: delete(Index, Tree, Flag) -> Tree.
+%% Function: delete(Key, Tree, Flag) -> Tree.
 %% @doc
-%%   If a value is associated the Index the Tree returned has that
-%%   association removed. If there is no value associated with the Index
+%%   If a value is associated the Key the Tree returned has that
+%%   association removed. If there is no value associated with the Key
 %%   in the Tree the flag determines what happens. If the flag is check
 %%   an exception is generated if no association exists, if the flag
 %%   is nocheck the unchanged tree is returned.
 %% @end
 %%--------------------------------------------------------------------
--spec delete(index(), p_tree(), flag()) -> p_tree().
+-spec delete(key(), p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
 delete(_, p_nil, check) -> erlang:error(badarg);
 delete(_, p_nil, nocheck) -> p_nil;
@@ -213,34 +211,34 @@ delete(I, #p_node{right = Right}, Flag) ->
     delete(I, Right, Flag).
 
 %%--------------------------------------------------------------------
-%% Function: deletes(Indces, Tree) -> Tree.
+%% Function: deletes(Keys, Tree) -> Tree.
 %% @doc
-%%  A tree that has all the associations for the indices removed.
+%%  A tree that has all the associations for the keys removed.
 %%  The call deletes(Indces, Tree) is equivalent to
-%%  deletes(Indces, Tree, nocheck).
+%%  deletes(Keys, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec deletes([index()], p_tree()) -> p_tree().
+-spec deletes([key()], p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
-deletes(Indices, Tree) -> deletes(Indices, Tree, nocheck).
+deletes(Keys, Tree) -> deletes(Keys, Tree, nocheck).
 
 %%--------------------------------------------------------------------
-%% Function: delete(Index, Tree, Flag) -> Tree.
+%% Function: deletes(Key, Tree, Flag) -> Tree.
 %% @doc
-%%   A tree that has all the associations for the indices removed.
-%%   If there is no value associated with any of the Indices
+%%   A tree that has all the associations for the keys removed.
+%%   If there is no value associated with any of the Keys
 %%   in the Tree, the flag determines what happens. If the flag is check
 %%   an exception is generated if, if the flag is nocheck a tree
 %%   is returned with the other associations removed.
 %% @end
 %%--------------------------------------------------------------------
--spec deletes([index()], p_tree(), flag()) -> p_tree().
+-spec deletes([key()], p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
-deletes(Indices, Tree, nocheck) ->
-    build(bucket_sort(deletes1(lists:sort(Indices), to_list(Tree)), []));
-deletes(Indices, Tree, check) ->
-    case lists:all(fun(I) -> member(I, Tree) end, Indices) of
-        true -> deletes(Indices, Tree, nocheck);
+deletes(Keys, Tree, nocheck) ->
+    build(bucket_sort(deletes1(lists:sort(Keys), to_list(Tree)), []));
+deletes(Keys, Tree, check) ->
+    case lists:all(fun(I) -> member(I, Tree) end, Keys) of
+        true -> deletes(Keys, Tree, nocheck);
         false -> erlang:error(badarg)
     end.
 
@@ -251,13 +249,13 @@ deletes1([H1 | T1], L = [{H2, _} | _]) when H1 > H2 -> deletes1(T1, L);
 deletes1(I, [_ | T]) -> deletes1(I, T).
 
 %%--------------------------------------------------------------------
-%% Function: member(Index, Tree) -> Boolean.
+%% Function: member(Key, Tree) -> Boolean.
 %% @doc
-%%   Returns true if there is a value associated with Index in the tree,
+%%   Returns true if there is a value associated with Key in the tree,
 %%   otherwise false.
 %% @end
 %%--------------------------------------------------------------------
--spec member(index(), p_tree()) -> boolean().
+-spec member(key(), p_tree()) -> boolean().
 %%--------------------------------------------------------------------
 member(_, p_nil) -> false;
 member([H], #p_node{pivot = H, value = Value}) -> Value /= undefined;
@@ -266,25 +264,25 @@ member(I = [H | _], #p_node{pivot = P, left = L}) when H < P -> member(I, L);
 member(I, #p_node{right = R}) -> member(I, R).
 
 %%--------------------------------------------------------------------
-%% Function: find(Index, Tree) -> Value.
+%% Function: find(Key, Tree) -> Value.
 %% @doc
-%%   Returns the value associated with the longest prefix of the Index in the
-%%   Tree or Default if no such association exists.
-%%   The call find(Index, Tree) is equivalent to find(Index, Tree, undefined).
+%%   Returns the value associated with the longest prefix of the Key in the
+%%   Tree or undefined if no such association exists.
+%%   The call find(Key, Tree) is equivalent to find(Key, Tree, undefined).
 %% @end
 %%--------------------------------------------------------------------
--spec find(index(), p_tree()) -> value() | undefined.
+-spec find(key(), p_tree()) -> value() | undefined.
 %%--------------------------------------------------------------------
-find(Index, Tree) -> find(Index, Tree, undefined).
+find(Key, Tree) -> find(Key, Tree, undefined).
 
 %%--------------------------------------------------------------------
-%% Function: find(Index, Tree, Default) -> Value.
+%% Function: find(Key, Tree, Default) -> Value.
 %% @doc
-%%   Returns the value associated with the longest prefix of the Index in the
+%%   Returns the value associated with the longest prefix of the Key in the
 %%   Tree or Default if no such association exists.
 %% @end
 %%--------------------------------------------------------------------
--spec find(index(), p_tree(), default()) -> value() | default().
+-spec find(key(), p_tree(), default()) -> value() | default().
 %%--------------------------------------------------------------------
 find(_, p_nil, Prev) -> Prev;
 find([H], #p_node{pivot = H, value = V}, Prev) -> update(V, Prev);
@@ -299,33 +297,33 @@ update(undefined, Prev) -> Prev;
 update(New, _) -> New.
 
 %%--------------------------------------------------------------------
-%% Function: indices(Tree) -> Indices.
+%% Function: keys(Tree) -> Keys.
 %% @doc
-%%   Returns all the indices in ascending order.
+%%   Returns all the keys in ascending order.
 %% @end
 %%--------------------------------------------------------------------
--spec indices(p_tree()) -> [prefix()].
+-spec keys(p_tree()) -> [key()].
 %%--------------------------------------------------------------------
-indices(Tree) -> indices(Tree, [], []).
+keys(Tree) -> keys(Tree, [], []).
 
-indices(p_nil, _, Acc) -> Acc;
-indices(#p_node{pivot = P, left=L,next=N,right=R,value=undefined},Xiferp,Acc) ->
+keys(p_nil, _, Acc) -> Acc;
+keys(#p_node{pivot = P, left=L,next=N,right=R,value=undefined},Xiferp,Acc) ->
     Xiferp1 = [P | Xiferp],
-    indices(L, Xiferp, indices(N, Xiferp1, indices(R, Xiferp, Acc)));
-indices(#p_node{pivot = P, left=L, next=N, right=R}, Xiferp, Acc) ->
+    keys(L, Xiferp, keys(N, Xiferp1, keys(R, Xiferp, Acc)));
+keys(#p_node{pivot = P, left=L, next=N, right=R}, Xiferp, Acc) ->
     Xiferp1 = [P | Xiferp],
-    indices(L,
+    keys(L,
             Xiferp,
             [lists:reverse(Xiferp1) |
-             indices(N, Xiferp1, indices(R, Xiferp, Acc))]).
+             keys(N, Xiferp1, keys(R, Xiferp, Acc))]).
 
 %%--------------------------------------------------------------------
 %% Function: values(Tree) -> Values.
 %% @doc
-%%   Returns all the values in ascending order of their indeces.
+%%   Returns all the values in ascending order of their keys.
 %% @end
 %%--------------------------------------------------------------------
--spec values(p_tree()) -> [index()].
+-spec values(p_tree()) -> [key()].
 %%--------------------------------------------------------------------
 values(Tree) -> values(Tree, []).
 
@@ -336,30 +334,30 @@ values(#p_node{left = L, next = N, right = R, value = V}, Acc) ->
     values(L, [V | values(N, values(R, Acc))]).
 
 %%--------------------------------------------------------------------
-%% Function: replace(Index, Value, Tree) -> Tree.
+%% Function: replace(Key, Value, Tree) -> Tree.
 %% @doc
-%%   Replaces any existing value associated with Index in the tree,
-%%   otherwise adds a association for the value with the Index.
-%%   The call replace(Index, Value, Tree) is equivalent to
-%%   replace(Index, Value, Tree, nocheck).
+%%   Replaces any existing value associated with Key in the tree,
+%%   otherwise adds a association for the value with the Key.
+%%   The call replace(Key, Value, Tree) is equivalent to
+%%   replace(Key, Value, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec replace(index(), value(), p_tree()) -> p_tree().
+-spec replace(key(), value(), p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
-replace(Index, Value, Tree) -> replace(Index, Value, Tree, nocheck).
+replace(Key, Value, Tree) -> replace(Key, Value, Tree, nocheck).
 
 %%--------------------------------------------------------------------
-%% Function: replace(Index, Values, Tree, Flag) -> Tree.
+%% Function: replace(Key, Values, Tree, Flag) -> Tree.
 %% @doc
-%%   Replaces any existing value associated with Index in the tree,
+%%   Replaces any existing value associated with Key in the tree,
 %%   otherwise the flag determines what happens. If the flag is check
 %%   an exception is generated, otherwise the value is added.
 %% @end
 %%--------------------------------------------------------------------
--spec replace(index(), value(), p_tree(), flag()) -> p_tree().
+-spec replace(key(), value(), p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
-replace(Index, Value, Tree, nocheck) -> add(Index, Value, Tree, nocheck);
-replace(Index, Value, Tree, check) -> replace_check(Index, Value, Tree).
+replace(Key, Value, Tree, nocheck) -> add(Key, Value, Tree, nocheck);
+replace(Key, Value, Tree, check) -> replace_check(Key, Value, Tree).
 
 replace_check(_, _, p_nil) -> erlang:error(badarg);
 replace_check([H], _, #p_node{pivot = H, value = undefined}) ->
@@ -376,10 +374,10 @@ replace_check(I, Value, Tree = #p_node{right = Right}) ->
 %%--------------------------------------------------------------------
 %% Function: to_list(Tree) -> Pairs.
 %% @doc
-%%    From a T-tree a list of {Index, Value} pairs.
+%%    From a P-tree a list of {Key, Value} pairs.
 %% @end
 %%--------------------------------------------------------------------
--spec to_list(p_tree()) -> [{index(), value()}].
+-spec to_list(p_tree()) -> [{key(), value()}].
 %%--------------------------------------------------------------------
 to_list(Tree) -> to_list(Tree, [], []).
 
@@ -397,11 +395,11 @@ to_list(#p_node{pivot = P, left=L, next=N, right=R, value=V}, Xiferp, Acc) ->
 %%--------------------------------------------------------------------
 %% Function: from_list(Pairs) -> Tree.
 %% @doc
-%%   For each {Index, Value} pair in Pairs the value is stored under the
-%%   index in the Tree. Equivalent to from_list(Pairs, []).
+%%   For each {Key, Value} pair in Pairs the value is stored under the
+%%   key in the Tree.
 %% @end
 %%--------------------------------------------------------------------
--spec from_list([{index(), value()}]) -> p_tree().
+-spec from_list([{key(), value()}]) -> p_tree().
 %%--------------------------------------------------------------------
 from_list(Plist) -> build(bucket_sort(Plist)).
 

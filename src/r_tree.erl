@@ -16,7 +16,8 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%   Implements range trees
+%%   Implements range trees, where the tree is organized with non-overlapping
+%%   ranges.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -46,7 +47,7 @@
 
 %% Types
 -opaque r_tree()   :: #r_node{} | r_nil.
--type   index()    :: [_].
+-type   key()    :: [_].
 -type   range()    :: {value(), value()}.
 -type   value()    :: _.
 -type   default()  :: _.
@@ -64,7 +65,7 @@
 %%--------------------------------------------------------------------
 %% Function: new() -> Tree.
 %% @doc
-%%   Creates an empty P-tree.
+%%   Creates an empty R-tree.
 %% @end
 %%--------------------------------------------------------------------
 -spec new() -> r_tree().
@@ -74,7 +75,7 @@ new() -> r_nil.
 %%--------------------------------------------------------------------
 %% Function: is_r_tree(X) -> Boolean().
 %% @doc
-%%   Returns true if X is a r_tree, false otherwise.
+%%   Returns true if X is a R-tree, false otherwise.
 %% @end
 %%--------------------------------------------------------------------
 -spec is_r_tree(_) -> boolean().
@@ -97,10 +98,9 @@ is_empty(_) -> false.
 %%--------------------------------------------------------------------
 %% Function: add(Range, Value, Tree) -> Tree.
 %% @doc
-%%   The Value is saved under the longet Prefix of the Index in the Tree,
-%%   if that prefix is present the value associated with the prefix is
-%%   replaced by Value.
-%%   add(Index, Value, Tree) is equivalent to add(Index, Value, Tree,nocheck).
+%%   The Value is saved in Tree under the Range, if that key is present the
+%%   value associated with the key is replaced by Value.
+%%   add(Range, Value, Tree) is equivalent to add(Range, Value, Tree,nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec add(range(), value(), r_tree()) -> r_tree().
@@ -108,12 +108,11 @@ is_empty(_) -> false.
 add(Range, Value, Tree) -> add(Range, Value, Tree, nocheck).
 
 %%--------------------------------------------------------------------
-%% Function: add(Prefix, Value, Tree, Flag) -> Tree.
+%% Function: add(Range, Value, Tree, Flag) -> Tree.
 %% @doc
-%%   The Value is saved under the Prefix in the Tree, the Flag determines
-%%   what should happen if that prefix already has a value associated with
-%%   in the Tree. If the flag is check an exception is generated and
-%%   if nocheck the value is replaced.
+%%   The Value is saved in Tree under the Range, if that key is present the
+%%   value associated with the key is replaced by Value. If the flag is
+%%   check an exception is generated and if nocheck the value is replaced.
 %% @end
 %%--------------------------------------------------------------------
 -spec add(range(), value(), r_tree(), flag()) -> r_tree().
@@ -129,22 +128,22 @@ add(R = {L,_}, Value, Tree=#r_node{high = H,right=Right},Flag) when L > H ->
 %%--------------------------------------------------------------------
 %% Function: adds(Pairs, Tree) -> Tree.
 %% @doc<
-%%   For each {Index, Value} pair in Pairs the value is stored under the
-%%   index in the Tree. The adds(Pairs, Tree) call is equivalent to
+%%   For each {Range, Value} pair in Pairs the value is stored under the
+%%   Range in the Tree. The adds(Pairs, Tree) call is equivalent to
 %%   adds(Pairs, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec adds([{index(), value()}], r_tree()) -> r_tree().
+-spec adds([range()], r_tree()) -> r_tree().
 %%--------------------------------------------------------------------
 adds(Pairs, Tree) -> adds(Pairs, Tree, nocheck).
 
 %%--------------------------------------------------------------------
 %% Function: adds(Pairs, Tree, Flag) -> Tree.
 %% @doc
-%%   For each {Index, Value} pair in Pairs the value is stored under the
-%%   index in the Tree. If an index already has a value associated with
+%%   For each {Range, Value} pair in Pairs the value is stored under the
+%%   Range in the Tree. If an Range already has a value associated with
 %%   in the Tree the flag determines what happens. If the flag is check
-%%   an exception is generated if a index has a value associated with it,
+%%   an exception is generated if a range has a value associated with it,
 %%   if the flag is nocheck the values will be replaced.
 %% @end
 %%--------------------------------------------------------------------
@@ -159,11 +158,11 @@ adds(Pairs, Tree, check) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: delete(Index, Tree) -> Tree.
+%% Function: delete(Range, Tree) -> Tree.
 %% @doc
-%%   If a value is associated the Index the Tree returned has that
-%%   association removed. The call delete(Index, Tree) is equivalent
-%%   to delete(Index, Tree, nocheck).
+%%   If a value is associated the Range the Tree returned has that
+%%   association removed. The call delete(Range, Tree) is equivalent
+%%   to delete(Range, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec delete(range(), r_tree()) -> r_tree().
@@ -171,16 +170,16 @@ adds(Pairs, Tree, check) ->
 delete(Range, Tree) -> delete(Range, Tree, nocheck).
 
 %%--------------------------------------------------------------------
-%% Function: delete(Index, Tree, Flag) -> Tree.
+%% Function: delete(Range, Tree, Flag) -> Tree.
 %% @doc
-%%   If a value is associated the Index the Tree returned has that
-%%   association removed. If there is no value associated with the Index
+%%   If a value is associated the Range the Tree returned has that
+%%   association removed. If there is no value associated with the Range
 %%   in the Tree the flag determines what happens. If the flag is check
 %%   an exception is generated if no association exists, if the flag
 %%   is nocheck the unchanged tree is returned.
 %% @end
 %%--------------------------------------------------------------------
--spec delete(index(), r_tree(), flag()) -> r_tree().
+-spec delete(range(), r_tree(), flag()) -> r_tree().
 %%--------------------------------------------------------------------
 delete(_, r_nil, check) -> erlang:error(badarg);
 delete(_, r_nil, nocheck) -> r_nil;
@@ -195,11 +194,11 @@ delete(R = {L, _}, #r_node{high = H, right = Right}, Flag) when L > H ->
     delete(R, Right, Flag).
 
 %%--------------------------------------------------------------------
-%% Function: deletes(Indces, Tree) -> Tree.
+%% Function: deletes(Ranges, Tree) -> Tree.
 %% @doc
-%%  A tree that has all the associations for the indices removed.
-%%  The call deletes(Indces, Tree) is equivalent to
-%%  deletes(Indces, Tree, nocheck).
+%%  A tree that has all the associations for the ranges removed.
+%%  The call deletes(Ranges, Tree) is equivalent to
+%%  deletes(Ranges, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec deletes([range()], r_tree()) -> r_tree().
@@ -207,10 +206,10 @@ delete(R = {L, _}, #r_node{high = H, right = Right}, Flag) when L > H ->
 deletes(Ranges, Tree) -> deletes(Ranges, Tree, nocheck).
 
 %%--------------------------------------------------------------------
-%% Function: delete(Index, Tree, Flag) -> Tree.
+%% Function: delete(Ranges, Tree, Flag) -> Tree.
 %% @doc
-%%   A tree that has all the associations for the indices removed.
-%%   If there is no value associated with any of the Indices
+%%   A tree that has all the associations for the rangess removed.
+%%   If there is no value associated with any of the Ranges
 %%   in the Tree, the flag determines what happens. If the flag is check
 %%   an exception is generated if, if the flag is nocheck a tree
 %%   is returned with the other associations removed.
@@ -233,9 +232,9 @@ deletes1([H1 | T1], L = [{H2, _} | _]) when H1 > H2 -> deletes1(T1, L);
 deletes1(I, [_ | T]) -> deletes1(I, T).
 
 %%--------------------------------------------------------------------
-%% Function: member(Index, Tree) -> Boolean.
+%% Function: member(Range, Tree) -> Boolean.
 %% @doc
-%%   Returns true if there is a value associated with Index in the tree,
+%%   Returns true if there is a value associated with Range in the tree,
 %%   otherwise false.
 %% @end
 %%--------------------------------------------------------------------
@@ -248,25 +247,25 @@ member(R = {L, _}, #r_node{high = H, right = Right}) when L > H ->
     member(R, Right).
 
 %%--------------------------------------------------------------------
-%% Function: find(Index, Tree) -> Value.
+%% Function: find(Key, Tree) -> Value.
 %% @doc
-%%   Returns the value associated with the longest prefix of the Index in the
-%%   Tree or Default if no such association exists.
-%%   The call find(Index, Tree) is equivalent to find(Index, Tree, undefined).
+%%   Returns the value associated with any range that includes the key in the
+%%   Tree or undefined if no such association exists.
+%%   The call find(Key, Tree) is equivalent to find(Key, Tree, undefined).
 %% @end
 %%--------------------------------------------------------------------
--spec find(index(), r_tree()) -> value() | undefined.
+-spec find(key(), r_tree()) -> value() | undefined.
 %%--------------------------------------------------------------------
-find(Index, Tree) -> find(Index, Tree, undefined).
+find(Key, Tree) -> find(Key, Tree, undefined).
 
 %%--------------------------------------------------------------------
-%% Function: find(Index, Tree, Default) -> Value.
+%% Function: find(Key, Tree, Default) -> Value.
 %% @doc
-%%   Returns the value associated with the longest prefix of the Index in the
+%%   Returns the value associated with any range that includes the key in the
 %%   Tree or Default if no such association exists.
 %% @end
 %%--------------------------------------------------------------------
--spec find(index(), r_tree(), default()) -> value() | default().
+-spec find(key(), r_tree(), default()) -> value() | default().
 %%--------------------------------------------------------------------
 find(_, r_nil, Default) -> Default;
 find(I, #r_node{low = L, left = Left}, Default) when I < L ->
@@ -277,9 +276,9 @@ find(_, #r_node{value = Value}, _) ->
     Value.
 
 %%--------------------------------------------------------------------
-%% Function: ranges(Tree) -> Indices.
+%% Function: ranges(Tree) -> Keys.
 %% @doc
-%%   Returns all the indices in ascending order.
+%%   Returns all the ranges in ascending order.
 %% @end
 %%--------------------------------------------------------------------
 -spec ranges(r_tree()) -> [range()].
@@ -293,7 +292,7 @@ ranges(#r_node{low = L, high = H, left = Left, right = Right}, Acc) ->
 %%--------------------------------------------------------------------
 %% Function: values(Tree) -> Values.
 %% @doc
-%%   Returns all the values in ascending order of their indeces.
+%%   Returns all the values in ascending order of their ranges.
 %% @end
 %%--------------------------------------------------------------------
 -spec values(r_tree()) -> [value()].
@@ -305,12 +304,12 @@ values(#r_node{left = Left, right = Right, value = Value}, Acc) ->
     values(Left, [Value | values(Right, Acc)]).
 
 %%--------------------------------------------------------------------
-%% Function: replace(Index, Value, Tree) -> Tree.
+%% Function: replace(Range, Value, Tree) -> Tree.
 %% @doc
-%%   Replaces any existing value associated with Index in the tree,
-%%   otherwise adds a association for the value with the Index.
-%%   The call replace(Index, Value, Tree) is equivalent to
-%%   replace(Index, Value, Tree, nocheck).
+%%   Replaces any existing value associated with Range in the tree,
+%%   otherwise adds a association for the value with the Range.
+%%   The call replace(Range, Value, Tree) is equivalent to
+%%   replace(Range, Value, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
 -spec replace(range(), value(), r_tree()) -> r_tree().
@@ -318,9 +317,9 @@ values(#r_node{left = Left, right = Right, value = Value}, Acc) ->
 replace(Range, Value, Tree) -> replace(Range, Value, Tree, nocheck).
 
 %%--------------------------------------------------------------------
-%% Function: replace(Index, Values, Tree, Flag) -> Tree.
+%% Function: replace(Range, Values, Tree, Flag) -> Tree.
 %% @doc
-%%   Replaces any existing value associated with Index in the tree,
+%%   Replaces any existing value associated with Range in the tree,
 %%   otherwise the flag determines what happens. If the flag is check
 %%   an exception is generated, otherwise the value is added.
 %% @end
@@ -340,7 +339,7 @@ replace_check(R = {L, _}, V, T = #r_node{high = H, right=Right}) when L > H ->
 %%--------------------------------------------------------------------
 %% Function: to_list(Tree) -> Pairs.
 %% @doc
-%%    From a T-tree a list of {Index, Value} pairs.
+%%    From a R-tree a list of {Range, Value} pairs.
 %% @end
 %%--------------------------------------------------------------------
 -spec to_list(r_tree()) -> [{range(), value()}].
@@ -354,8 +353,8 @@ to_list(#r_node{low = L, high = H, left = Left, right = Right, value=V}, Acc) ->
 %%--------------------------------------------------------------------
 %% Function: from_list(Pairs) -> Tree.
 %% @doc
-%%   For each {Index, Value} pair in Pairs the value is stored under the
-%%   index in the Tree. Equivalent to from_list(Pairs, []).
+%%   For each {Range, Value} pair in Pairs the value is stored under the
+%%   key in the Tree.
 %% @end
 %%--------------------------------------------------------------------
 -spec from_list([{range(), value()}]) -> r_tree().

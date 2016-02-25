@@ -66,7 +66,7 @@
          {{3758096128,3758096383},"AU"}]).
 
 -define(SHORT_RANGES, [Range || {Range, _} <- ?SHORT]).
--define(SHORT_INDICES, [Low || {{Low, _}, _} <- ?SHORT]).
+-define(SHORT_KEYS, [Low || {{Low, _}, _} <- ?SHORT]).
 -define(SHORT_VALUES, [Value || {_, Value} <- ?SHORT]).
 
 %% ===================================================================
@@ -203,7 +203,7 @@ adds_2_test_() ->
                               r_tree:adds(Where, r_tree:new()),
                               check))))
      },
-     {"Add and check the indices",
+     {"Add and check the keys",
       ?_test(
           ?assertEqual(Ranges,
                        r_tree:ranges(r_tree:adds(Where, r_tree:new()))))}
@@ -277,7 +277,7 @@ find_2_test_() ->
     Tree = r_tree:from_list(get(where)),
     [{"Find success",
       [?_test(?assertEqual(V, r_tree:find(R, Tree))) ||
-          {R, V} <- lists:zip(?SHORT_INDICES, ?SHORT_VALUES)]},
+          {R, V} <- lists:zip(?SHORT_KEYS, ?SHORT_VALUES)]},
      {"Find failure",
        [?_test(?assertEqual(undefined, r_tree:find([$a + X], Tree))) ||
            X <- lists:seq(1, 20)]}
@@ -291,7 +291,7 @@ find_3_test_() ->
     Tree = r_tree:from_list(get(where)),
     [{"Find success",
       [?_test(?assertEqual(V, r_tree:find(R, Tree, none))) ||
-          {R, V} <- lists:zip(?SHORT_INDICES, ?SHORT_VALUES)]},
+          {R, V} <- lists:zip(?SHORT_KEYS, ?SHORT_VALUES)]},
      {"Find failure",
       [?_test(?assertEqual(none, r_tree:find([$a + X], Tree, none))) ||
           X <- lists:seq(1, 20)]}
@@ -306,7 +306,7 @@ replace_3_test_() ->
     [{"Replace existing",
       [?_test(?assertEqual(I,
                            r_tree:find(I, r_tree:replace(R, I, Tree)))) ||
-          {I, R} <- lists:zip(?SHORT_INDICES, ?SHORT_RANGES)]},
+          {I, R} <- lists:zip(?SHORT_KEYS, ?SHORT_RANGES)]},
      {"Replace not existing",
       [?_test(
           ?assertEqual(I1,
@@ -314,7 +314,7 @@ replace_3_test_() ->
                                    r_tree:replace({I1 + 1000, I2 + 1000},
                                                   I1,
                                                   Tree)))) ||
-          {I1, I2} <- ?SHORT_INDICES]}
+          {I1, I2} <- ?SHORT_KEYS]}
     ].
 
 %%--------------------------------------------------------------------
@@ -326,12 +326,12 @@ replace_4_test_() ->
     [{"Replace existing",
       [?_test(?assertEqual(I,
                            r_tree:find(I, r_tree:replace(R, I, Tree,check)))) ||
-          {I, R} <- lists:zip(?SHORT_INDICES, ?SHORT_RANGES)]},
+          {I, R} <- lists:zip(?SHORT_KEYS, ?SHORT_RANGES)]},
      {"Replace not existing",
       [?_test(
           ?assertError(badarg,
                        r_tree:replace({I1 + 1000,I2 + 1000},I1,Tree,check))) ||
-          {I1, I2} <- ?SHORT_INDICES]}
+          {I1, I2} <- ?SHORT_KEYS]}
     ].
 
 %% ===================================================================
