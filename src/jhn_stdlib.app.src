@@ -26,7 +26,7 @@
 %%%-------------------------------------------------------------------
 {application, jhn_stdlib,
  [{description, "Jan Henry Nystrom's standard library"},
-  {vsn, "2.4"},
+  {vsn, "2.5"},
   {registered, []},
   {applications, [kernel, stdlib]},
   {env, []}
