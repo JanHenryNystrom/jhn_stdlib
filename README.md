@@ -46,6 +46,7 @@ Features/Modules
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
   * Data structures
+    * Bloom filters -- bloom
     * Property lists -- plist
     * Prefix trees -- p_tree
     * Range trees -- r_tree
