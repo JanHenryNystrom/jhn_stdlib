@@ -119,16 +119,16 @@ encode_2_decode_2_test_() ->
 %% encode/2 <-> /decode/2 integer_type
 %%--------------------------------------------------------------------
 encode_2_decode_2_integer_type_test_() ->
-    [begin
-         ?_test(
-            ?assertEqual(Value,
-                         msgpack:decode(msgpack:encode({Type, Value},
-                                                       [binary])))),
-         ?_test(
-            ?assertEqual({Type, Value},
-                         msgpack:decode(msgpack:encode({Type, Value}, [binary]),
-                                        [number_types])))
-     end ||
+    [[
+      ?_test(
+         ?assertEqual(Value,
+                      msgpack:decode(msgpack:encode({Type, Value},
+                                                    [binary])))),
+      ?_test(
+         ?assertEqual({Type, Value},
+                      msgpack:decode(msgpack:encode({Type, Value}, [binary]),
+                                     [number_types])))]
+     ||
         {Type, Values} <- ?INTEGER_TYPE,
         Value <- Values
     ].
