@@ -177,12 +177,17 @@ add(Term, F = #filter{type=scalable, slices=Fs,growth_ratio=G,error_ratio=R}) ->
         false ->
             case Fs of
                 [H = #filter{capacity = C, size = S}| T] when S < C ->
-                    F#filter{slices = [add(Term, H) | T]};
+                    F#filter{slices = [add(H0, H1, H) | T]};
                 [#filter{slice_size = SS, error_prob = E}| _] ->
                     Opts = [{size, SS bsl G}, {error_prob, E * R}],
-                    F#filter{slices = [add(Term, filter(Opts)) | Fs]}
+                    F#filter{slices = [add(H0, H1, filter(Opts)) | Fs]}
             end
     end.
+
+add(H0, H1, F = #filter{size = S, slice_size=SS, slices=Slices}) ->
+    Mask = SS - 1,
+    {I0, I1} = indices(Mask, H0, H1),
+    F#filter{size = S + 1, slices = set_bits(Mask, I1, I0, Slices, [])}.
 
 %%--------------------------------------------------------------------
 %% Function:
