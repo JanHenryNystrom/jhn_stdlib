@@ -813,57 +813,63 @@ decode_number(Binary, Stage, Phase, Acc, State) ->
     end.
 
 decode_string(Binary, State=#state{encoding = Enc, plain_string = Plain}) ->
-    {Unescaped, T} = unescape(Binary, [], State),
-    {char_code(iolist_to_binary(Unescaped), Enc, Plain), T}.
+    {Unescaped, T} = unescape(Binary, <<>>, State),
+    {char_code(Unescaped, Enc, Plain), T}.
 
 unescape(Binary, Acc, State = #state{encoding = Encoding}) ->
     case next(Binary, State) of
         {$\\, T} -> unescape_solid(T, Acc, State);
-        {$", T} -> {lists:reverse(Acc), T};
-        {H, T} when Encoding == utf8 -> unescape(T, [H | Acc], State);
+        {$", T} -> {Acc, T};
+        {H, T} when Encoding == utf8 -> unescape(T, <<Acc/binary, H/utf8>>, State);
         _ when Encoding == ?UTF16L; Encoding == ?UTF16B ->
             <<H:16, T/binary>> = Binary,
-            unescape(T, [<<H:16>> | Acc], State);
+            unescape(T, <<Acc/binary, H:16>>, State);
         _ when Encoding == ?UTF32L; Encoding == ?UTF32B ->
             <<H:32, T/binary>> = Binary,
-            unescape(T, [<<H:32>> | Acc], State)
+            unescape(T, <<Acc/binary, H:32>>, State)
     end.
 
 unescape_solid(Binary, Acc, State) ->
     case next(Binary, State) of
-        {$", T} -> unescape(T, [encode_char($", State) | Acc], State);
-        {$\\, T} -> unescape(T, [encode_char($\\, State) | Acc], State);
-        {$/, T} -> unescape(T, [encode_char($/, State) | Acc], State);
-        {$0, T} -> unescape(T, [encode_char(?NULL, State) | Acc], State);
-        {$a, T} -> unescape(T, [encode_char(?BEL, State) | Acc], State);
-        {$b, T} -> unescape(T, [encode_char(?BS, State) | Acc], State);
-        {$t, T} -> unescape(T, [encode_char(?HT, State) | Acc], State);
-        {$n, T} -> unescape(T, [encode_char(?LF, State) | Acc], State);
-        {$f, T} -> unescape(T, [encode_char(?FF, State) | Acc], State);
-        {$v, T} -> unescape(T, [encode_char(?VT, State) | Acc], State);
-        {$r, T} -> unescape(T, [encode_char(?CR, State) | Acc], State);
-        {$s, T} -> unescape(T, [encode_char(?SPC, State) | Acc], State);
+        {$", T} -> unescape(T, add_char($", Acc, State), State);
+        {$\\, T} -> unescape(T, add_char($\\, Acc, State), State);
+        {$/, T} -> unescape(T, add_char($/, Acc, State), State);
+        {$0, T} -> unescape(T, add_char(?NULL, Acc, State), State);
+        {$a, T} -> unescape(T, add_char(?BEL, Acc, State), State);
+        {$b, T} -> unescape(T, add_char(?BS, Acc, State), State);
+        {$t, T} -> unescape(T, add_char(?HT, Acc, State), State);
+        {$n, T} -> unescape(T, add_char(?LF, Acc, State), State);
+        {$f, T} -> unescape(T, add_char(?FF, Acc, State), State);
+        {$v, T} -> unescape(T, add_char(?VT, Acc, State), State);
+        {$r, T} -> unescape(T, add_char(?CR, Acc, State), State);
+        {$s, T} -> unescape(T, add_char(?SPC, Acc, State), State);
         {$u, T} -> unescape_hex(T, Acc, State);
         {H, T} when is_integer(H) ->
-            unescape(T,[encode_char(H,State),encode_char($\\,State)|Acc],State);
+            unescape(T, add_char(H, add_char($\\, Acc, State), State),State);
         {H, T} when is_binary(H) ->
-            unescape(T, [H, encode_char($\\, State) | Acc], State)
+            unescape(T, <<(add_char($\\, Acc, State))/binary, H/binary>>, State)
     end.
 
+add_char(C, S, #state{encoding = utf8}) -> <<S/binary, C/utf8>>;
+add_char(C, S, #state{encoding = ?UTF16L}) -> <<S/binary, C, 0>>;
+add_char(C, S, #state{encoding = ?UTF16B}) -> <<S/binary, 0, C>>;
+add_char(C, S, #state{encoding = ?UTF32L}) -> <<S/binary, C, 0:24>>;
+add_char(C, S, #state{encoding = ?UTF32B}) -> <<S/binary, 0:24, C>>.
+
 unescape_hex(<<A, B, C, D, T/binary>>, Acc, State = #state{encoding = utf8}) ->
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(Binary, Acc, State = #state{encoding = ?UTF16L}) ->
     <<A, 0, B, 0, C, 0, D, 0, T/binary>> = Binary,
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(Binary, Acc, State = #state{encoding = ?UTF16B}) ->
     <<0, A, 0, B, 0, C, 0, D, T/binary>> = Binary,
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32L}) ->
     <<A, 0:24, B, 0:24, C, 0:24, D, 0:24, T/binary>> = Binary,
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32B}) ->
     <<0:24, A, 0:24, B, 0:24, C, 0:24, D, T/binary>> = Binary,
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(_, _, _) ->
     erlang:error(badarg).
 
@@ -1926,7 +1932,7 @@ parse_opt({encoding, Encoding} , State) ->
 parse_opt(_, _) ->
     erlang:error(badarg).
 
-next(<<H, T/binary>>, #state{encoding = utf8}) -> {H, T};
+next(<<H/utf8, T/binary>>, #state{encoding = utf8}) -> {H, T};
 next(<<H, 0, T/binary>>, #state{encoding = ?UTF16L}) -> {H, T};
 next(<<0, H, T/binary>>, #state{encoding = ?UTF16B}) -> {H, T};
 next(<<H:16, T/binary>>, #state{encoding = {utf16, _}}) -> {<<H:16>>, T};
@@ -1942,7 +1948,7 @@ encode_chars(Chars, State) when is_list(Chars) ->
 encode_chars(Chars, State) when is_binary(Chars) ->
     << <<(encode_char(C, State))/binary>> || <<C>> <= Chars>>.
 
-encode_char(C, #state{encoding = utf8}) -> <<C>>;
+encode_char(C, #state{encoding = utf8}) -> <<C/utf8>>;
 encode_char(C, #state{encoding = ?UTF16L}) -> <<C, 0>>;
 encode_char(C, #state{encoding = ?UTF16B}) -> <<0, C>>;
 encode_char(C, #state{encoding = ?UTF32L}) -> <<C, 0:24>>;
