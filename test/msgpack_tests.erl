@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013-2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(msgpack_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -119,16 +119,16 @@ encode_2_decode_2_test_() ->
 %% encode/2 <-> /decode/2 integer_type
 %%--------------------------------------------------------------------
 encode_2_decode_2_integer_type_test_() ->
-    [begin
-         ?_test(
-            ?assertEqual(Value,
-                         msgpack:decode(msgpack:encode({Type, Value},
-                                                       [binary])))),
-         ?_test(
-            ?assertEqual({Type, Value},
-                         msgpack:decode(msgpack:encode({Type, Value}, [binary]),
-                                        [number_types])))
-     end ||
+    [[
+      ?_test(
+         ?assertEqual(Value,
+                      msgpack:decode(msgpack:encode({Type, Value},
+                                                    [binary])))),
+      ?_test(
+         ?assertEqual({Type, Value},
+                      msgpack:decode(msgpack:encode({Type, Value}, [binary]),
+                                     [number_types])))]
+     ||
         {Type, Values} <- ?INTEGER_TYPE,
         Value <- Values
     ].

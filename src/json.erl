@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013-2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 %%%    JavaScript Object Notation (JSON) Pointer                       (rfc6901)
 %%%    JSON Reference                             (draft-pbryan-zyp-json-ref-03)
 %%%    JSON Schema: core definitions and terminology  (draft-zyp-json-schema-04)
-%%     JSON Schema: interactive and non interactive validation 
+%%     JSON Schema: interactive and non interactive validation
 %%                                         (draft-fge-json-schema-validation-00)
 %%%
 %%%  JSON is represented as follows:
@@ -32,7 +32,7 @@
 %%%  rfc4627_text  : object | array (rfc4627 compability mode)
 %%%  pointer       : [integer | string | '-']
 %%%  schema        : object
-%%%  
+%%%
 %%%  value         : true | false | null | object | array | number | string
 %%%
 %%%  object        : {[{string, value}*]} |
@@ -69,7 +69,7 @@
 %%%  has to be the same as used when decoding either the JSON or schema.
 %%%  When a JSON should be decoded by the validation that has to be indicated
 %%%  by the decode flag.
-%%%  
+%%%
 %%%  Only one URI resolver is provided for now and that is against jhn_stdlib's
 %%%  priv dir, is another is provided and validation of schemas is used
 %%%  it has to be abe to resolve http://json-schema.org/draft-04/schema#.
@@ -80,7 +80,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -152,8 +152,7 @@
           top_uri = #uri{} :: uri:uri(),
           scope = #uri{} :: uri:uri(),
           schema :: json(),
-          props_validated = false :: boolean(),
-          orig_call
+          props_validated = false :: boolean()
         }).
 
 %% Defines
@@ -214,8 +213,7 @@
 %%--------------------------------------------------------------------
 -spec encode(json()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Term) ->
-    encode(Term, #state{orig_call = {encode, [Term], ?LINE}}).
+encode(Term) -> encode(Term, #state{}).
 
 %%--------------------------------------------------------------------
 %% Function: encode(Term, Options) -> JSON | JSONPointer.
@@ -241,14 +239,11 @@ encode(Term) ->
 encode(Term, State = #state{}) ->
     encode_value(Term, State);
 encode(Term, Opts) ->
-    Line = ?LINE,
-    State =
-        #state{pointer = Pointer,
-               rfc4627 = RFC4627,
-               return_type = ReturnType,
-               encoding = Encoding,
-               bom = Bom} =
-        parse_opts(Opts, #state{orig_call = {encode, [Term, Opts], Line}}),
+    State = #state{pointer = Pointer,
+                   rfc4627 = RFC4627,
+                   return_type = ReturnType,
+                   encoding = Encoding,
+                   bom = Bom} = parse_opts(Opts, #state{}),
     Encoded = case {Pointer, RFC4627} of
                   {true, _} -> encode_pointer(Term, State, []);
                   {false, true} -> encode_rfc4627_text(Term, State);
@@ -271,9 +266,7 @@ encode(Term, Opts) ->
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> json().
 %%--------------------------------------------------------------------
-decode(Binary) ->
-    Line = ?LINE,
-    decode(Binary, #state{orig_call = {decode, [Binary], Line}}).
+decode(Binary) -> decode(Binary, #state{}).
 
 %%--------------------------------------------------------------------
 %% Function: decode(JSON | JSONPointer, Options) -> Term.
@@ -307,9 +300,7 @@ decode(Binary, State = #state{}) ->
     {Value, _} = decode_text(Binary, State#state{encoding = Encoding}),
     Value;
 decode(Binary, Opts) ->
-    Line = ?LINE,
-    State = #state{rfc4627 = RFC4627} =
-        parse_opts(Opts, #state{orig_call = {decode, [Binary, Opts], Line}}),
+    State = #state{rfc4627 = RFC4627} = parse_opts(Opts, #state{}),
     {Binary1, Encoding} = encoding(Binary, State),
     State1 = State#state{encoding = Encoding},
     case RFC4627 of
@@ -330,9 +321,7 @@ decode(Binary, Opts) ->
 %%--------------------------------------------------------------------
 -spec eval(binary(), binary()) -> json() | binary() | {error, _}.
 %%--------------------------------------------------------------------
-eval(Pointer, JSON) ->
-    Line = ?LINE,
-    eval(Pointer, JSON, #state{orig_call = {eval, [Pointer, JSON], Line}}).
+eval(Pointer, JSON) -> eval(Pointer, JSON, #state{}).
 
 %%--------------------------------------------------------------------
 %% Function: eval(JSONPointer, JSON, Options) -> Term or Fragment or error.
@@ -369,8 +358,7 @@ eval(Pointer, Binary, State = #state{}) ->
     {Binary, Encoding} = encoding(Binary, State),
     eval_json(Pointer, Binary, [], State#state{encoding = Encoding});
 eval(Pointer, Binary, Opts) ->
-    Line = ?LINE,
-    State = parse_opts(Opts, #state{orig_call = {eval, [Binary, Opts], Line}}),
+    State = parse_opts(Opts, #state{}),
     eval(Pointer, Binary, State).
 
 %%--------------------------------------------------------------------
@@ -398,10 +386,10 @@ validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 %% Function: validate(JSONSchema, JSON, Options) -> true, {true, Term} | false.
 %% @doc
 %%   Validates a JSON document, and optionally decodes, based on the Schema
-%%    
+%%
 %%   If either the schema or the json is already decode they have to be decoded
 %%   with the same flags and thos provided to the validation.
-%%    
+%%
 %%   Options are:
 %%     decode -> the JSON validated is decoded
 %%     bom -> the binary to decode has a UTF byte order mark
@@ -418,7 +406,7 @@ validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 %%--------------------------------------------------------------------
 validate(Schema, JSON, State = #state{}) when is_binary(Schema) ->
     validate(decode(Schema, State), JSON, State);
-validate(Schema, Binary, State = #state{decode = true}) when is_binary(Binary) ->
+validate(Schema, Binary, State = #state{decode =true}) when is_binary(Binary) ->
     validate(Schema, decode(Binary, State), State);
 validate(Schema, JSON, State = #state{decode = Decode}) ->
     try {Decode, validate_schema(Schema, JSON, State#state{top = Schema})} of
@@ -443,11 +431,11 @@ encode_rfc4627_text(Object = #{}, State = #state{maps = true}) ->
     encode_object(Object, State);
 encode_rfc4627_text(Array, State) when is_list(Array) ->
     [encode_char($[, State) | encode_array(Array, [], State)];
-encode_rfc4627_text(_, State) ->
-    badarg(State).
+encode_rfc4627_text(_, _) ->
+    erlang:error(badarg).
 
 encode_object([], State) -> encode_chars(<<"{}">>, State);
-encode_object(Object = #{}, State) -> 
+encode_object(Object = #{}, State) ->
     Comma = encode_char($,, State),
     Colon = encode_char($:, State),
     Encode = fun(Name, Value, Acc) ->
@@ -474,8 +462,8 @@ encode_object1([{Name, Value} | T], Acc, Comma, Colon, State) ->
     Value1 = encode_value(Value, State),
     Acc1 = [Comma, Value1, Colon, Name1 | Acc],
     encode_object1(T, Acc1, Comma, Colon, State);
-encode_object1(_, _, _, _, State) ->
-    badarg(State).
+encode_object1(_, _, _, _, _) ->
+    erlang:error(badarg).
 
 encode_array([], Acc, State) -> lists:reverse([encode_char($],State) | Acc]);
 encode_array([H], Acc, State) ->
@@ -484,8 +472,8 @@ encode_array([H | Array], Acc, State) ->
     encode_array(Array,
                  [encode_char($,, State), encode_value(H, State) | Acc],
                  State);
-encode_array(_, _, State) ->
-    badarg(State).
+encode_array(_, _, _) ->
+    erlang:error(badarg).
 
 encode_value(true, State) -> encode_chars(<<"true">>, State);
 encode_value(false, State) -> encode_chars(<<"false">>, State);
@@ -502,8 +490,8 @@ encode_value(Integer, State) when is_integer(Integer) ->
     encode_chars(integer_to_list(Integer), State);
 encode_value(Float, State) when is_float(Float) ->
     encode_chars(float_to_binary(Float), State);
-encode_value(_, State) ->
-    badarg(State).
+encode_value(_, _) ->
+    erlang:error(badarg).
 
 encode_string(Atom, State = #state{atom_strings = true}) when is_atom(Atom) ->
     encode_string(atom_to_binary(Atom, utf8), State);
@@ -512,8 +500,8 @@ encode_string(String, State) when is_binary(String) ->
     [encode_char($", State),
      char_code(escape(String, Plain, State), Plain, Encoding),
      encode_char($", State)];
-encode_string(_, State) ->
-    badarg(State).
+encode_string(_, _) ->
+    erlang:error(badarg).
 
 escape(String, Plain, State) ->
     case escapeable(String, Plain) of
@@ -727,7 +715,7 @@ decode_rfc4627_text(Binary, State) ->
         {WS, T} when ?IS_WS(WS)-> decode_rfc4627_text(T, State);
         {${, T} -> decode_object(T,{false,false},[], State);
         {$[, T}-> decode_array(T, {false, false}, [], State);
-        _ -> badarg(State)
+        _ -> erlang:error(badarg)
     end.
 
 decode_object(Binary, Expect, Acc, State) ->
@@ -757,7 +745,7 @@ decode_object(Binary, Expect, Acc, State) ->
             {Value, T2} = decode_value(decode_skip(T1, $:, State), State),
             decode_object(T2, {false, true}, [{Name, Value} | Acc], State);
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 unique_keys(Members) -> length(Members) == length(lists:ukeysort(1, Members)).
@@ -771,7 +759,7 @@ decode_array(Binary, Expect, Acc, State) ->
             {Value, T} = decode_value(Binary, State),
             decode_array(T, {false, true}, [Value | Acc], State);
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 decode_value(Binary, State) ->
@@ -787,14 +775,14 @@ decode_value(Binary, State) ->
         {H, _} when H >= $0, H =< $9 ->
             decode_number(Binary, pre, int, [], State);
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 decode_base("", T, Value, _) -> {Value, T};
 decode_base([H | T], Binary, Value, State) ->
     case next(Binary, State) of
         {H, Binary1} -> decode_base(T, Binary1, Value, State);
-        _ -> badarg(State)
+        _ -> erlang:error(badarg)
     end.
 
 decode_number(Binary, Stage, Phase, Acc, State) ->
@@ -821,72 +809,78 @@ decode_number(Binary, Stage, Phase, Acc, State) ->
         {_, post, _} ->
             {list_to_float(lists:reverse(Acc)), Binary};
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 decode_string(Binary, State=#state{encoding = Enc, plain_string = Plain}) ->
-    {Unescaped, T} = unescape(Binary, [], State),
-    {char_code(iolist_to_binary(Unescaped), Enc, Plain), T}.
+    {Unescaped, T} = unescape(Binary, <<>>, State),
+    {char_code(Unescaped, Enc, Plain), T}.
 
 unescape(Binary, Acc, State = #state{encoding = Encoding}) ->
     case next(Binary, State) of
         {$\\, T} -> unescape_solid(T, Acc, State);
-        {$", T} -> {lists:reverse(Acc), T};
-        {H, T} when Encoding == utf8 -> unescape(T, [H | Acc], State);
+        {$", T} -> {Acc, T};
+        {H, T} when Encoding == utf8 -> unescape(T, <<Acc/binary, H/utf8>>, State);
         _ when Encoding == ?UTF16L; Encoding == ?UTF16B ->
             <<H:16, T/binary>> = Binary,
-            unescape(T, [<<H:16>> | Acc], State);
+            unescape(T, <<Acc/binary, H:16>>, State);
         _ when Encoding == ?UTF32L; Encoding == ?UTF32B ->
             <<H:32, T/binary>> = Binary,
-            unescape(T, [<<H:32>> | Acc], State)
+            unescape(T, <<Acc/binary, H:32>>, State)
     end.
 
 unescape_solid(Binary, Acc, State) ->
     case next(Binary, State) of
-        {$", T} -> unescape(T, [encode_char($", State) | Acc], State);
-        {$\\, T} -> unescape(T, [encode_char($\\, State) | Acc], State);
-        {$/, T} -> unescape(T, [encode_char($/, State) | Acc], State);
-        {$0, T} -> unescape(T, [encode_char(?NULL, State) | Acc], State);
-        {$a, T} -> unescape(T, [encode_char(?BEL, State) | Acc], State);
-        {$b, T} -> unescape(T, [encode_char(?BS, State) | Acc], State);
-        {$t, T} -> unescape(T, [encode_char(?HT, State) | Acc], State);
-        {$n, T} -> unescape(T, [encode_char(?LF, State) | Acc], State);
-        {$f, T} -> unescape(T, [encode_char(?FF, State) | Acc], State);
-        {$v, T} -> unescape(T, [encode_char(?VT, State) | Acc], State);
-        {$r, T} -> unescape(T, [encode_char(?CR, State) | Acc], State);
-        {$s, T} -> unescape(T, [encode_char(?SPC, State) | Acc], State);
+        {$", T} -> unescape(T, add_char($", Acc, State), State);
+        {$\\, T} -> unescape(T, add_char($\\, Acc, State), State);
+        {$/, T} -> unescape(T, add_char($/, Acc, State), State);
+        {$0, T} -> unescape(T, add_char(?NULL, Acc, State), State);
+        {$a, T} -> unescape(T, add_char(?BEL, Acc, State), State);
+        {$b, T} -> unescape(T, add_char(?BS, Acc, State), State);
+        {$t, T} -> unescape(T, add_char(?HT, Acc, State), State);
+        {$n, T} -> unescape(T, add_char(?LF, Acc, State), State);
+        {$f, T} -> unescape(T, add_char(?FF, Acc, State), State);
+        {$v, T} -> unescape(T, add_char(?VT, Acc, State), State);
+        {$r, T} -> unescape(T, add_char(?CR, Acc, State), State);
+        {$s, T} -> unescape(T, add_char(?SPC, Acc, State), State);
         {$u, T} -> unescape_hex(T, Acc, State);
         {H, T} when is_integer(H) ->
-            unescape(T,[encode_char(H,State),encode_char($\\,State)|Acc],State);
+            unescape(T, add_char(H, add_char($\\, Acc, State), State),State);
         {H, T} when is_binary(H) ->
-            unescape(T, [H, encode_char($\\, State) | Acc], State)
+            unescape(T, <<(add_char($\\, Acc, State))/binary, H/binary>>, State)
     end.
 
+add_char(C, S, #state{encoding = utf8}) -> <<S/binary, C/utf8>>;
+add_char(C, S, #state{encoding = ?UTF16L}) -> <<S/binary, C, 0>>;
+add_char(C, S, #state{encoding = ?UTF16B}) -> <<S/binary, 0, C>>;
+add_char(C, S, #state{encoding = ?UTF32L}) -> <<S/binary, C, 0:24>>;
+add_char(C, S, #state{encoding = ?UTF32B}) -> <<S/binary, 0:24, C>>.
+
 unescape_hex(<<A, B, C, D, T/binary>>, Acc, State = #state{encoding = utf8}) ->
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(Binary, Acc, State = #state{encoding = ?UTF16L}) ->
     <<A, 0, B, 0, C, 0, D, 0, T/binary>> = Binary,
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(Binary, Acc, State = #state{encoding = ?UTF16B}) ->
     <<0, A, 0, B, 0, C, 0, D, T/binary>> = Binary,
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32L}) ->
     <<A, 0:24, B, 0:24, C, 0:24, D, 0:24, T/binary>> = Binary,
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
 unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32B}) ->
     <<0:24, A, 0:24, B, 0:24, C, 0:24, D, T/binary>> = Binary,
-    unescape(T, [encode_hex([A, B, C, D], State) | Acc], State);
-unescape_hex(_, _, State) ->
-    badarg(State).
+    unescape(T, <<Acc/binary, (encode_hex([A, B, C, D], State))/binary>>,State);
+unescape_hex(_, _, _) ->
+    erlang:error(badarg).
 
 encode_hex(List, #state{encoding = Enc}) ->
-    char_code(<<(list_to_integer(List, 16)):16/unsigned-integer>>, ?UTF16B, Enc).
+    char_code(<<(list_to_integer(List, 16)):16/unsigned-integer>>, ?UTF16B,Enc).
 
 decode_skip(Binary, H, State) ->
     case next(Binary, State) of
         {H, T} -> T;
         {WS, T} when ?IS_WS(WS) -> decode_skip(T, H, State);
-        _ -> badarg(State)
+        _ -> erlang:error(badarg)
     end.
 
 %% ===================================================================
@@ -909,8 +903,8 @@ encode_pointer([H | T], State, Acc) when is_integer(H), H >= 0 ->
     H1 = encode_chars([$/ | integer_to_list(H)],
                       State#state{encoding = State#state.encoding}),
     encode_pointer(T, State, [H1 | Acc]);
-encode_pointer(_, State, _) ->
-    badarg(State).
+encode_pointer(_, _, _) ->
+    erlang:error(badarg).
 
 pointer_escape(String, Plain) ->
     case pointer_escapeable(String, Plain) of
@@ -995,7 +989,7 @@ decode_pointer_int(Binary, Acc, State) ->
         eob -> {list_to_integer(lists:reverse(Acc)), <<>>};
         {$/, T} -> {list_to_integer(lists:reverse(Acc)), T};
         {H, T} when ?IS_INT(H) -> decode_pointer_int(T, [H | Acc], State)
-    end.    
+    end.
 
 decode_pointer_member(Bin, Acc,State=#state{encoding=Enc,plain_string=Plain}) ->
     #state{encoding = Enc, plain_string = Plain} = State,
@@ -1064,7 +1058,7 @@ eval_binary(P = [Key | T], Bin,Path,State) when is_binary(Key); is_atom(Key) ->
     case next(Bin, State) of
         {H, BT} when ?IS_WS(H) -> eval_binary(P, BT, Path, inc(State));
         {${, BT} ->
-            case eval_binary_object(Key, BT, {false, false}, Path, inc(State)) of
+            case eval_binary_object(Key, BT, {false, false}, Path,inc(State)) of
                 Error = {error, _} -> Error;
                 {BT1, State1} -> eval_binary(T, BT1, [Key | Path], State1)
             end;
@@ -1072,7 +1066,7 @@ eval_binary(P = [Key | T], Bin,Path,State) when is_binary(Key); is_atom(Key) ->
             {error, {incorrect_pointer, lists:reverse([Key | Path])}}
     end.
 
-eval_binary_dash(Binary, Expect, Size, State) -> 
+eval_binary_dash(Binary, Expect, Size, State) ->
     case {next(Binary, State), Expect} of
         {{WS, T}, _} when ?IS_WS(WS) ->
             eval_binary_dash(T, Expect, Size, State);
@@ -1084,7 +1078,7 @@ eval_binary_dash(Binary, Expect, Size, State) ->
             {T, _} = skip_value(Binary, State),
             eval_binary_dash(T, {false, true}, Size + 1, State);
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 eval_binary_object(Key, Binary, Expect, Path, State) ->
@@ -1104,11 +1098,11 @@ eval_binary_object(Key, Binary, Expect, Path, State) ->
                     eval_binary_object(Key, T3, {false, true}, Path, State3)
             end;
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 eval_binary_array(0, Binary, _, _, State) -> {Binary, State};
-eval_binary_array(N, Binary, Expect, Path, State) -> 
+eval_binary_array(N, Binary, Expect, Path, State) ->
     case {next(Binary, State), Expect} of
         {{WS, T}, _} when ?IS_WS(WS) ->
             eval_binary_array(N, T, Expect, Path, inc(State));
@@ -1120,7 +1114,7 @@ eval_binary_array(N, Binary, Expect, Path, State) ->
             {T, State1} = skip_value(Binary, State),
             eval_binary_array(N, T, {false, true}, Path, State1);
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 eval_binary_string(Bin, State=#state{encoding = Enc, atom_keys = true}) ->
@@ -1202,8 +1196,8 @@ eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32L}) ->
 eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32B}) ->
     <<0:24, A, 0:24, B, 0:24, C, 0:24, D, T/binary>> = Binary,
     eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4));
-eval_binary_unescape_hex(_, _, State) ->
-    badarg(State).
+eval_binary_unescape_hex(_, _, _) ->
+    erlang:error(badarg).
 
 
 skip_value(Binary, State) ->
@@ -1218,14 +1212,14 @@ skip_value(Binary, State) ->
         {$-, T} -> skip_number(T, pre, int, inc(State));
         {H, _} when H >= $0, H =< $9 ->
             skip_number(Binary, pre, int, State);
-        _ -> badarg(State)
+        _ -> erlang:error(badarg)
     end.
 
 skip_base("", T, State) -> {T, State};
 skip_base([H | T], Binary, State) ->
     case next(Binary, State) of
         {H, Binary1} -> skip_base(T, Binary1, inc(State));
-        _ -> badarg(State)
+        _ -> erlang:error(badarg)
     end.
 
 skip_object(Binary, Expect, State) ->
@@ -1239,14 +1233,14 @@ skip_object(Binary, Expect, State) ->
             {T3, State3} = skip_value(T2, State2),
             skip_object(T3, {false, true}, State3);
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 skip_char(Binary, H, State) ->
     case next(Binary, State) of
         {H, T} -> {T, inc(State)};
         {WS, T} when ?IS_WS(WS) -> skip_char(T, H, inc(State));
-        _ -> badarg(State)
+        _ -> erlang:error(badarg)
     end.
 
 skip_ws(Binary, State) ->
@@ -1264,7 +1258,7 @@ skip_array(Binary, Expect, State) ->
             {T, State1} = skip_value(Binary, State),
             skip_array(T, {false, true}, State1);
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 skip_string(Binary, State) ->
@@ -1286,8 +1280,8 @@ skip_string_hex(<<_:64, T/binary>>, State = #state{encoding = {utf16, _}}) ->
     skip_string(T, inc(State, 4));
 skip_string_hex(<<_:128, T/binary>>, State = #state{encoding = {utf32, _}}) ->
     skip_string(T, inc(State, 4));
-skip_string_hex(_, State) ->
-    badarg(State).
+skip_string_hex(_, _) ->
+    erlang:error(badarg).
 
 skip_number(Binary, Stage, Phase, State) ->
     case {next(Binary, State), Stage, Phase} of
@@ -1313,7 +1307,7 @@ skip_number(Binary, Stage, Phase, State) ->
         {_, post, _} ->
             {Binary, State};
         _ ->
-            badarg(State)
+            erlang:error(badarg)
     end.
 
 step(State = #state{encoding = utf8}) -> State#state{step = 1};
@@ -1504,7 +1498,7 @@ validate_prop(additionalProperties, _, _, _) ->
     true;
 validate_prop(dependencies, {Deps}, JSON = {_}, State) ->
     validate_dependencies(Deps, JSON, State#state{props_validated = false});
-validate_prop(dependencies, Deps, JSON, State) when is_map(Deps), is_map(JSON) ->
+validate_prop(dependencies, Deps, JSON, State) when is_map(Deps),is_map(JSON) ->
     validate_dependencies(maps:to_list(Deps),
                           {maps:to_list(JSON)},
                           State#state{props_validated = false});
@@ -1572,7 +1566,7 @@ validate_prop(format, Format, _, _) when is_binary(Format) ->
     true;
 validate_prop(id, Id, _, State = #state{plain_string=utf8}) when is_binary(Id)->
     validate_id(uri:decode(Id), State);
-validate_prop(id, Id, _, State = #state{plain_string=Plain}) when is_binary(Id)->
+validate_prop(id, Id, _, State =#state{plain_string=Plain}) when is_binary(Id)->
     validate_id(uri:decode(char_code(Id, Plain, utf8)), State);
 validate_prop('$schema', Schema, _, #state{plain_string = Plain})  ->
     Schema1 = case Plain of
@@ -1594,7 +1588,7 @@ schema(Key, #state{atom_keys = true, schema = Schema}, Default) ->
 schema(Key, #state{existing_atom_keys = true, schema = Schema}, Default) ->
     plist:find(Key, Schema, Default);
 schema(Key, #state{plain_string = Plain, schema = Schema}, Default) ->
-    plist:find(char_code(atom_to_binary(Key, utf8),utf8,Plain), Schema, Default).
+    plist:find(char_code(atom_to_binary(Key, utf8),utf8,Plain), Schema,Default).
 
 validate_array([], _, _, _) -> true;
 validate_array(_, [], true, _) -> true;
@@ -1653,7 +1647,7 @@ select_additional(Schema) when is_map(Schema) -> [Schema];
 select_additional(true) -> [].
 
 validate_dependencies([], _, _) -> true;
-validate_dependencies([{Key, Keys} | T], JSON = {M}, State) when is_list(Keys) ->
+validate_dependencies([{Key, Keys} | T], JSON ={M}, State) when is_list(Keys) ->
     case plist:member(Key, M) of
         true -> [validate_dependency(K, M, State) || K <- Keys];
         _ -> true
@@ -1670,7 +1664,7 @@ validate_dependencies(Props, JSON, State) when is_map(JSON) ->
 
 validate_dependency(K, M, #state{atom_keys = true, plain_string = P}) ->
     true = plist:member(binary_to_atom(char_code(K, P, utf8), utf8), M);
-validate_dependency(K, M, #state{existing_atom_keys = true, plain_string = P}) ->
+validate_dependency(K, M, #state{existing_atom_keys = true, plain_string =P}) ->
     true = plist:member(binary_to_atom(char_code(K, P, utf8), utf8), M);
 validate_dependency(K, M, _) ->
     true = plist:member(K, M).
@@ -1695,13 +1689,13 @@ validate_enum([SMap | T], JSON, State) when is_map(SMap), is_map(JSON) ->
     validate_enum([{maps:to_list(SMap)} | T], {maps:to_list(JSON)}, State);
 validate_enum([_ | T], JSON, State) ->
     validate_enum(T, JSON, State).
-                     
-validate_enum_prop({Key, SVal}, {Key, JVal}, State = #state{atom_keys = true}) ->
+
+validate_enum_prop({Key, SVal}, {Key, JVal}, State = #state{atom_keys =true}) ->
     validate_enum([SVal], JVal, State);
-validate_enum_prop({K, SVal}, {K, JVal},State=#state{existing_atom_keys=true}) ->
+validate_enum_prop({K, SVal}, {K,JVal},State=#state{existing_atom_keys=true}) ->
     validate_enum([SVal], JVal, State);
 validate_enum_prop({SKey, SVal}, {JKey, JVal}, State) ->
-    JKey = char_code(atom_to_binary(SKey, utf8), utf8, State#state.plain_string),
+    JKey = char_code(atom_to_binary(SKey, utf8), utf8,State#state.plain_string),
     validate_enum([SVal], JVal, State).
 
 validate_type([Type | Types], JSON, State) ->
@@ -1726,10 +1720,10 @@ validate_oneof([Schema | Schemas], JSON, true, State) ->
     catch _: _ -> validate_oneof(Schemas, JSON, true, State)
     end.
 
-validate_id(#uri{scheme=undefined, path=[], fragment=F}, State) when F /= <<>> ->
+validate_id(#uri{scheme=undefined, path=[], fragment=F},State) when F /= <<>> ->
     #state{scope = URI} = State,
     State#state{scope = URI#uri{fragment = F}};
-validate_id(#uri{scheme = undefined, path = Path, fragment = Fragment}, State) ->
+validate_id(#uri{scheme = undefined, path = Path, fragment =Fragment}, State) ->
     #state{scope = URI} = State,
     State#state{scope = URI#uri{path = Path, fragment = Fragment}};
 validate_id(URI, State) ->
@@ -1928,17 +1922,17 @@ parse_opt({existing_atom_keys, Bool}, State) when is_boolean(Bool)->
 parse_opt({plain_string, PlainString}, State) ->
     case lists:member(PlainString, ?PLAINFORMATS) of
         true -> State#state{plain_string = PlainString};
-        false -> badarg(State)
+        false -> erlang:error(badarg)
     end;
 parse_opt({encoding, Encoding} , State) ->
     case lists:member(Encoding, ?ENCODINGS) of
         true -> State#state{encoding = Encoding};
-        false -> badarg(State)
+        false -> erlang:error(badarg)
     end;
-parse_opt(_, State) ->
-    badarg(State).
+parse_opt(_, _) ->
+    erlang:error(badarg).
 
-next(<<H, T/binary>>, #state{encoding = utf8}) -> {H, T};
+next(<<H/utf8, T/binary>>, #state{encoding = utf8}) -> {H, T};
 next(<<H, 0, T/binary>>, #state{encoding = ?UTF16L}) -> {H, T};
 next(<<0, H, T/binary>>, #state{encoding = ?UTF16B}) -> {H, T};
 next(<<H:16, T/binary>>, #state{encoding = {utf16, _}}) -> {<<H:16>>, T};
@@ -1946,7 +1940,7 @@ next(<<H, 0:24, T/binary>>, #state{encoding = ?UTF32L}) -> {H, T};
 next(<<0:24, H, T/binary>>, #state{encoding = ?UTF32B}) -> {H, T};
 next(<<H:32, T/binary>>, #state{encoding = {utf32, _}}) -> {<<H:32>>, T};
 next(<<>>, _) -> eob;
-next(_, State) -> badarg(State).
+next(_, _) -> erlang:error(badarg).
 
 encode_chars(Chars, #state{encoding = utf8}) -> Chars;
 encode_chars(Chars, State) when is_list(Chars) ->
@@ -1954,7 +1948,7 @@ encode_chars(Chars, State) when is_list(Chars) ->
 encode_chars(Chars, State) when is_binary(Chars) ->
     << <<(encode_char(C, State))/binary>> || <<C>> <= Chars>>.
 
-encode_char(C, #state{encoding = utf8}) -> <<C>>;
+encode_char(C, #state{encoding = utf8}) -> <<C/utf8>>;
 encode_char(C, #state{encoding = ?UTF16L}) -> <<C, 0>>;
 encode_char(C, #state{encoding = ?UTF16B}) -> <<0, C>>;
 encode_char(C, #state{encoding = ?UTF32L}) -> <<C, 0:24>>;
@@ -2001,12 +1995,3 @@ char_code(Text, ?UTF32L, ?UTF16L) ->
     << <<C/utf16-little>> || <<C/utf32-little>> <= Text >>;
 char_code(Text, ?UTF32L, ?UTF32B) ->
     << <<C/utf32-big>> || <<C/utf32-little>> <= Text >>.
-
-%%--------------------------------------------------------------------
--spec badarg(#state{}) -> no_return().
-%%--------------------------------------------------------------------
-badarg(#state{orig_call = {Funcion, Args, Line}}) ->
-    Trace = [{?MODULE, Funcion, Args, [{file, ?FILE}, {line, Line - 1}]} |
-             lists:dropwhile(fun(T) -> element(1, T) == ?MODULE end,
-                             erlang:get_stacktrace())],
-    exit({badarg, Trace}).

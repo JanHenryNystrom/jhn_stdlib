@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2015 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2015-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2015, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2015-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json_schema_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -38,7 +38,7 @@
 json_schema_test_() ->
     {ok, Schema} =
         file:read_file(
-          filename:join([code:priv_dir(jhn_stdlib), 'draft-04', 'schema.json'])),
+          filename:join([code:priv_dir(jhn_stdlib), 'draft-04','schema.json'])),
     [{"schema.json", ?_test(?assertMatch({true, _}, json:validate(Schema)))}].
 
 all_schema_test_() ->
@@ -230,7 +230,6 @@ type_test_() -> suites(type).
 %%--------------------------------------------------------------------
 
 uniqueItems_test_() -> suites(uniqueItems).
-    
 
 %% ===================================================================
 %% Internal functions.
@@ -291,7 +290,8 @@ file(TestSuites) ->
 
 find(Key, Map, Opts) when is_map(Map) -> find(Key, {maps:to_list(Map)}, Opts);
 find(Key, {Object}, Opts) ->
-    Atom = lists:member(atom_keys,Opts) or lists:member(existing_atom_keys,Opts),
+    Atom =
+        lists:member(atom_keys, Opts) or lists:member(existing_atom_keys, Opts),
     case {Atom, plist:find(plain_string, Opts, utf8)} of
         {true, _} -> plist:find(Key, Object);
         {_, Plain} ->
