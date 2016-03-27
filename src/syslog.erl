@@ -137,7 +137,23 @@ decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
 %% Encoding
 %% ===================================================================
 
-do_encode(_, _) -> [].
+do_encode(Entry, _) ->
+    [encode_header(Entry), $\s,
+     encode_structured_data(Entry),
+     encode_msg(Entry)].
+
+encode_header(Entry) ->
+    Header = maps:get(header, Entry, #{}),
+    Severity = encode_severity(maps:get(severity, Header, info)),
+    Facility = encode_facility(maps:get(facility, Header, user)),
+    Version = integer_to_binary(maps:get(version, Header, 1)),
+    Timestamp = encode_time_stamp(maps:get(time_stamp, Header, '-')),
+    HostName = maps:get(host_name, Header, "-"),
+    AppName = maps:get(app_name, Header, "-"),
+    ProcId = maps:get(proc_id, Header, "-"),
+    MsgId = maps:get(msg_id, Header, "-"),
+    [$<, integer_to_binary(Severity + Facility), $>, Version,
+     $\s, Timestamp, $\s, HostName, $\s, AppName, $\s, ProcId, $\s, MsgId].
 
 encode_severity(emerg) -> 0;
 encode_severity(alert) -> 1;
@@ -173,6 +189,22 @@ encode_facility(local5) -> 168;
 encode_facility(local6) -> 176;
 encode_facility(local7) -> 184.
 
+encode_time_stamp('-') -> "-".
+
+encode_structured_data(#{structured := Structured}) ->
+    [encode_structured_data(Id, Params) || {Id, Params}  <- Structured];
+encode_structured_data(_) ->
+    [].
+
+encode_structured_data(Id, Params) ->
+    [$[, Id, [encode_structured_param(Param) || Param <- Params], $]].
+
+encode_structured_param({Name, Value}) -> [$\s, Name, $=, $", Value, $"].
+
+encode_msg(#{msg := #{type := utf8, content:=Msg}}) -> [$\s,<<?UTF8_BOM>>,Msg];
+encode_msg(#{msg := #{content := Msg}}) -> [$\s, Msg];
+encode_msg(_) -> [].
+
 %% ===================================================================
 %% Decoding
 %% ===================================================================
@@ -184,7 +216,7 @@ do_decode(<<$<, T/binary>>, _) ->
             case decode_msg(T2) of
                 {any, <<>>} -> #{header => Header};
                 {Type, Msg} ->
-                    #{header => Header, msg => #{type => Type, msg => Msg}}
+                    #{header => Header, msg => #{type => Type, content => Msg}}
             end;
         {Structured, T2} ->
             case decode_msg(T2) of
@@ -192,7 +224,7 @@ do_decode(<<$<, T/binary>>, _) ->
                 {Type, Msg} ->
                     #{header => Header,
                       structured => Structured,
-                      msg => #{type => Type, msg => Msg}}
+                      msg => #{type => Type, content => Msg}}
             end
     end.
 
