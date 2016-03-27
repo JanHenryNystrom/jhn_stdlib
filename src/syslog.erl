@@ -347,7 +347,7 @@ recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
                 {ok, {_, _, Packet}} ->
                     case unframe(tcp, <<Buf/binary, Packet/binary>>) of
                         {more, Len} ->
-                            try gen_tcp:recv(Sock, Len, 0) of
+                            try gen_tcp:recv(Sock, Len) of
                                 {ok, {_, _, Packet1}} ->
                                     {Frame, Buf1} =
                                         unframe(tcp,
@@ -376,7 +376,7 @@ recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
                 {ok, {_, _, Packet}} ->
                     case unframe(tcp, <<Buf/binary, Packet/binary>>) of
                         {more, Len} ->
-                            try gen_tcp:recv(Sock, Len, 0, Timeout) of
+                            try gen_tcp:recv(Sock, Len, Timeout) of
                                 {ok, {_, _, Packet1}} ->
                                     {Frame, Buf1} =
                                         unframe(tcp, <<Buf/binary,
@@ -407,7 +407,7 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
                 {ok, {_, _, Packet}} ->
                     case unframe(tls, <<Buf/binary, Packet/binary>>) of
                         {more, Len} ->
-                            try ssl:recv(Sock, Len, 0) of
+                            try ssl:recv(Sock, Len) of
                                 {ok, {_, _, Packet1}} ->
                                     {Frame, Buf1} =
                                         unframe(tls,
@@ -436,7 +436,7 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
                 {ok, {_, _, Packet}} ->
                     case unframe(tls, <<Buf/binary, Packet/binary>>) of
                         {more, Len} ->
-                            try ssl:recv(Sock, Len, 0, Timeout) of
+                            try ssl:recv(Sock, Len, Timeout) of
                                 {ok, {_, _, Packet1}} ->
                                     {Frame, Buf1} =
                                         unframe(tls, <<Buf/binary,
@@ -491,17 +491,27 @@ accept(Transport = #transport{type = tcp, listen_socket = LSock}, Opts) ->
 accept(Transport = #transport{type = tls, listen_socket = LSock}, Opts) ->
     case parse_opts(Opts) of
         #opts{timeout = undefined} ->
-            try ssl:accept(LSock) of
-                {ok, Sock}  -> Transport#transport{socket = Sock};
-                Error -> Error
+            try ssl:transport_accept(LSock) of
+                {ok, Sock}  ->
+                    case ssl:ssl_accept(Sock) of
+                        ok -> Transport#transport{socket = Sock};
+                        Error -> Error
+                    end;
+                Error ->
+                    Error
             catch
                 error:Error -> {error, Error};
                 Class:Error -> {error, {Class, Error}}
             end;
         #opts{timeout = Timeout} ->
-            try ssl:accept(LSock, Timeout) of
-                {ok, Sock}  -> Transport#transport{socket = Sock};
-                Error -> Error
+            try ssl:transport_accept(LSock, Timeout) of
+                {ok, Sock}  ->
+                    case ssl:ssl_accept(Sock) of
+                        ok -> Transport#transport{socket = Sock};
+                        Error -> Error
+                    end;
+                Error ->
+                    Error
             catch
                 error:Error -> {error, Error};
                 Class:Error -> {error, {Class, Error}}
