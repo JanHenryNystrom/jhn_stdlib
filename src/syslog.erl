@@ -44,23 +44,6 @@
 %% Records
 -record(opts, {return_type = iolist :: iolist | binary}).
 
-%% -record(time_stamp, {date              :: {integer(), integer(), integer()},
-%%                      time              :: {integer(), integer(), integer()},
-%%                      fraction    = 0   :: integer(),
-%%                      offset_sign = 'Z' :: 'Z' | '-' |'+',
-%%                      offset            :: undefined | {integer(), integer()}
-%%                     }).
-
-%% -record(header, {facility         :: atom(),
-%%                  severity         :: atom(),
-%%                  version    = 1   :: integer(),
-%%                  time_stamp = nil :: nil | #time_stamp{},
-%%                  host_name  = nil :: nil | binary(),
-%%                  app_name   = nil :: nil | binary(),
-%%                  proc_id    = nil :: nil | binary(),
-%%                  msg_id     = nil :: nil | binary()
-%%                 }).
-
 %% Types
 -type opt() :: none.
 
@@ -189,6 +172,7 @@ encode_facility(local5) -> 168;
 encode_facility(local6) -> 176;
 encode_facility(local7) -> 184.
 
+%% TODO: Add endcoding
 encode_time_stamp('-') -> "-".
 
 encode_structured_data(#{structured := Structured}) ->
@@ -199,6 +183,7 @@ encode_structured_data(_) ->
 encode_structured_data(Id, Params) ->
     [$[, Id, [encode_structured_param(Param) || Param <- Params], $]].
 
+%% TODO: Add escaping
 encode_structured_param({Name, Value}) -> [$\s, Name, $=, $", Value, $"].
 
 encode_msg(#{msg := #{type := utf8, content:=Msg}}) -> [$\s,<<?UTF8_BOM>>,Msg];
@@ -318,6 +303,7 @@ decode_sd_param(<<$=, $", T/binary>>, Acc) ->
 decode_sd_param(<<H, T/binary>>, Acc) ->
     decode_sd_param(T, <<Acc/binary, H>>).
 
+%% TODO: add handling of escape
 decode_sd_value(<<$=, T/binary>>, Acc) -> {Acc, T};
 decode_sd_value(<<H/utf8, T/binary>>, Acc) ->
     decode_sd_value(T, <<Acc/binary, H/utf8>>).
