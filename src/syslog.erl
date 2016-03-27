@@ -34,7 +34,9 @@
 %% API
 -export([open/0, open/1, open/2,
          close/1,
-         send/2, send/3
+         send/2, send/3,
+         recv/1, recv/2,
+         setopts/2
         ]).
 
 %% Library functions
@@ -48,8 +50,9 @@
 %% Includes
 
 %% Records
--record(opts, {dest              :: inet:ip_address() | inet:hostname(),
-               dest_port   = 154 :: inet:port(),
+-record(opts, {dest                 :: inet:ip_address() | inet:hostname(),
+               dest_port   = 154    :: inet:port(),
+               timeout              :: integer(),
                return_type = iolist :: iolist | binary}).
 
 -record(transport, {type      :: udp | tcp | tls,
@@ -63,6 +66,7 @@
 -type opt() :: none.
 -type transport() :: #transport{}.
 -type entry() :: map().
+-type socket_options() :: gen_tcp:option() | gen_udp:option().
 
 %% Defines
 -define(GREGORIAN_POSIX_DIFF, 62167219200).
@@ -110,8 +114,8 @@ open(Args = #{type := udp}, #opts{dest = Dest, dest_port = DestPort}) ->
       opts := TransportOpts,
       ipv := IPv} = maps:merge(?DEFAULTS_UDP, Args),
     TransportOpts1 = case IPv of
-                         4 -> [inet | TransportOpts];
-                         6 -> [inet6 | TransportOpts]
+                         4 -> [inet, binary | TransportOpts];
+                         6 -> [inet6, binary | TransportOpts]
                      end,
     {ok, Sock} = gen_udp:open(Port, TransportOpts1),
     #transport{port = Port, socket = Sock, dest = Dest, dest_port = DestPort};
@@ -164,6 +168,56 @@ send(Transport = #transport{type = udp, socket = Sock}, Entry, Opts) ->
             catch error:Error -> {error, Error};
                   Class:Error -> {error, {Class, Error}}
             end
+    end.
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec recv(transport()) -> {ok, entry()} | {error, _}.
+%%--------------------------------------------------------------------
+recv(Transport) -> recv(Transport, #opts{}).
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec recv(transport(), [opt()] | #opts{}) -> {ok, entry()} | {error, _}.
+%%--------------------------------------------------------------------
+recv(#transport{type = udp, socket = Sock}, Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try gen_udp:recv(Sock, 0) of
+                {ok, {_, _, Packet}} -> {ok, decode(Packet, Opts)};
+                Error -> Error
+            catch error:Error -> {error, Error};
+                  Class:Error -> {error, {Class, Error}}
+            end;
+        #opts{timeout = Timeout} ->
+            try gen_udp:recv(Sock, Timeout) of
+                {ok, {_, _, Packet}} -> {ok, decode(Packet, Opts)};
+                Error -> Error
+            catch error:Error -> {error, Error};
+                  Class:Error -> {error, {Class, Error}}
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec setopts(transport(), socket_options()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+setopts(#transport{type = udp, socket = Sock}, Options) ->
+    try inet:setopts(Sock, Options)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
     end.
 
 %% ===================================================================
@@ -481,4 +535,5 @@ parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt({destination, Destination}, Opts) -> Opts#opts{dest = Destination};
 parse_opt({destination_port, Port}, Opts) -> Opts#opts{dest_port = Port};
+parse_opt({timeout, Timeout}, Opts) -> Opts#opts{timeout = Timeout};
 parse_opt(_, Opts) -> erlang:error(badarg, Opts).
