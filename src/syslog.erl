@@ -53,7 +53,7 @@
 %% Includes
 
 %% Records
--record(opts, {type        = udp    :: udp | tcp | tls, 
+-record(opts, {type        = udp    :: udp | tcp | tls,
                role        = client :: client | server,
                port                 :: integer(),
                opts        = []     :: [{atom(), _}],
