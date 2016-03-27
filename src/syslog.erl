@@ -23,6 +23,7 @@
 %%%    Textual Conventions for Syslog Management                       (rfc5427)
 %%%    Transmission of Syslog Messages over TCP                        (rfc6587)
 %%%
+%%%    TCP only supports Octet counting framing.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -36,12 +37,14 @@
          close/1,
          send/2, send/3,
          recv/1, recv/2,
+         accept/2,
          setopts/2
         ]).
 
 %% Library functions
 -export([encode/1, encode/2,
-         decode/1, decode/2
+         decode/1, decode/2,
+         frame/2, unframe/2
         ]).
 
 %% Exported types
@@ -55,27 +58,36 @@
                timeout              :: integer(),
                return_type = iolist :: iolist | binary}).
 
--record(transport, {type      :: udp | tcp | tls,
-                    port      :: integer(),
-                    ipv       :: integer(),
-                    dest      :: inet:ip_address() | inet:hostname(),
-                    dest_port :: inet:port(),
-                    socket    :: gen_udp:socket()}).
+-record(transport, {type                 :: udp | tcp | tls,
+                    role                 :: client | server,
+                    port                 :: inet:port(),
+                    ipv                  :: integer(),
+                    dest                 :: inet:ip_address() | inet:hostname(),
+                    dest_port            :: inet:port(),
+                    socket               :: gen_udp:socket() |
+                                            gen_tcp:socket() |
+                                            ssl:socket(),
+                    listen_socket        :: gen_tcp:socket() | ssl:socket(),
+                    buf           = <<>> :: binary()
+                   }).
 
 %% Types
 -type opt() :: none.
 -type transport() :: #transport{}.
 -type entry() :: map().
--type socket_options() :: gen_tcp:option() | gen_udp:option().
+-type socket_options() :: gen_udp:option() | gen_tcp:option() | ssl:option().
 
 %% Defines
 -define(GREGORIAN_POSIX_DIFF, 62167219200).
 
 -define(UTF8_BOM, 239,187,191).
 
+%% TODO: enforce max size
 -define(UDP_MAX_SIZE, 65507).
 
--define(DEFAULTS_UDP, #{port => 154, opts => [], ipv => 4}).
+-define(DEFAULTS_UDP, #{role => client, port => 154, opts => [], ipv => 4}).
+-define(DEFAULTS_TCP, #{role => client, port => 601, opts => [], ipv => 4}).
+-define(DEFAULTS_TLS, #{role => client, port => 6514, opts => [], ipv => 4}).
 
 %% ===================================================================
 %% API functions.
@@ -109,16 +121,123 @@ open(Args) -> open(Args, #opts{}).
 %%--------------------------------------------------------------------
 -spec open(#{}, [opt()] | #opts{}) -> transport() | {error, _}.
 %%--------------------------------------------------------------------
-open(Args = #{type := udp}, #opts{dest = Dest, dest_port = DestPort}) ->
-    #{port := Port,
+open(Args = #{type := udp}, Opts) ->
+    #opts{dest = Dest, dest_port = DestPort} = parse_opts(Opts),
+    #{role := Role,
+      port := Port,
       opts := TransportOpts,
       ipv := IPv} = maps:merge(?DEFAULTS_UDP, Args),
     TransportOpts1 = case IPv of
                          4 -> [inet, binary | TransportOpts];
                          6 -> [inet6, binary | TransportOpts]
                      end,
-    {ok, Sock} = gen_udp:open(Port, TransportOpts1),
-    #transport{port = Port, socket = Sock, dest = Dest, dest_port = DestPort};
+    try gen_udp:open(Port, TransportOpts1) of
+        {ok, Sock} -> #transport{port = Port,
+                                 role = Role,
+                                 socket = Sock,
+                                 dest = Dest,
+                                 dest_port = DestPort};
+        Error -> Error
+    catch
+        error:Error -> {error, Error};
+        Class:Error -> {error, {Class, Error}}
+    end;
+open(Args = #{type := tcp}, Opts) ->
+    #opts{dest = Dest, dest_port = DestPort, timeout = Timeout} =
+        parse_opts(Opts),
+    #{role := Role,
+      port := Port,
+      opts := TransportOpts,
+      ipv := IPv} = maps:merge(?DEFAULTS_TCP, Args),
+    TransportOpts1 = case IPv of
+                         4 -> [inet, binary | TransportOpts];
+                         6 -> [inet6, binary | TransportOpts]
+                     end,
+    case {Role, Timeout} of
+        {client, undefined} ->
+            try gen_tcp:connect(Dest, DestPort, TransportOpts1) of
+                {ok, Sock} -> #transport{type = tcp,
+                                         role = client,
+                                         socket = Sock,
+                                         dest = Dest,
+                                         dest_port = DestPort};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end;
+        {client, Timeout} ->
+            try gen_tcp:connect(Dest, DestPort, TransportOpts1, Timeout) of
+                {ok, Sock} -> #transport{type = tcp,
+                                         role = client,
+                                         socket = Sock,
+                                         dest = Dest,
+                                         dest_port = DestPort};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end;
+        {server, _} ->
+            try gen_tcp:listen(Port, TransportOpts1) of
+                {ok, Sock} -> #transport{type = tcp,
+                                         role = server,
+                                         listen_socket = Sock};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end
+    end;
+open(Args = #{type := tls}, Opts) ->
+    #opts{dest = Dest, dest_port = DestPort, timeout = Timeout} =
+        parse_opts(Opts),
+    #{role := Role,
+      port := Port,
+      opts := TransportOpts,
+      ipv := IPv} = maps:merge(?DEFAULTS_TLS, Args),
+    TransportOpts1 = case IPv of
+                         4 -> [inet, binary, {versions, ['tlsv1.2']} |
+                               TransportOpts];
+                         6 -> [inet6, binary, {versions, ['tlsv1.2']} |
+                               TransportOpts]
+                     end,
+    case {Role, Timeout} of
+        {client, undefined} ->
+            try ssl:connect(Dest, DestPort, TransportOpts1) of
+                {ok, Sock} -> #transport{type = tls,
+                                         role = client,
+                                         socket = Sock,
+                                         dest = Dest,
+                                         dest_port = DestPort};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end;
+        {client, Timeout} ->
+            try ssl:connect(Dest, DestPort, TransportOpts1, Timeout) of
+                {ok, Sock} -> #transport{type = tls,
+                                         role = client,
+                                         socket = Sock,
+                                         dest = Dest,
+                                         dest_port = DestPort};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end;
+        {server, _} ->
+            try ssl:listen(Port, TransportOpts1) of
+                {ok, Sock} -> #transport{type = tls,
+                                         role = server,
+                                         listen_socket = Sock};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end
+    end;
 open(Args, Opts) ->
     open(Args#{type => udp}, Opts).
 
@@ -133,6 +252,16 @@ open(Args, Opts) ->
 %%--------------------------------------------------------------------
 close(#transport{type = udp, socket = Sock}) ->
     try gen_udp:close(Sock)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+close(#transport{type = tcp, socket = Sock}) ->
+    try gen_tcp:close(Sock)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+close(#transport{type = tls, socket = Sock}) ->
+    try ssl:close(Sock)
     catch error:Error -> {error, Error};
           Class:Error -> {error, {Class, Error}}
     end.
@@ -168,6 +297,16 @@ send(Transport = #transport{type = udp, socket = Sock}, Entry, Opts) ->
             catch error:Error -> {error, Error};
                   Class:Error -> {error, {Class, Error}}
             end
+    end;
+send(#transport{type = tcp, socket = Sock}, Entry, Opts) ->
+    try gen_tcp:send(Sock, frame(tcp, encode(Entry, Opts)))
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+send(#transport{type = tls, socket = Sock}, Entry, Opts) ->
+    try ssl:send(Sock, frame(tls, encode(Entry, Opts)))
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
     end.
 
 %%--------------------------------------------------------------------
@@ -176,7 +315,7 @@ send(Transport = #transport{type = udp, socket = Sock}, Entry, Opts) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec recv(transport()) -> {ok, entry()} | {error, _}.
+-spec recv(transport()) -> {ok, entry(), transport()} | {error, _}.
 %%--------------------------------------------------------------------
 recv(Transport) -> recv(Transport, #opts{}).
 
@@ -186,7 +325,8 @@ recv(Transport) -> recv(Transport, #opts{}).
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec recv(transport(), [opt()] | #opts{}) -> {ok, entry()} | {error, _}.
+-spec recv(transport(), [opt()] | #opts{}) ->
+                  {ok, entry(), transport()} | {error, _}.
 %%--------------------------------------------------------------------
 recv(#transport{type = udp, socket = Sock}, Opts) ->
     case parse_opts(Opts) of
@@ -204,6 +344,173 @@ recv(#transport{type = udp, socket = Sock}, Opts) ->
             catch error:Error -> {error, Error};
                   Class:Error -> {error, {Class, Error}}
             end
+    end;
+recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try gen_tcp:recv(Sock, 0) of
+                {ok, {_, _, Packet}} ->
+                    case unframe(tcp, <<Buf/binary, Packet/binary>>) of
+                        {more, Len} ->
+                            try gen_tcp:recv(Sock, Len, 0) of
+                                {ok, {_, _, Packet1}} ->
+                                    {Frame, Buf1} =
+                                        unframe(tcp,
+                                                <<Buf/binary,
+                                                  Packet/binary,
+                                                  Packet1/binary>>),
+                                    {ok,
+                                     decode(Frame, Opts),
+                                     Transport#transport{buf = Buf1}};
+                                Error -> Error
+                            catch error:Error -> {error, Error};
+                                  Class:Error -> {error, {Class, Error}}
+                            end;
+                        {Frame, Buf1} ->
+                            {ok,
+                             decode(Frame, Opts),
+                             Transport#transport{buf = Buf1}}
+                    end;
+                Error ->
+                    Error
+            catch error:Error -> {error, Error};
+                  Class:Error -> {error, {Class, Error}}
+            end;
+        #opts{timeout = Timeout} ->
+            try gen_tcp:recv(Sock, 0, Timeout) of
+                {ok, {_, _, Packet}} ->
+                    case unframe(tcp, <<Buf/binary, Packet/binary>>) of
+                        {more, Len} ->
+                            try gen_tcp:recv(Sock, Len, 0, Timeout) of
+                                {ok, {_, _, Packet1}} ->
+                                    {Frame, Buf1} =
+                                        unframe(tcp, <<Buf/binary,
+                                                       Packet/binary,
+                                                       Packet1/binary>>),
+                                    {ok,
+                                     decode(Frame, Opts),
+                                     Transport#transport{buf = Buf1}};
+                                Error -> Error
+                            catch error:Error -> {error, Error};
+                                  Class:Error -> {error, {Class, Error}}
+                            end;
+                        {Frame, Buf1} ->
+                            {ok,
+                             decode(Frame, Opts),
+                             Transport#transport{buf = Buf1}}
+                    end;
+                Error ->
+                    Error
+            catch error:Error -> {error, Error};
+                  Class:Error -> {error, {Class, Error}}
+            end
+    end;
+recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try ssl:recv(Sock, 0) of
+                {ok, {_, _, Packet}} ->
+                    case unframe(tls, <<Buf/binary, Packet/binary>>) of
+                        {more, Len} ->
+                            try ssl:recv(Sock, Len, 0) of
+                                {ok, {_, _, Packet1}} ->
+                                    {Frame, Buf1} =
+                                        unframe(tls,
+                                                <<Buf/binary,
+                                                  Packet/binary,
+                                                  Packet1/binary>>),
+                                    {ok,
+                                     decode(Frame, Opts),
+                                     Transport#transport{buf = Buf1}};
+                                Error -> Error
+                            catch error:Error -> {error, Error};
+                                  Class:Error -> {error, {Class, Error}}
+                            end;
+                        {Frame, Buf1} ->
+                            {ok,
+                             decode(Frame, Opts),
+                             Transport#transport{buf = Buf1}}
+                    end;
+                Error ->
+                    Error
+            catch error:Error -> {error, Error};
+                  Class:Error -> {error, {Class, Error}}
+            end;
+        #opts{timeout = Timeout} ->
+            try ssl:recv(Sock, 0, Timeout) of
+                {ok, {_, _, Packet}} ->
+                    case unframe(tls, <<Buf/binary, Packet/binary>>) of
+                        {more, Len} ->
+                            try ssl:recv(Sock, Len, 0, Timeout) of
+                                {ok, {_, _, Packet1}} ->
+                                    {Frame, Buf1} =
+                                        unframe(tls, <<Buf/binary,
+                                                       Packet/binary,
+                                                       Packet1/binary>>),
+                                    {ok,
+                                     decode(Frame, Opts),
+                                     Transport#transport{buf = Buf1}};
+                                Error -> Error
+                            catch error:Error -> {error, Error};
+                                  Class:Error -> {error, {Class, Error}}
+                            end;
+                        {Frame, Buf1} ->
+                            {ok,
+                             decode(Frame, Opts),
+                             Transport#transport{buf = Buf1}}
+                    end;
+                Error ->
+                    Error
+            catch error:Error -> {error, Error};
+                  Class:Error -> {error, {Class, Error}}
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec accept(transport(), [opt()]) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+accept(Transport = #transport{type = tcp, listen_socket = LSock}, Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try gen_tcp:accept(LSock) of
+                {ok, Sock}  -> Transport#transport{socket = Sock};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end;
+        #opts{timeout = Timeout} ->
+            try gen_tcp:accept(LSock, Timeout) of
+                {ok, Sock}  -> Transport#transport{socket = Sock};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end
+    end;
+accept(Transport = #transport{type = tls, listen_socket = LSock}, Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try ssl:accept(LSock) of
+                {ok, Sock}  -> Transport#transport{socket = Sock};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end;
+        #opts{timeout = Timeout} ->
+            try ssl:accept(LSock, Timeout) of
+                {ok, Sock}  -> Transport#transport{socket = Sock};
+                Error -> Error
+            catch
+                error:Error -> {error, Error};
+                Class:Error -> {error, {Class, Error}}
+            end
     end.
 
 %%--------------------------------------------------------------------
@@ -216,6 +523,16 @@ recv(#transport{type = udp, socket = Sock}, Opts) ->
 %%--------------------------------------------------------------------
 setopts(#transport{type = udp, socket = Sock}, Options) ->
     try inet:setopts(Sock, Options)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+setopts(#transport{type = tcp, socket = Sock}, Options) ->
+    try inet:setopts(Sock, Options)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+setopts(#transport{type = tls, socket = Sock}, Options) ->
+    try ssl:setopts(Sock, Options)
     catch error:Error -> {error, Error};
           Class:Error -> {error, {Class, Error}}
     end.
@@ -279,6 +596,36 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec frame(atom(), iodata()) -> iodata().
+%%--------------------------------------------------------------------
+frame(_, Data) -> [integer_to_binary(iolist_size(Data)), $\s, Data].
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec unframe(atom(), iodata()) -> iodata().
+%%--------------------------------------------------------------------
+unframe(_, Data) -> unframe1(Data, <<>>).
+
+unframe1(<<$\s, T/binary>>, Acc) ->
+    case {binary_to_integer(Acc), byte_size(T)} of
+        {Octets, Size} when Size < Octets -> {more, Octets - Size};
+        {Octets, _} ->
+            <<Frame:Octets/binary, T1>> = T,
+            {Frame, T1}
+    end;
+unframe1(<<H, T/binary>>, Acc) ->
+    unframe1(T, <<Acc/binary, H>>).
 
 %% ===================================================================
 %% Internal functions.
@@ -520,6 +867,10 @@ decode_facility(160) -> local4;
 decode_facility(168) -> local5;
 decode_facility(176) -> local6;
 decode_facility(184) -> local7.
+
+%% ===================================================================
+%% Frame
+%% ===================================================================
 
 %% ===================================================================
 %% Common parts
