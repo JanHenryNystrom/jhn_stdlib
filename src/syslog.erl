@@ -31,44 +31,158 @@
 -module(syslog).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
+%% API
+-export([open/0, open/1, open/2,
+         close/1,
+         send/2, send/3
+        ]).
+
 %% Library functions
 -export([encode/1, encode/2,
          decode/1, decode/2
         ]).
 
 %% Exported types
--export_type([]).
+-export_type([transport/0, entry/0]).
 
 %% Includes
 
 %% Records
--record(opts, {return_type = iolist :: iolist | binary}).
+-record(opts, {dest              :: inet:ip_address() | inet:hostname(),
+               dest_port   = 154 :: inet:port(),
+               return_type = iolist :: iolist | binary}).
+
+-record(transport, {type      :: udp | tcp | tls,
+                    port      :: integer(),
+                    ipv       :: integer(),
+                    dest      :: inet:ip_address() | inet:hostname(),
+                    dest_port :: inet:port(),
+                    socket    :: gen_udp:socket()}).
 
 %% Types
 -type opt() :: none.
+-type transport() :: #transport{}.
+-type entry() :: map().
 
 %% Defines
 -define(GREGORIAN_POSIX_DIFF, 62167219200).
 
 -define(UTF8_BOM, 239,187,191).
 
+-define(UDP_MAX_SIZE, 65507).
+
+-define(DEFAULTS_UDP, #{}).
+
+%% ===================================================================
+%% API functions.
+%% ===================================================================
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec open() -> transport() | {error, _}.
+%%--------------------------------------------------------------------
+open() -> open(#{}).
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec open(#{}) -> transport() | {error, _}.
+%%--------------------------------------------------------------------
+open(Args) -> open(Args, #opts{}).
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec open(#{}, [opt()] | #opts{}) -> transport() | {error, _}.
+%%--------------------------------------------------------------------
+open(Args = #{type := udp}, #opts{dest = Dest, dest_port = DestPort}) ->
+    #{port := Port,
+      opts := TransportOpts,
+      ipv := IPv} = maps:merge(?DEFAULTS_UDP, Args),
+    TransportOpts1 = case IPv of
+                         4 -> [inet | TransportOpts];
+                         6 -> [inet6 | TransportOpts]
+                     end,
+    {ok, Sock} = gen_udp:open(Port, TransportOpts1),
+    #transport{port = Port, socket = Sock, dest = Dest, dest_port = DestPort};
+open(Args, Opts) ->
+    open(Args#{type => udp}, Opts).
+
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec close(transport()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+close(#transport{type = udp, socket = Sock}) ->
+    try gen_udp:close(Sock)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end.
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec send(transport(), entry()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+send(Transport, Entry) -> send(Transport, Entry, #opts{}).
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec send(transport(), entry(), [opt()] | #opts{}) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+send(Transport = #transport{type = udp, socket = Sock}, Entry, Opts) ->
+    case parse_opts(Opts) of
+        ParsedOpts = #opts{dest = undefined} ->
+            #transport{dest = Dest, dest_port = Port} = Transport,
+            try gen_udp:send(Sock, Dest, Port, encode(Entry, ParsedOpts))
+            catch error:Error -> {error, Error};
+                  Class:Error -> {error, {Class, Error}}
+            end;
+        ParsedOpts  = #opts{dest = Dest, dest_port = Port}->
+            try gen_udp:send(Sock, Dest, Port, encode(Entry, ParsedOpts))
+            catch error:Error -> {error, Error};
+                  Class:Error -> {error, {Class, Error}}
+            end
+    end.
+
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: encode(Term) -> Syslog entry.
+%% Function: encode(Entry) -> Syslog entry.
 %% @doc
 %%   Encodes the structured Erlang term as an iolist.
-%%   Equivalent of encode(Term, []) -> Syslog encode.
+%%   Equivalent of encode(Entry, []) -> Syslog encode.
 %% @end
 %%--------------------------------------------------------------------
--spec encode(_) -> iolist().
+-spec encode(entry()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Term) -> encode(Term, #opts{}).
+encode(Entry) -> encode(Entry, #opts{}).
 
 %%--------------------------------------------------------------------
-%% Function: encode(Term, Options) -> Syslog entry
+%% Function: encode(Entry, Options) -> Syslog entry
 %% @doc
 %%   Encodes the structured Erlang term as an iolist or binary.
 %%   Encode will give an exception if the erlang term is not well formed.
@@ -77,29 +191,29 @@ encode(Term) -> encode(Term, #opts{}).
 %%     iolist -> a iolist is returned
 %% @end
 %%--------------------------------------------------------------------
--spec encode(_, [opt()] | #opts{}) -> iolist() | binary().
+-spec encode(entry(), [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
-encode(Term, Opts = #opts{}) -> do_encode(Term, Opts);
-encode(Term, Opts) ->
+encode(Entry, Opts = #opts{}) -> do_encode(Entry, Opts);
+encode(Entry, Opts) ->
     ParsedOpts = parse_opts(Opts, #opts{}),
     case ParsedOpts#opts.return_type of
-        iolist-> do_encode(Term, ParsedOpts);
-        binary -> iolist_to_binary(do_encode(Term, ParsedOpts))
+        iolist-> do_encode(Entry, ParsedOpts);
+        binary -> iolist_to_binary(do_encode(Entry, ParsedOpts))
     end.
 
 %%--------------------------------------------------------------------
-%% Function: decode(Binary) -> Term.
+%% Function: decode(Binary) -> Entry.
 %% @doc
 %%   Decodes the binary into a structured Erlang term.
 %%   Equivalent of decode(Binary, []) -> URI.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary()) -> _.
+-spec decode(binary()) -> entry().
 %%--------------------------------------------------------------------
 decode(Binary) -> decode(Binary, #opts{}).
 
 %%--------------------------------------------------------------------
-%% Function: decode(Binary, Options) -> Term.
+%% Function: decode(Binary, Options) -> Entry.
 %% @doc
 %%   Decodes the binary into a structured Erlang.
 %%   Decode will give an exception if the binary is not well formed
@@ -107,7 +221,7 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%   Options are:
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), [opt()] | #opts{}) -> _.
+-spec decode(binary(), [opt()] | #opts{}) -> entry().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
@@ -357,9 +471,14 @@ decode_facility(184) -> local7.
 %% Common parts
 %% ===================================================================
 
+parse_opts(Rec = #opts{}) -> Rec;
+parse_opts(Opts) -> parse_opts(Opts, []).
+
 parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt({destination, Destination}, Opts) -> Opts#opts{dest = Destination};
+parse_opt({destination_port, Port}, Opts) -> Opts#opts{dest_port = Port};
 parse_opt(_, Opts) -> erlang:error(badarg, Opts).
