@@ -33,7 +33,7 @@
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% API
--export([open/0, open/1, open/2,
+-export([open/0, open/1,
          close/1,
          send/2, send/3,
          recv/1, recv/2,
@@ -53,15 +53,20 @@
 %% Includes
 
 %% Records
--record(opts, {dest                 :: inet:ip_address() | inet:hostname(),
-               dest_port   = 154    :: inet:port(),
+-record(opts, {type        = udp    :: udp | tcp | tls, 
+               role        = client :: client | server,
+               port                 :: integer(),
+               opts        = []     :: [{atom(), _}],
+               ipv         = ipv4   :: ipv4 | ipv6,
+               dest                 :: inet:ip_address() | inet:hostname(),
+               dest_port            :: inet:port(),
                timeout              :: integer(),
                return_type = iolist :: iolist | binary}).
 
 -record(transport, {type                 :: udp | tcp | tls,
                     role                 :: client | server,
                     port                 :: inet:port(),
-                    ipv                  :: integer(),
+                    ipv                  :: ipv4 | ipv6,
                     dest                 :: inet:ip_address() | inet:hostname(),
                     dest_port            :: inet:port(),
                     socket               :: gen_udp:socket() |
@@ -80,10 +85,6 @@
 %% Defines
 -define(UTF8_BOM, 239,187,191).
 
--define(DEFAULTS_UDP, #{role => client, port => 154, opts => [], ipv => 4}).
--define(DEFAULTS_TCP, #{role => client, port => 601, opts => [], ipv => 4}).
--define(DEFAULTS_TLS, #{role => client, port => 6514, opts => [], ipv => 4}).
-
 %% ===================================================================
 %% API functions.
 %% ===================================================================
@@ -96,7 +97,7 @@
 %%--------------------------------------------------------------------
 -spec open() -> transport() | {error, _}.
 %%--------------------------------------------------------------------
-open() -> open(#{}).
+open() -> open(#opts{}).
 
 %%--------------------------------------------------------------------
 %% Function:
@@ -104,77 +105,73 @@ open() -> open(#{}).
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec open(#{}) -> transport() | {error, _}.
+-spec open([opt()] | #opts{}) -> transport() | {error, _}.
 %%--------------------------------------------------------------------
-open(Args) -> open(Args, #opts{}).
-
-%%--------------------------------------------------------------------
-%% Function:
-%% @doc
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec open(#{}, [opt()] | #opts{}) -> transport() | {error, _}.
-%%--------------------------------------------------------------------
-open(Args = #{type := udp}, Opts) ->
-    #opts{dest = Dest, dest_port = DestPort} = parse_opts(Opts),
-    #{role := Role,
-      port := Port,
-      opts := TransportOpts,
-      ipv := IPv} = maps:merge(?DEFAULTS_UDP, Args),
+open(Opts = #opts{type = udp}) ->
+    #opts{role = Role,
+          port = Port,
+          opts = TransportOpts,
+          ipv = IPv,
+          dest = Dest,
+          dest_port = DestPort} = Opts,
+    Port1 = port(udp, Port),
+    DestPort1 = port(udp, DestPort),
     TransportOpts1 = case IPv of
-                         4 -> [inet, binary | TransportOpts];
-                         6 -> [inet6, binary | TransportOpts]
+                         ipv4 -> [inet, binary | TransportOpts];
+                         ipv6 -> [inet6, binary | TransportOpts]
                      end,
-    try gen_udp:open(Port, TransportOpts1) of
-        {ok, Sock} -> #transport{port = Port,
+    try gen_udp:open(Port1, TransportOpts1) of
+        {ok, Sock} -> #transport{port = Port1,
                                  role = Role,
                                  socket = Sock,
                                  dest = Dest,
-                                 dest_port = DestPort};
+                                 dest_port = DestPort1};
         Error -> Error
     catch
         error:Error -> {error, Error};
         Class:Error -> {error, {Class, Error}}
     end;
-open(Args = #{type := tcp}, Opts) ->
-    #opts{dest = Dest, dest_port = DestPort, timeout = Timeout} =
-        parse_opts(Opts),
-    #{role := Role,
-      port := Port,
-      opts := TransportOpts,
-      ipv := IPv} = maps:merge(?DEFAULTS_TCP, Args),
+open(Opts = #opts{type = tcp}) ->
+    #opts{role = Role,
+          port = Port,
+          opts = TransportOpts,
+          ipv = IPv,
+          dest = Dest,
+          dest_port = DestPort,
+          timeout = Timeout} = Opts,
+    Port1 = port(udp, Port),
+    DestPort1 = port(udp, DestPort),
     TransportOpts1 = case IPv of
-                         4 -> [inet, binary | TransportOpts];
-                         6 -> [inet6, binary | TransportOpts]
+                         ipv4 -> [inet, binary | TransportOpts];
+                         ipv6 -> [inet6, binary | TransportOpts]
                      end,
     case {Role, Timeout} of
         {client, undefined} ->
-            try gen_tcp:connect(Dest, DestPort, TransportOpts1) of
+            try gen_tcp:connect(Dest, DestPort1, TransportOpts1) of
                 {ok, Sock} -> #transport{type = tcp,
                                          role = client,
                                          socket = Sock,
                                          dest = Dest,
-                                         dest_port = DestPort};
+                                         dest_port = DestPort1};
                 Error -> Error
             catch
                 error:Error -> {error, Error};
                 Class:Error -> {error, {Class, Error}}
             end;
         {client, Timeout} ->
-            try gen_tcp:connect(Dest, DestPort, TransportOpts1, Timeout) of
+            try gen_tcp:connect(Dest, DestPort1, TransportOpts1, Timeout) of
                 {ok, Sock} -> #transport{type = tcp,
                                          role = client,
                                          socket = Sock,
                                          dest = Dest,
-                                         dest_port = DestPort};
+                                         dest_port = DestPort1};
                 Error -> Error
             catch
                 error:Error -> {error, Error};
                 Class:Error -> {error, {Class, Error}}
             end;
         {server, _} ->
-            try gen_tcp:listen(Port, TransportOpts1) of
+            try gen_tcp:listen(Port1, TransportOpts1) of
                 {ok, Sock} -> #transport{type = tcp,
                                          role = server,
                                          listen_socket = Sock};
@@ -184,46 +181,49 @@ open(Args = #{type := tcp}, Opts) ->
                 Class:Error -> {error, {Class, Error}}
             end
     end;
-open(Args = #{type := tls}, Opts) ->
-    #opts{dest = Dest, dest_port = DestPort, timeout = Timeout} =
-        parse_opts(Opts),
-    #{role := Role,
-      port := Port,
-      opts := TransportOpts,
-      ipv := IPv} = maps:merge(?DEFAULTS_TLS, Args),
+open(Opts = #opts{type = tls}) ->
+    #opts{role = Role,
+          port = Port,
+          opts = TransportOpts,
+          ipv = IPv,
+          dest = Dest,
+          dest_port = DestPort,
+          timeout = Timeout} = Opts,
+    Port1 = port(udp, Port),
+    DestPort1 = port(udp, DestPort),
     TransportOpts1 = case IPv of
-                         4 -> [inet, binary, {versions, ['tlsv1.2']} |
-                               TransportOpts];
-                         6 -> [inet6, binary, {versions, ['tlsv1.2']} |
-                               TransportOpts]
+                         ipv4 -> [inet, binary, {versions, ['tlsv1.2']} |
+                                  TransportOpts];
+                         ipv6 -> [inet6, binary, {versions, ['tlsv1.2']} |
+                                  TransportOpts]
                      end,
     case {Role, Timeout} of
         {client, undefined} ->
-            try ssl:connect(Dest, DestPort, TransportOpts1) of
+            try ssl:connect(Dest, DestPort1, TransportOpts1) of
                 {ok, Sock} -> #transport{type = tls,
                                          role = client,
                                          socket = Sock,
                                          dest = Dest,
-                                         dest_port = DestPort};
+                                         dest_port = DestPort1};
                 Error -> Error
             catch
                 error:Error -> {error, Error};
                 Class:Error -> {error, {Class, Error}}
             end;
         {client, Timeout} ->
-            try ssl:connect(Dest, DestPort, TransportOpts1, Timeout) of
+            try ssl:connect(Dest, DestPort1, TransportOpts1, Timeout) of
                 {ok, Sock} -> #transport{type = tls,
                                          role = client,
                                          socket = Sock,
                                          dest = Dest,
-                                         dest_port = DestPort};
+                                         dest_port = DestPort1};
                 Error -> Error
             catch
                 error:Error -> {error, Error};
                 Class:Error -> {error, {Class, Error}}
             end;
         {server, _} ->
-            try ssl:listen(Port, TransportOpts1) of
+            try ssl:listen(Port1, TransportOpts1) of
                 {ok, Sock} -> #transport{type = tls,
                                          role = server,
                                          listen_socket = Sock};
@@ -233,8 +233,7 @@ open(Args = #{type := tls}, Opts) ->
                 Class:Error -> {error, {Class, Error}}
             end
     end;
-open(Args, Opts) ->
-    open(Args#{type => udp}, Opts).
+open(Opts) -> open(parse_opts(Opts)).
 
 
 %%--------------------------------------------------------------------
@@ -908,7 +907,19 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt(udp, Opts) -> Opts#opts{type = udp};
+parse_opt(tcp, Opts) -> Opts#opts{type = tcp};
+parse_opt(tls, Opts) -> Opts#opts{type = tls};
+parse_opt({port, Port}, Opts) -> Opts#opts{port = Port};
+parse_opt({opts, TransportOpts}, Opts) -> Opts#opts{opts = TransportOpts};
+parse_opt(ipv4, Opts) -> Opts#opts{ipv = ipv4};
+parse_opt(ipv6, Opts) -> Opts#opts{ipv = ipv6};
 parse_opt({destination, Destination}, Opts) -> Opts#opts{dest = Destination};
 parse_opt({destination_port, Port}, Opts) -> Opts#opts{dest_port = Port};
 parse_opt({timeout, Timeout}, Opts) -> Opts#opts{timeout = Timeout};
 parse_opt(_, Opts) -> erlang:error(badarg, Opts).
+
+port(udp, undefined) -> 154;
+port(tcp, undefined) -> 601;
+port(tls, undefined) -> 6514;
+port(_, Port) -> Port.
