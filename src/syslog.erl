@@ -78,12 +78,7 @@
 -type socket_options() :: gen_udp:option() | gen_tcp:option() | ssl:option().
 
 %% Defines
--define(GREGORIAN_POSIX_DIFF, 62167219200).
-
 -define(UTF8_BOM, 239,187,191).
-
-%% TODO: enforce max size
--define(UDP_MAX_SIZE, 65507).
 
 -define(DEFAULTS_UDP, #{role => client, port => 154, opts => [], ipv => 4}).
 -define(DEFAULTS_TCP, #{role => client, port => 601, opts => [], ipv => 4}).
@@ -645,7 +640,7 @@ encode_header(Entry) ->
     Severity = encode_severity(maps:get(severity, Header, info)),
     Facility = encode_facility(maps:get(facility, Header, user)),
     Version = integer_to_binary(maps:get(version, Header, 1)),
-    Timestamp = encode_time_stamp(maps:get(time_stamp, Header, '-')),
+    Timestamp = encode_time_stamp(maps:get(time_stamp, Header, '-'), Header),
     HostName = maps:get(host_name, Header, "-"),
     AppName = maps:get(app_name, Header, "-"),
     ProcId = maps:get(proc_id, Header, "-"),
@@ -687,8 +682,27 @@ encode_facility(local5) -> 168;
 encode_facility(local6) -> 176;
 encode_facility(local7) -> 184.
 
-%% TODO: Add endcoding
-encode_time_stamp('-') -> "-".
+encode_time_stamp('-', _) -> "-";
+encode_time_stamp({{Y, M , D}, {H, Mi, S}}, Header) ->
+    [integer_to_binary(Y), $-,
+     integer_to_binary(M), $-,
+     integer_to_binary(D), $T,
+     integer_to_binary(H), $:,
+     integer_to_binary(Mi), $:,
+     integer_to_binary(S), $:,
+     case maps:get(fraction, Header, undefined) of
+         undefined -> [];
+         Fraction -> [$., integer_to_binary(Fraction)]
+     end,
+     case maps:get(offset_sign, Header, undefined) of
+         'Z' -> [$Z];
+         '+' ->
+             {HO, MiO} = maps:get(offset, Header),
+             [$+, integer_to_binary(HO), $:, integer_to_binary(MiO)];
+         '-' ->
+             {HO, MiO} = maps:get(offset, Header),
+             [$-, integer_to_binary(HO), $:, integer_to_binary(MiO)]
+     end].
 
 encode_structured_data(#{structured := Structured}) ->
     [encode_structured_data(Id, Params) || {Id, Params}  <- Structured];
