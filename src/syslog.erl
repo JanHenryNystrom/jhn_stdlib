@@ -75,7 +75,7 @@
 
 -define(UDP_MAX_SIZE, 65507).
 
--define(DEFAULTS_UDP, #{}).
+-define(DEFAULTS_UDP, #{port => 154, opts => [], ipv => 4}).
 
 %% ===================================================================
 %% API functions.
