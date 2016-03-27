@@ -18,8 +18,10 @@
 %%% @doc
 %%%  A Syslog library based on:
 %%%    The Syslog Protocol                                             (rfc5424)
+%%%    Transport Layer Security (TLS) Transport Mapping for Syslog     (rfc5425)
 %%%    Transmission of Syslog Messages over UDP                        (rfc5426)
 %%%    Textual Conventions for Syslog Management                       (rfc5427)
+%%%    Transmission of Syslog Messages over TCP                        (rfc6587)
 %%%
 %%% @end
 %%%
@@ -64,6 +66,8 @@
 
 %% Defines
 -define(GREGORIAN_POSIX_DIFF, 62167219200).
+
+-define(UTF8_BOM, 239,187,191).
 
 %% ===================================================================
 %% Library functions.
@@ -175,7 +179,22 @@ encode_facility(local7) -> 184.
 
 do_decode(<<$<, T/binary>>, _) ->
     {Header, T1} = decode_header(T, <<>>),
-    {Id, Params, T2} = decode_structured_data(T1).
+    case decode_structured_data(T1) of
+        {nil, T2} ->
+            case decode_msg(T2) of
+                {any, <<>>} -> #{header => Header};
+                {Type, Msg} ->
+                    #{header => Header, msg => #{type => Type, msg => Msg}}
+            end;
+        {Structured, T2} ->
+            case decode_msg(T2) of
+                {any, <<>>} -> #{header => Header, structured => Structured};
+                {Type, Msg} ->
+                    #{header => Header,
+                      structured => Structured,
+                      msg => #{type => Type, msg => Msg}}
+            end
+    end.
 
 decode_header(<<$>, T/binary>>, Acc) ->
     Priority = binary_to_integer(Acc),
@@ -241,15 +260,43 @@ decode_msg_id(Bin, Header) ->
     {Header#{msg_id => ProcId}, T}.
 
 decode_structured_data(<<$-, T/binary>>) -> {nil, T};
-decode_structured_data(<<$[, T/binary>>) -> decode_sd_id(T, <<>>).
+decode_structured_data(<<$[, T/binary>>) ->
+    {Id, Params, T1} = decode_sd_id(T, <<>>),
+    decode_structured_data_next(T1, [{Id, Params}]).
+
+decode_structured_data_next(<<$[, T/binary>>, Acc) ->
+    {Id, Params, T1} = decode_sd_id(T, <<>>),
+    decode_structured_data_next(T1, [{Id, Params} | Acc]);
+decode_structured_data_next(T, Acc) ->
+    {Acc, T}.
 
 decode_sd_id(<<$], T/binary>>, Acc) -> {Acc, [], T};
 decode_sd_id(<<$\s, T/binary>>, Acc) ->
     {Params, T1} = decode_sd_params(T, []),
     {Acc, Params, T1}.
 
-decode_sd_params(_, _) -> [].
+decode_sd_params(<<$], T/binary>>, Acc) -> {lists:reverse(Acc), T};
+decode_sd_params(Bin, Acc) ->
+    {Param, T} = decode_sd_param(Bin, <<>>),
+    decode_sd_params(T, [Param | Acc]).
 
+decode_sd_param(<<$=, $", T/binary>>, Acc) ->
+    {Value, T1} = decode_sd_value(T, <<>>),
+    {{Acc, Value}, T1};
+decode_sd_param(<<H, T/binary>>, Acc) ->
+    decode_sd_param(T, <<Acc/binary, H>>).
+
+decode_sd_value(<<$=, T/binary>>, Acc) -> {Acc, T};
+decode_sd_value(<<H/utf8, T/binary>>, Acc) ->
+    decode_sd_value(T, <<Acc/binary, H/utf8>>).
+
+decode_msg(<<?UTF8_BOM, T>>) ->
+    {utf8, decode_msg_utf8(T, T)};
+decode_msg(Bin) ->
+    {any, Bin}.
+
+decode_msg_utf8(<<>>, Msg) -> Msg;
+decode_msg_utf8(<<_/utf8, T>>, Msg) -> decode_msg_utf8(T, Msg).
 
 decode_string(<<$\s, T/binary>>, Acc) -> {Acc, T};
 decode_string(<<H, T/binary>>, Acc) -> decode_string(T, <<Acc/binary, H>>).
@@ -297,5 +344,4 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
-parse_opt(list, Opts) -> Opts#opts{return_type = list};
 parse_opt(_, Opts) -> erlang:error(badarg, Opts).
