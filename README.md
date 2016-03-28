@@ -51,6 +51,8 @@ Features/Modules
     * Prefix trees -- p_tree
     * Range trees -- r_tree
     * T-trees -- t_tree
+  * Algorithms
+    * Levenshtein distance -- levenshtein
 
 <a name='build'>
 
