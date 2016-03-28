@@ -694,29 +694,36 @@ encode_facility(local7) -> 184.
 encode_time_stamp('-', _) -> "-";
 encode_time_stamp({{Y, M , D}, {H, Mi, S}}, Header) ->
     [integer_to_binary(Y), $-,
-     integer_to_binary(M), $-,
-     integer_to_binary(D), $T,
-     integer_to_binary(H), $:,
-     integer_to_binary(Mi), $:,
-     integer_to_binary(S), $:,
+     integer_to_binary_pad(M), $-,
+     integer_to_binary_pad(D), $T,
+     integer_to_binary_pad(H), $:,
+     integer_to_binary_pad(Mi), $:,
+     integer_to_binary_pad(S),
      case maps:get(fraction, Header, undefined) of
          undefined -> [];
          Fraction -> [$., integer_to_binary(Fraction)]
      end,
      case maps:get(offset_sign, Header, undefined) of
+         undefined -> [$Z];
          'Z' -> [$Z];
          '+' ->
              {HO, MiO} = maps:get(offset, Header),
-             [$+, integer_to_binary(HO), $:, integer_to_binary(MiO)];
+             [$+, integer_to_binary_pad(HO), $:, integer_to_binary_pad(MiO)];
          '-' ->
              {HO, MiO} = maps:get(offset, Header),
-             [$-, integer_to_binary(HO), $:, integer_to_binary(MiO)]
+             [$-, integer_to_binary_pad(HO), $:, integer_to_binary_pad(MiO)]
      end].
+
+integer_to_binary_pad(N) ->
+    case integer_to_binary(N) of
+        <<D>> -> <<$0, D>>;
+        D -> D
+    end.
 
 encode_structured_data(#{structured := Structured}) ->
     [encode_structured_data(Id, Params) || {Id, Params}  <- Structured];
 encode_structured_data(_) ->
-    [].
+    [$-].
 
 encode_structured_data(Id, Params) ->
     [$[, Id, [encode_structured_param(Param) || Param <- Params], $]].
@@ -753,8 +760,9 @@ do_decode(<<$<, T/binary>>, _) ->
 
 decode_header(<<$>, T/binary>>, Acc) ->
     Priority = binary_to_integer(Acc),
-    Facility = decode_facility(Priority div 8),
-    Severity = decode_severity(Priority - (Facility * 8)),
+    FacilityNum = Priority div 8 * 8,
+    Facility = decode_facility(FacilityNum),
+    Severity = decode_severity(Priority - FacilityNum),
     decode_version(T, #{facility => Facility, severity => Severity}, <<>>);
 decode_header(<<H, T/binary>>, Acc) ->
     decode_header(T, <<Acc/binary, H>>).
@@ -764,13 +772,12 @@ decode_version(<<$\s, T/binary>>, Header, Acc) ->
 decode_version(<<H, T/binary>>, Header, Acc) ->
     decode_version(T, Header, <<Acc/binary ,H>>).
 
-decode_timestamp(<<$-, $\s, T/binary>>, Header) ->
-    decode_hostname(T, Header#{time_stamp => nil});
-decode_timestamp(<<Y:32, $-, M:2/bytes, $-, D:2/bytes, $T,
+decode_timestamp(<<$-, $\s, T/binary>>, Header) -> decode_hostname(T, Header);
+decode_timestamp(<<Y:4/bytes, $-, M:2/bytes, $-, D:2/bytes, $T,
                    H:2/bytes, $:, Mi:2/bytes, $:, S:2/bytes,
                    T/binary>>,
                  Header) ->
-    Header1 = Header#{time_stamp => {{Y,
+    Header1 = Header#{time_stamp => {{binary_to_integer(Y),
                                       binary_to_integer(M),
                                       binary_to_integer(D)},
                                      {binary_to_integer(H),
@@ -782,34 +789,39 @@ decode_timestamp1(<<$Z, $\s, T/binary>>, Header) -> decode_hostname(T, Header);
 decode_timestamp1(<<$., T/binary>>, Header) -> decode_fraction(T, Header, <<>>);
 decode_timestamp1(<<$+, T/binary>>, Header) ->
     decode_offset(T, Header#{offset_sign => '+'});
-decode_timestamp1(<<$-, T/binary>>, Header ) ->
+decode_timestamp1(<<$-, T/binary>>, Header) ->
     decode_offset(T, Header#{offset_sign => '-'}).
 
 decode_fraction(<<$Z, $\s, T/binary>>, Header, Acc) ->
-    decode_hostname(T, Header#{fraction => Acc}).
+    decode_hostname(T, Header#{fraction => Acc});
+decode_fraction(<<H, T/binary>>, Header, Acc) ->
+    decode_fraction(T, Header, <<Acc/binary, H>>);
+decode_fraction(<<$+, T/binary>>, Header, Acc) ->
+    decode_offset(T, Header#{fraction=> Acc, offset_sign => '+'});
+decode_fraction(<<$-, T/binary>>, Header, Acc) ->
+    decode_offset(T, Header#{fraction=> Acc, offset_sign => '-'}).
 
 decode_offset(<<H:2/bytes, $:, M:2/bytes, $\s, T/binary>>, Header) ->
-    decode_hostname(T, Header#{offset => {H, M}}).
+    decode_hostname(T,
+                    Header#{offset =>
+                                {binary_to_integer(H), binary_to_integer(M)}}).
 
-decode_hostname(<<$-, $\s, T/binary>>, Header) ->
-    decode_appname(T, Header#{host_name => nil});
+decode_hostname(<<$-, $\s, T/binary>>, Header) -> decode_appname(T, Header);
 decode_hostname(Bin, Header) ->
     {HostName, T} = decode_string(Bin, <<>>),
     decode_appname(T, Header#{host_name => HostName}).
 
-decode_appname(<<$-, $\s, T/binary>>, Header) ->
-    decode_proc_id(T, Header#{app_name => nil});
+decode_appname(<<$-, $\s, T/binary>>, Header) -> decode_proc_id(T, Header);
 decode_appname(Bin, Header) ->
     {AppName, T} = decode_string(Bin, <<>>),
     decode_proc_id(T, Header#{app_name => AppName}).
 
-decode_proc_id(<<$-, $\s, T/binary>>, Header) ->
-    decode_msg_id(T, Header#{proc_id => nil});
+decode_proc_id(<<$-, $\s, T/binary>>, Header) -> decode_msg_id(T, Header);
 decode_proc_id(Bin, Header) ->
     {ProcId, T} = decode_string(Bin, <<>>),
     decode_msg_id(T, Header#{proc_id => ProcId}).
 
-decode_msg_id(<<$-, $\s, T/binary>>, Header) -> {Header#{msg_id => nil}, T};
+decode_msg_id(<<$-, $\s, T/binary>>, Header) -> {Header, T};
 decode_msg_id(Bin, Header) ->
     {ProcId, T} = decode_string(Bin, <<>>),
     {Header#{msg_id => ProcId}, T}.
