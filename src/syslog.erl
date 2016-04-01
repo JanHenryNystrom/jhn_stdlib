@@ -63,7 +63,9 @@
                timeout              :: integer(),
                return_type = iolist :: iolist | binary}).
 
--record(transport, {type                 :: udp | tcp | tls,
+-record(transport, {type                 :: udp |
+                                            tcp_listen | tls_listen |
+                                            tcp | tls,
                     role                 :: client | server,
                     port                 :: inet:port(),
                     ipv                  :: ipv4 | ipv6,
@@ -114,17 +116,18 @@ open(Opts = #opts{type = udp}) ->
           ipv = IPv,
           dest = Dest,
           dest_port = DestPort} = Opts,
-    Port1 = port(udp, Port),
-    DestPort1 = port(udp, DestPort),
+    Port1 = port(udp, Port, Role),
+    DestPort1 = port(udp, DestPort, inverse(Role)),
     TransportOpts1 = case IPv of
                          ipv4 -> [inet, binary | TransportOpts];
                          ipv6 -> [inet6, binary | TransportOpts]
                      end,
     try gen_udp:open(Port1, TransportOpts1) of
-        {ok, Sock} -> #transport{port = Port1,
+        {ok, Sock} -> #transport{type = udp,
+                                 port = Port1,
                                  role = Role,
                                  socket = Sock,
-                                 dest = Dest,
+                                 dest = dest(Dest, IPv),
                                  dest_port = DestPort1};
         Error -> Error
     catch
@@ -139,19 +142,20 @@ open(Opts = #opts{type = tcp}) ->
           dest = Dest,
           dest_port = DestPort,
           timeout = Timeout} = Opts,
-    Port1 = port(udp, Port),
-    DestPort1 = port(udp, DestPort),
+    Port1 = port(tcp, Port, Role),
+    Dest1 = dest(Dest, IPv),
+    DestPort1 = port(tcp, DestPort, inverse(Role)),
     TransportOpts1 = case IPv of
                          ipv4 -> [inet, binary | TransportOpts];
                          ipv6 -> [inet6, binary | TransportOpts]
                      end,
     case {Role, Timeout} of
         {client, undefined} ->
-            try gen_tcp:connect(Dest, DestPort1, TransportOpts1) of
+            try gen_tcp:connect(Dest1, DestPort1, TransportOpts1) of
                 {ok, Sock} -> #transport{type = tcp,
                                          role = client,
                                          socket = Sock,
-                                         dest = Dest,
+                                         dest = Dest1,
                                          dest_port = DestPort1};
                 Error -> Error
             catch
@@ -159,11 +163,11 @@ open(Opts = #opts{type = tcp}) ->
                 Class:Error -> {error, {Class, Error}}
             end;
         {client, Timeout} ->
-            try gen_tcp:connect(Dest, DestPort1, TransportOpts1, Timeout) of
+            try gen_tcp:connect(Dest1, DestPort1, TransportOpts1, Timeout) of
                 {ok, Sock} -> #transport{type = tcp,
                                          role = client,
                                          socket = Sock,
-                                         dest = Dest,
+                                         dest = Dest1,
                                          dest_port = DestPort1};
                 Error -> Error
             catch
@@ -172,7 +176,7 @@ open(Opts = #opts{type = tcp}) ->
             end;
         {server, _} ->
             try gen_tcp:listen(Port1, TransportOpts1) of
-                {ok, Sock} -> #transport{type = tcp,
+                {ok, Sock} -> #transport{type = tcp_listen,
                                          role = server,
                                          listen_socket = Sock};
                 Error -> Error
@@ -189,8 +193,9 @@ open(Opts = #opts{type = tls}) ->
           dest = Dest,
           dest_port = DestPort,
           timeout = Timeout} = Opts,
-    Port1 = port(udp, Port),
-    DestPort1 = port(udp, DestPort),
+    Port1 = port(tls, Port, Role),
+    Dest1 = dest(Dest, IPv),
+    DestPort1 = port(tls, DestPort, inverse(Role)),
     TransportOpts1 = case IPv of
                          ipv4 -> [inet, binary, {versions, ['tlsv1.2']} |
                                   TransportOpts];
@@ -199,11 +204,11 @@ open(Opts = #opts{type = tls}) ->
                      end,
     case {Role, Timeout} of
         {client, undefined} ->
-            try ssl:connect(Dest, DestPort1, TransportOpts1) of
+            try ssl:connect(Dest1, DestPort1, TransportOpts1) of
                 {ok, Sock} -> #transport{type = tls,
                                          role = client,
                                          socket = Sock,
-                                         dest = Dest,
+                                         dest = Dest1,
                                          dest_port = DestPort1};
                 Error -> Error
             catch
@@ -211,11 +216,11 @@ open(Opts = #opts{type = tls}) ->
                 Class:Error -> {error, {Class, Error}}
             end;
         {client, Timeout} ->
-            try ssl:connect(Dest, DestPort1, TransportOpts1, Timeout) of
+            try ssl:connect(Dest1, DestPort1, TransportOpts1, Timeout) of
                 {ok, Sock} -> #transport{type = tls,
                                          role = client,
                                          socket = Sock,
-                                         dest = Dest,
+                                         dest = Dest1,
                                          dest_port = DestPort1};
                 Error -> Error
             catch
@@ -224,7 +229,7 @@ open(Opts = #opts{type = tls}) ->
             end;
         {server, _} ->
             try ssl:listen(Port1, TransportOpts1) of
-                {ok, Sock} -> #transport{type = tls,
+                {ok, Sock} -> #transport{type = tls_listen,
                                          role = server,
                                          listen_socket = Sock};
                 Error -> Error
@@ -249,8 +254,18 @@ close(#transport{type = udp, socket = Sock}) ->
     catch error:Error -> {error, Error};
           Class:Error -> {error, {Class, Error}}
     end;
+close(#transport{type = tcp_listen, listen_socket = Sock}) ->
+    try gen_tcp:close(Sock)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
 close(#transport{type = tcp, socket = Sock}) ->
     try gen_tcp:close(Sock)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+close(#transport{type = tls_listen, listen_socket = Sock}) ->
+    try ssl:close(Sock)
     catch error:Error -> {error, Error};
           Class:Error -> {error, {Class, Error}}
     end;
@@ -468,33 +483,45 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
 %%--------------------------------------------------------------------
 -spec accept(transport(), [opt()]) -> ok | {error, _}.
 %%--------------------------------------------------------------------
-accept(Transport = #transport{type = tcp, listen_socket = LSock}, Opts) ->
+accept(Transport = #transport{type = tcp_listen, listen_socket = LSock},Opts) ->
     case parse_opts(Opts) of
         #opts{timeout = undefined} ->
             try gen_tcp:accept(LSock) of
-                {ok, Sock}  -> Transport#transport{socket = Sock};
-                Error -> Error
+                {ok, Sock}  ->
+                    Transport#transport{type = tcp,
+                                        socket = Sock,
+                                        listen_socket = undefined};
+                Error ->
+                    Error
             catch
                 error:Error -> {error, Error};
                 Class:Error -> {error, {Class, Error}}
             end;
         #opts{timeout = Timeout} ->
             try gen_tcp:accept(LSock, Timeout) of
-                {ok, Sock}  -> Transport#transport{socket = Sock};
-                Error -> Error
+                {ok, Sock}  ->
+                    Transport#transport{type = tcp,
+                                        socket = Sock,
+                                       listen_socket = undefined};
+                Error ->
+                    Error
             catch
                 error:Error -> {error, Error};
                 Class:Error -> {error, {Class, Error}}
             end
     end;
-accept(Transport = #transport{type = tls, listen_socket = LSock}, Opts) ->
+accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
     case parse_opts(Opts) of
         #opts{timeout = undefined} ->
             try ssl:transport_accept(LSock) of
                 {ok, Sock}  ->
                     case ssl:ssl_accept(Sock) of
-                        ok -> Transport#transport{socket = Sock};
-                        Error -> Error
+                        ok ->
+                            Transport#transport{type = tls,
+                                                socket = Sock,
+                                               listen_socket = undefined};
+                        Error ->
+                            Error
                     end;
                 Error ->
                     Error
@@ -506,8 +533,12 @@ accept(Transport = #transport{type = tls, listen_socket = LSock}, Opts) ->
             try ssl:transport_accept(LSock, Timeout) of
                 {ok, Sock}  ->
                     case ssl:ssl_accept(Sock) of
-                        ok -> Transport#transport{socket = Sock};
-                        Error -> Error
+                        ok ->
+                            Transport#transport{type = tls,
+                                                socket = Sock,
+                                                listen_socket = Sock};
+                        Error ->
+                            Error
                     end;
                 Error ->
                     Error
@@ -636,6 +667,23 @@ unframe1(<<H, T/binary>>, Acc) ->
 %% ===================================================================
 
 %% ===================================================================
+%% API
+%% ===================================================================
+
+dest(undefined, ipv4) -> {127, 0, 0,1};
+dest(undefined, ipv6) -> {0, 0, 0, 0, 0, 0, 0, 1};
+dest(Address, _) -> Address.
+
+port(udp, undefined, server) -> 154;
+port(tcp, undefined, server) -> 601;
+port(tls, undefined, server) -> 6514;
+port(_, undefined, client) -> 0;
+port(_, Port, _) when is_integer(Port) -> Port.
+
+inverse(client) -> server;
+inverse(server) -> client.
+
+%% ===================================================================
 %% Encoding
 %% ===================================================================
 
@@ -731,7 +779,7 @@ encode_structured_data(Id, Params) ->
 %% TODO: Add escaping
 encode_structured_param({Name, Value}) -> [$\s, Name, $=, $", Value, $"].
 
-encode_msg(#{msg := #{type := utf8, content:=Msg}}) -> [$\s,<<?UTF8_BOM>>,Msg];
+encode_msg(#{msg := #{type := utf8, content:=Msg}}) -> [$\s, <<?UTF8_BOM>>,Msg];
 encode_msg(#{msg := #{content := Msg}}) -> [$\s, Msg];
 encode_msg(_) -> [].
 
@@ -793,13 +841,18 @@ decode_timestamp1(<<$-, T/binary>>, Header) ->
     decode_offset(T, Header#{offset_sign => '-'}).
 
 decode_fraction(<<$Z, $\s, T/binary>>, Header, Acc) ->
-    decode_hostname(T, Header#{fraction => Acc});
-decode_fraction(<<H, T/binary>>, Header, Acc) ->
-    decode_fraction(T, Header, <<Acc/binary, H>>);
+    decode_hostname(T, Header#{fraction => binary_to_integer(Acc)});
 decode_fraction(<<$+, T/binary>>, Header, Acc) ->
-    decode_offset(T, Header#{fraction=> Acc, offset_sign => '+'});
+    decode_offset(T,
+                  Header#{fraction => binary_to_integer(Acc),
+                          offset_sign => '+'});
 decode_fraction(<<$-, T/binary>>, Header, Acc) ->
-    decode_offset(T, Header#{fraction=> Acc, offset_sign => '-'}).
+    decode_offset(T,
+                  Header#{fraction => binary_to_integer(Acc),
+                          offset_sign => '-'});
+decode_fraction(<<H, T/binary>>, Header, Acc) ->
+    decode_fraction(T, Header, <<Acc/binary, H>>).
+
 
 decode_offset(<<H:2/bytes, $:, M:2/bytes, $\s, T/binary>>, Header) ->
     decode_hostname(T,
@@ -835,17 +888,19 @@ decode_structured_data_next(<<$[, T/binary>>, Acc) ->
     {Id, Params, T1} = decode_sd_id(T, <<>>),
     decode_structured_data_next(T1, [{Id, Params} | Acc]);
 decode_structured_data_next(T, Acc) ->
-    {Acc, T}.
+    {lists:reverse(Acc), T}.
 
 decode_sd_id(<<$], T/binary>>, Acc) -> {Acc, [], T};
-decode_sd_id(<<$\s, T/binary>>, Acc) ->
-    {Params, T1} = decode_sd_params(T, []),
-    {Acc, Params, T1}.
+decode_sd_id(Bin = <<$\s, _/binary>>, Acc) ->
+    {Params, T1} = decode_sd_params(Bin, []),
+    {Acc, Params, T1};
+decode_sd_id(<<H, T/binary>>, Acc) ->
+    decode_sd_id(T, <<Acc/binary, H>>).
 
 decode_sd_params(<<$], T/binary>>, Acc) -> {lists:reverse(Acc), T};
-decode_sd_params(Bin, Acc) ->
-    {Param, T} = decode_sd_param(Bin, <<>>),
-    decode_sd_params(T, [Param | Acc]).
+decode_sd_params(<<$\s, T/binary>>, Acc) ->
+    {Param, T1} = decode_sd_param(T, <<>>),
+    decode_sd_params(T1, [Param | Acc]).
 
 decode_sd_param(<<$=, $", T/binary>>, Acc) ->
     {Value, T1} = decode_sd_value(T, <<>>),
@@ -854,17 +909,16 @@ decode_sd_param(<<H, T/binary>>, Acc) ->
     decode_sd_param(T, <<Acc/binary, H>>).
 
 %% TODO: add handling of escape
-decode_sd_value(<<$=, T/binary>>, Acc) -> {Acc, T};
+decode_sd_value(<<$", T/binary>>, Acc) -> {Acc, T};
 decode_sd_value(<<H/utf8, T/binary>>, Acc) ->
     decode_sd_value(T, <<Acc/binary, H/utf8>>).
 
-decode_msg(<<?UTF8_BOM, T>>) ->
-    {utf8, decode_msg_utf8(T, T)};
-decode_msg(Bin) ->
-    {any, Bin}.
+decode_msg(<<>>) -> {any, <<>>};
+decode_msg(<<$\s, ?UTF8_BOM, T/binary>>) -> {utf8, decode_msg_utf8(T, T)};
+decode_msg(<<$\s, T/binary>>) -> {any, T}.
 
 decode_msg_utf8(<<>>, Msg) -> Msg;
-decode_msg_utf8(<<_/utf8, T>>, Msg) -> decode_msg_utf8(T, Msg).
+decode_msg_utf8(<<_/utf8, T/binary>>, Msg) -> decode_msg_utf8(T, Msg).
 
 decode_string(<<$\s, T/binary>>, Acc) -> {Acc, T};
 decode_string(<<H, T/binary>>, Acc) -> decode_string(T, <<Acc/binary, H>>).
@@ -908,7 +962,7 @@ decode_facility(184) -> local7.
 %% ===================================================================
 
 parse_opts(Rec = #opts{}) -> Rec;
-parse_opts(Opts) -> parse_opts(Opts, []).
+parse_opts(Opts) -> parse_opts(Opts, #opts{}).
 
 parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
@@ -918,6 +972,8 @@ parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(udp, Opts) -> Opts#opts{type = udp};
 parse_opt(tcp, Opts) -> Opts#opts{type = tcp};
 parse_opt(tls, Opts) -> Opts#opts{type = tls};
+parse_opt(client, Opts) -> Opts#opts{role = client};
+parse_opt(server, Opts) -> Opts#opts{role = server};
 parse_opt({port, Port}, Opts) -> Opts#opts{port = Port};
 parse_opt({opts, TransportOpts}, Opts) -> Opts#opts{opts = TransportOpts};
 parse_opt(ipv4, Opts) -> Opts#opts{ipv = ipv4};
@@ -926,8 +982,3 @@ parse_opt({destination, Destination}, Opts) -> Opts#opts{dest = Destination};
 parse_opt({destination_port, Port}, Opts) -> Opts#opts{dest_port = Port};
 parse_opt({timeout, Timeout}, Opts) -> Opts#opts{timeout = Timeout};
 parse_opt(_, Opts) -> erlang:error(badarg, Opts).
-
-port(udp, undefined) -> 154;
-port(tcp, undefined) -> 601;
-port(tls, undefined) -> 6514;
-port(_, Port) -> Port.
