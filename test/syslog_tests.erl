@@ -117,6 +117,7 @@ send_2_test_() ->
               true = ets:insert(send_2_test, {tcpc, TCPC}),
               TLSS = {tls, server_start(tls, 6514, send_2_test_)},
               TLSC = syslog:open([tls,
+                                  {opts, [{verify, verify_none}]},
                                   {destination, {127, 0, 0, 1}},
                                   {destination_port, 6514}]),
               true = ets:insert(send_2_test, {tlsc, TLSC}),
@@ -139,12 +140,11 @@ send_2_test_() ->
                                   #{}))),
       ?_test(?assertMatch(#{},
                           syslog:decode(
-                            element(1, syslog:unframe(tcp, active(tcp))))))
-     %% ,
-     %%  ?_test(
-     %%     ?assertMatch(ok,
-     %%                  syslog:send(element(2, hd(ets:lookup(send_2_test, tlsc))),
-     %%                              #{})))
+                            element(1, syslog:unframe(tcp, active(tcp)))))),
+      ?_test(
+         ?assertMatch(ok,
+                      syslog:send(element(2, hd(ets:lookup(send_2_test, tlsc))),
+                                  #{})))
      ]}.
 
 %%--------------------------------------------------------------------
@@ -152,7 +152,6 @@ send_2_test_() ->
 %%--------------------------------------------------------------------
 close_1_test_() ->
     [?_test(?assertMatch(ok, syslog:close(syslog:open()))),
-     ?_test(?assertMatch(ok, syslog:close(syslog:open()))),
      ?_test(?assertError(function_clause, syslog:close({error, eaccess})))
     ].
 
@@ -356,6 +355,17 @@ encode_2_decode_1_test_() ->
 %% Internal functions.
 %% ===================================================================
 
+server_start(tls, Port, Parent) ->
+    Transport =
+        syslog:open([server,
+                     tls,
+                     {port, Port},
+                     {opts, [{certfile, "../test/crt.pem"},
+                             {keyfile, "../test/key.pem"}]}]),
+    Pid = spawn_link(fun() ->  server(tls, Parent) end),
+    ok = syslog:controlling_process(Transport, Pid),
+    Pid ! {transport, Transport},
+    Pid;
 server_start(Type, Port, Parent) ->
     Transport = syslog:open([server, Type, {port, Port}]),
     Pid = spawn_link(fun() ->  server(Type, Parent) end),
