@@ -130,8 +130,7 @@ open(Opts = #opts{type = udp}) ->
                                  dest_port = DestPort1};
         Error -> Error
     catch
-        error:Error -> {error, Error};
-        Class:Error -> {error, {Class, Error}}
+        error:Error -> {error, Error}
     end;
 open(Opts = #opts{type = tcp}) ->
     #opts{role = Role,
@@ -158,8 +157,7 @@ open(Opts = #opts{type = tcp}) ->
                                          dest_port = DestPort1};
                 Error -> Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end;
         {client, Timeout} ->
             try gen_tcp:connect(Dest1, DestPort1, TransportOpts1, Timeout) of
@@ -170,8 +168,7 @@ open(Opts = #opts{type = tcp}) ->
                                          dest_port = DestPort1};
                 Error -> Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end;
         {server, _} ->
             try gen_tcp:listen(Port1, TransportOpts1) of
@@ -180,8 +177,7 @@ open(Opts = #opts{type = tcp}) ->
                                          listen_socket = Sock};
                 Error -> Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end
     end;
 open(Opts = #opts{type = tls}) ->
@@ -211,8 +207,7 @@ open(Opts = #opts{type = tls}) ->
                                          dest_port = DestPort1};
                 Error -> Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end;
         {client, Timeout} ->
             try ssl:connect(Dest1, DestPort1, TransportOpts1, Timeout) of
@@ -223,8 +218,7 @@ open(Opts = #opts{type = tls}) ->
                                          dest_port = DestPort1};
                 Error -> Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end;
         {server, _} ->
             try ssl:listen(Port1, TransportOpts1) of
@@ -233,8 +227,7 @@ open(Opts = #opts{type = tls}) ->
                                          listen_socket = Sock};
                 Error -> Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end
     end;
 open(Opts) -> open(parse_opts(Opts)).
@@ -249,30 +242,15 @@ open(Opts) -> open(parse_opts(Opts)).
 -spec close(transport()) -> ok | {error, _}.
 %%--------------------------------------------------------------------
 close(#transport{type = udp, socket = Sock}) ->
-    try gen_udp:close(Sock)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
-    end;
+    try gen_udp:close(Sock) catch error:Error -> {error, Error} end;
 close(#transport{type = tcp_listen, listen_socket = Sock}) ->
-    try gen_tcp:close(Sock)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
-    end;
+    try gen_tcp:close(Sock) catch error:Error -> {error, Error} end;
 close(#transport{type = tcp, socket = Sock}) ->
-    try gen_tcp:close(Sock)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
-    end;
+    try gen_tcp:close(Sock) catch error:Error -> {error, Error} end;
 close(#transport{type = tls_listen, listen_socket = Sock}) ->
-    try ssl:close(Sock)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
-    end;
+    try ssl:close(Sock) catch error:Error -> {error, Error} end;
 close(#transport{type = tls, socket = Sock}) ->
-    try ssl:close(Sock)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
-    end.
+    try ssl:close(Sock) catch error:Error -> {error, Error} end.
 
 %%--------------------------------------------------------------------
 %% Function:
@@ -297,24 +275,20 @@ send(Transport = #transport{type = udp, socket = Sock}, Entry, Opts) ->
         ParsedOpts = #opts{dest = undefined} ->
             #transport{dest = Dest, dest_port = Port} = Transport,
             try gen_udp:send(Sock, Dest, Port, encode(Entry, ParsedOpts))
-            catch error:Error -> {error, Error};
-                  Class:Error -> {error, {Class, Error}}
+            catch error:Error -> {error, Error}
             end;
         ParsedOpts  = #opts{dest = Dest, dest_port = Port}->
             try gen_udp:send(Sock, Dest, Port, encode(Entry, ParsedOpts))
-            catch error:Error -> {error, Error};
-                  Class:Error -> {error, {Class, Error}}
+            catch error:Error -> {error, Error}
             end
     end;
 send(#transport{type = tcp, socket = Sock}, Entry, Opts) ->
     try gen_tcp:send(Sock, frame(tcp, encode(Entry, Opts)))
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end;
 send(#transport{type = tls, socket = Sock}, Entry, Opts) ->
     try ssl:send(Sock, frame(tls, encode(Entry, Opts)))
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end.
 
 %%--------------------------------------------------------------------
@@ -342,15 +316,15 @@ recv(#transport{type = udp, socket = Sock}, Opts) ->
             try gen_udp:recv(Sock, 0) of
                 {ok, {_, _, Packet}} -> {ok, decode(Packet, Opts)};
                 Error -> Error
-            catch error:Error -> {error, Error};
-                  Class:Error -> {error, {Class, Error}}
+            catch
+                error:Error -> {error, Error}
             end;
         #opts{timeout = Timeout} ->
             try gen_udp:recv(Sock, Timeout) of
                 {ok, {_, _, Packet}} -> {ok, decode(Packet, Opts)};
                 Error -> Error
-            catch error:Error -> {error, Error};
-                  Class:Error -> {error, {Class, Error}}
+            catch
+                error:Error -> {error, Error}
             end
     end;
 recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
@@ -371,8 +345,7 @@ recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
                                      decode(Frame, Opts),
                                      Transport#transport{buf = Buf1}};
                                 Error -> Error
-                            catch error:Error -> {error, Error};
-                                  Class:Error -> {error, {Class, Error}}
+                            catch error:Error -> {error, Error}
                             end;
                         {Frame, Buf1} ->
                             {ok,
@@ -381,8 +354,7 @@ recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
                     end;
                 Error ->
                     Error
-            catch error:Error -> {error, Error};
-                  Class:Error -> {error, {Class, Error}}
+            catch error:Error -> {error, Error}
             end;
         #opts{timeout = Timeout} ->
             try gen_tcp:recv(Sock, 0, Timeout) of
@@ -399,8 +371,7 @@ recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
                                      decode(Frame, Opts),
                                      Transport#transport{buf = Buf1}};
                                 Error -> Error
-                            catch error:Error -> {error, Error};
-                                  Class:Error -> {error, {Class, Error}}
+                            catch error:Error -> {error, Error}
                             end;
                         {Frame, Buf1} ->
                             {ok,
@@ -409,8 +380,7 @@ recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
                     end;
                 Error ->
                     Error
-            catch error:Error -> {error, Error};
-                  Class:Error -> {error, {Class, Error}}
+            catch error:Error -> {error, Error}
             end
     end;
 recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
@@ -431,8 +401,7 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
                                      decode(Frame, Opts),
                                      Transport#transport{buf = Buf1}};
                                 Error -> Error
-                            catch error:Error -> {error, Error};
-                                  Class:Error -> {error, {Class, Error}}
+                            catch error:Error -> {error, Error}
                             end;
                         {Frame, Buf1} ->
                             {ok,
@@ -441,8 +410,7 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
                     end;
                 Error ->
                     Error
-            catch error:Error -> {error, Error};
-                  Class:Error -> {error, {Class, Error}}
+            catch error:Error -> {error, Error}
             end;
         #opts{timeout = Timeout} ->
             try ssl:recv(Sock, 0, Timeout) of
@@ -459,8 +427,7 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
                                      decode(Frame, Opts),
                                      Transport#transport{buf = Buf1}};
                                 Error -> Error
-                            catch error:Error -> {error, Error};
-                                  Class:Error -> {error, {Class, Error}}
+                            catch error:Error -> {error, Error}
                             end;
                         {Frame, Buf1} ->
                             {ok,
@@ -469,8 +436,7 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
                     end;
                 Error ->
                     Error
-            catch error:Error -> {error, Error};
-                  Class:Error -> {error, {Class, Error}}
+            catch error:Error -> {error, Error}
             end
     end.
 
@@ -503,8 +469,7 @@ accept(Transport = #transport{type = tcp_listen, listen_socket = LSock},Opts) ->
                 Error ->
                     Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end;
         #opts{timeout = Timeout} ->
             try gen_tcp:accept(LSock, Timeout) of
@@ -515,8 +480,7 @@ accept(Transport = #transport{type = tcp_listen, listen_socket = LSock},Opts) ->
                 Error ->
                     Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end
     end;
 accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
@@ -535,8 +499,7 @@ accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
                 Error ->
                     Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end;
         #opts{timeout = Timeout} ->
             try ssl:transport_accept(LSock, Timeout) of
@@ -552,8 +515,7 @@ accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
                 Error ->
                     Error
             catch
-                error:Error -> {error, Error};
-                Class:Error -> {error, {Class, Error}}
+                error:Error -> {error, Error}
             end
     end.
 
@@ -567,18 +529,15 @@ accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
 %%--------------------------------------------------------------------
 setopts(#transport{type = udp, socket = Sock}, Options) ->
     try inet:setopts(Sock, Options)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end;
 setopts(#transport{type = tcp, socket = Sock}, Options) ->
     try inet:setopts(Sock, Options)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end;
 setopts(#transport{type = tls, socket = Sock}, Options) ->
     try ssl:setopts(Sock, Options)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end.
 
 %%--------------------------------------------------------------------
@@ -591,28 +550,23 @@ setopts(#transport{type = tls, socket = Sock}, Options) ->
 %%--------------------------------------------------------------------
 controlling_process(#transport{type = udp, socket = Sock}, Pid) ->
     try gen_udp:controlling_process(Sock, Pid)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end;
 controlling_process(#transport{type = tcp, socket = Sock}, Pid) ->
     try gen_tcp:controlling_process(Sock, Pid)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end;
 controlling_process(#transport{type = tcp_listen, listen_socket = Sock}, Pid) ->
     try gen_tcp:controlling_process(Sock, Pid)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end;
 controlling_process(#transport{type = tls, socket = Sock}, Pid) ->
     try ssl:controlling_process(Sock, Pid)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end;
 controlling_process(#transport{type = tls_listen, listen_socket = Sock}, Pid) ->
     try ssl:controlling_process(Sock, Pid)
-    catch error:Error -> {error, Error};
-          Class:Error -> {error, {Class, Error}}
+    catch error:Error -> {error, Error}
     end.
 
 %% ===================================================================

@@ -61,14 +61,62 @@ open_0_test_() ->
 %% open/1
 %%--------------------------------------------------------------------
 open_1_client_test_() ->
+    {setup,
+     fun() ->
+             {ok, Apps} = application:ensure_all_started(ssl),
+             TCPS = {tcp, server_start(tcp, 1601, dummy)},
+             TLSS = {tls, server_start(tls, 6514, dummy)},
+             {Apps, [TCPS , TLSS]}
+     end,
+     fun({Apps, Servers}) ->
+             [server_stop(Type, Server) || {Type, Server} <- Servers],
+             [application:stop(App) || App <- Apps]
+     end,
     [?_test(?assertMatch(ok, syslog:close(syslog:open([])))),
      ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv4])))),
      ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, client])))),
      ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv6])))),
-     ?_test(?assertEqual({error, econnrefused}, syslog:open([tcp]))),
-     ?_test(?assertEqual({error, econnrefused}, syslog:open([tls])))
-    ].
+     ?_test(?assertEqual(ok,
+                         syslog:close(
+                           syslog:open([tcp,
+                                        {destination, {127, 0, 0, 1}},
+                                        {destination_port, 1601}])))),
+     ?_test(?assertEqual(ok,
+                         syslog:close(
+                           syslog:open([tls,
+                                        {destination, {127, 0, 0, 1}},
+                                        {destination_port, 6514}]))))
+    ]}.
 
+open_1_client_timeout_test_() ->
+    {setup,
+     fun() ->
+             {ok, Apps} = application:ensure_all_started(ssl),
+             TCPS = {tcp, server_start(tcp, 1601, dummy)},
+             TLSS = {tls, server_start(tls, 6514, dummy)},
+             {Apps, [TCPS , TLSS]}
+     end,
+     fun({Apps, Servers}) ->
+             [server_stop(Type, Server) || {Type, Server} <- Servers],
+             [application:stop(App) || App <- Apps]
+     end,
+    [?_test(?assertMatch(ok, syslog:close(syslog:open([])))),
+     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv4])))),
+     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, client])))),
+     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv6])))),
+     ?_test(?assertEqual(ok,
+                         syslog:close(
+                           syslog:open([tcp,
+                                        {timeout, 500},
+                                        {destination, {127, 0, 0, 1}},
+                                        {destination_port, 1601}])))),
+     ?_test(?assertEqual(ok,
+                         syslog:close(
+                           syslog:open([tls,
+                                        {timeout, 500},
+                                        {destination, {127, 0, 0, 1}},
+                                        {destination_port, 6514}]))))
+    ]}.
 
 open_1_server_test_() ->
     {setup,
@@ -90,13 +138,12 @@ open_1_server_test_() ->
          ?assertMatch(ok,
                       syslog:close(
                         syslog:open([tcp, server, ipv6, {port, 1601}])))),
+      ?_test(?assertMatch(ok, syslog:close(syslog:open([tls, ipv6, server])))),
       ?_test(
          ?assertMatch(ok,
-                      syslog:close(
-                        syslog:open([tls, server, ipv6, {port, 6514}])))),
-      ?_test(
-         ?assertMatch(ok,
-                      syslog:close(syslog:open([tls, server, {port, 6514}]))))
+                      syslog:close(syslog:open([tls, server, {port, 6514}])))),
+      ?_test(?assertEqual({error,eacces}, syslog:open([server, udp]))),
+      ?_test(?assertEqual({error,eacces}, syslog:open([server, tcp])))
      ]}.
 
 %%--------------------------------------------------------------------
@@ -137,6 +184,13 @@ send_2_test_() ->
       ?_test(?assertMatch(#{}, syslog:decode(active(udp)))),
       ?_test(
          ?assertMatch(ok,
+                      syslog:send(element(2, hd(ets:lookup(send_2_test, udpc))),
+                                  #{},
+                                  [{destination, {127, 0, 0, 1}},
+                                   {destination_port, 1154}]))),
+      ?_test(?assertMatch(#{}, syslog:decode(active(udp)))),
+      ?_test(
+         ?assertMatch(ok,
                       syslog:send(element(2, hd(ets:lookup(send_2_test, tcpc))),
                                   #{}))),
       ?_test(?assertMatch(#{},
@@ -153,7 +207,16 @@ send_2_test_() ->
 %%--------------------------------------------------------------------
 close_1_test_() ->
     [?_test(?assertMatch(ok, syslog:close(syslog:open()))),
-     ?_test(?assertError(function_clause, syslog:close({error, eaccess})))
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:close(#transport{type = udp}))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:close(#transport{type = tcp}))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:close(#transport{type = tcp_listen}))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:close(#transport{type = tls}))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:close(#transport{type = tls_listen})))
     ].
 
 
@@ -400,9 +463,4 @@ server_loop(Parent, TransportL, Transport) ->
 
 server_stop(_, Pid) -> Pid ! stop.
 
-active(_) ->
-        receive
-            {active, Packet} -> Packet
-        after
-            500 -> timeout
-        end.
+active(_) -> receive {active, Packet} -> Packet after 500 -> timeout end.
