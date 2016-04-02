@@ -85,7 +85,9 @@ open_1_client_test_() ->
                          syslog:close(
                            syslog:open([tls,
                                         {destination, {127, 0, 0, 1}},
-                                        {destination_port, 6514}]))))
+                                        {destination_port, 6514}])))),
+     ?_test(?assertEqual({error, {exit, badarg}},
+                         syslog:open([{opts, [{ip, none}]}])))
     ]}.
 
 open_1_client_timeout_test_() ->
@@ -199,7 +201,21 @@ send_2_test_() ->
       ?_test(
          ?assertMatch(ok,
                       syslog:send(element(2, hd(ets:lookup(send_2_test, tlsc))),
-                                  #{})))
+                                  #{}))),
+      ?_test(
+         ?assertEqual({error, function_clause},
+                      syslog:send(#transport{type = udp}, #{}))),
+      ?_test(
+         ?assertEqual({error, function_clause},
+                      syslog:send(#transport{type = udp},
+                                  #{},
+                                  [{destination, {127, 0, 0, 1}}]))),
+      ?_test(
+         ?assertEqual({error, function_clause},
+                      syslog:send(#transport{type = tcp}, #{}))),
+      ?_test(
+         ?assertEqual({error, function_clause},
+                      syslog:send(#transport{type = tls}, #{})))
      ]}.
 
 %%--------------------------------------------------------------------
@@ -217,6 +233,41 @@ close_1_test_() ->
                          syslog:close(#transport{type = tls}))),
      ?_test(?assertEqual({error, function_clause},
                          syslog:close(#transport{type = tls_listen})))
+    ].
+
+%%--------------------------------------------------------------------
+%% setopts/2
+%%--------------------------------------------------------------------
+setopts_2_test_() ->
+    [?_test(?assertEqual({error, function_clause},
+                         syslog:setopts(#transport{type = udp}, self()))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:setopts(#transport{type = tcp}, self()))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:setopts(#transport{type = tls}, self())))
+    ].
+
+%%--------------------------------------------------------------------
+%% controlling_process/2
+%%--------------------------------------------------------------------
+controlling_process_2_test_() ->
+    [?_test(?assertEqual({error, function_clause},
+                         syslog:controlling_process(#transport{type = udp},
+                                                    self()))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:controlling_process(#transport{type = tcp},
+                                                    self()))),
+     ?_test(
+        ?assertEqual({error, function_clause},
+                     syslog:controlling_process(#transport{type = tcp_listen},
+                                                    self()))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:controlling_process(#transport{type = tls},
+                                                    self()))),
+     ?_test(
+        ?assertEqual({error, function_clause},
+                     syslog:controlling_process(#transport{type = tls_listen},
+                                                self())))
     ].
 
 

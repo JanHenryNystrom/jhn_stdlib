@@ -130,7 +130,7 @@ open(Opts = #opts{type = udp}) ->
                                  dest_port = DestPort1};
         Error -> Error
     catch
-        error:Error -> {error, Error}
+        Class:Error -> {error, {Class, Error}}
     end;
 open(Opts = #opts{type = tcp}) ->
     #opts{role = Role,
