@@ -34,11 +34,10 @@
 
 %% API
 -export([open/0, open/1,
+         accept/1, accept/2, setopts/2, controlling_process/2,
          close/1,
          send/2, send/3,
-         recv/1, recv/2,
-         accept/2,
-         setopts/2
+         recv/1, recv/2
         ]).
 
 %% Library functions
@@ -481,6 +480,16 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec accept(transport()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+accept(Transport) -> accept(Transport, []).
+
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec accept(transport(), [opt()]) -> ok | {error, _}.
 %%--------------------------------------------------------------------
 accept(Transport = #transport{type = tcp_listen, listen_socket = LSock},Opts) ->
@@ -572,6 +581,40 @@ setopts(#transport{type = tls, socket = Sock}, Options) ->
           Class:Error -> {error, {Class, Error}}
     end.
 
+%%--------------------------------------------------------------------
+%% Function:
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec controlling_process(transport(), pid()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+controlling_process(#transport{type = udp, socket = Sock}, Pid) ->
+    try gen_udp:controlling_process(Sock, Pid)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+controlling_process(#transport{type = tcp, socket = Sock}, Pid) ->
+    try gen_tcp:controlling_process(Sock, Pid)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+controlling_process(#transport{type = tcp_listen, listen_socket = Sock}, Pid) ->
+    try gen_tcp:controlling_process(Sock, Pid)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+controlling_process(#transport{type = tls, socket = Sock}, Pid) ->
+    try ssl:controlling_process(Sock, Pid)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end;
+controlling_process(#transport{type = tls_listen, listen_socket = Sock}, Pid) ->
+    try ssl:controlling_process(Sock, Pid)
+    catch error:Error -> {error, Error};
+          Class:Error -> {error, {Class, Error}}
+    end.
+
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
@@ -656,7 +699,7 @@ unframe1(<<$\s, T/binary>>, Acc) ->
     case {binary_to_integer(Acc), byte_size(T)} of
         {Octets, Size} when Size < Octets -> {more, Octets - Size};
         {Octets, _} ->
-            <<Frame:Octets/binary, T1>> = T,
+            <<Frame:Octets/binary, T1/binary>> = T,
             {Frame, T1}
     end;
 unframe1(<<H, T/binary>>, Acc) ->

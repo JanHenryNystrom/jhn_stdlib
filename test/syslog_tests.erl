@@ -106,40 +106,45 @@ send_2_test_() ->
     ets:new(send_2_test, [named_table, public]),
     {setup,
      fun() -> {ok, Apps} = application:ensure_all_started(ssl),
-              UDPS = syslog:open([server, {port, 1154}]),
+              UDPS = {udp, server_start(udp, 1154, send_2_test_)},
               UDPC = syslog:open([{destination, {127, 0, 0, 1}},
                                   {destination_port, 1154}]),
               true = ets:insert(send_2_test, {udpc, UDPC}),
-              TCPS = syslog:open([tcp, server, {port, 1601}]),
+              TCPS = {tcp, server_start(tcp, 1601, send_2_test_)},
               TCPC = syslog:open([tcp,
                                   {destination, {127, 0, 0, 1}},
                                   {destination_port, 1601}]),
               true = ets:insert(send_2_test, {tcpc, TCPC}),
-              %% TLSS = syslog:open([tls, server, {port, 1601}]),
-              %% TLSC = syslog:open([tls,
-              %%                     {destination, {127, 0, 0, 1}},
-              %%                     {destination_port, 1601}]),
-              %% true = ets:insert(send_2_test, {tlsc, TLSC}),
-              {Apps, [UDPS, UDPC, TCPS, TCPC
-                     %% , TLSS, TLSC
-                     ]}
+              TLSS = {tls, server_start(tls, 6514, send_2_test_)},
+              TLSC = syslog:open([tls,
+                                  {destination, {127, 0, 0, 1}},
+                                  {destination_port, 6514}]),
+              true = ets:insert(send_2_test, {tlsc, TLSC}),
+              {Apps, [UDPC, TCPC, TLSC], [UDPS, TCPS , TLSS]}
      end,
-     fun({Apps, Sockets}) ->
-             [syslog:close(Socket) || Socket <- Sockets],
+     fun({Apps, Clients, Servers}) ->
+             [syslog:close(Client) || Client <- Clients],
+             [server_stop(Type, Server) || {Type, Server} <- Servers],
              [application:stop(App) || App <- Apps]
      end,
-     [?_test(
+     [?_test(?assertEqual(true, register(send_2_test_, self()))),
+      ?_test(
          ?assertMatch(ok,
                       syslog:send(element(2, hd(ets:lookup(send_2_test, udpc))),
                                   #{}))),
+      ?_test(?assertMatch(#{}, syslog:decode(active(udp)))),
       ?_test(
          ?assertMatch(ok,
                       syslog:send(element(2, hd(ets:lookup(send_2_test, tcpc))),
-                                  #{})))%% ,
-      %% ?_test(
-      %%    ?assertMatch(ok,
-      %%                 syslog:send(element(2, hd(ets:lookup(send_2_test, tlsc))),
-      %%                             #{})))
+                                  #{}))),
+      ?_test(?assertMatch(#{},
+                          syslog:decode(
+                            element(1, syslog:unframe(tcp, active(tcp))))))
+     %% ,
+     %%  ?_test(
+     %%     ?assertMatch(ok,
+     %%                  syslog:send(element(2, hd(ets:lookup(send_2_test, tlsc))),
+     %%                              #{})))
      ]}.
 
 %%--------------------------------------------------------------------
@@ -350,3 +355,43 @@ encode_2_decode_1_test_() ->
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
+
+server_start(Type, Port, Parent) ->
+    Transport = syslog:open([server, Type, {port, Port}]),
+    Pid = spawn_link(fun() ->  server(Type, Parent) end),
+    ok = syslog:controlling_process(Transport, Pid),
+    Pid ! {transport, Transport},
+    Pid.
+
+server(udp, Parent) ->
+    Transport = receive {transport, Transport0} -> Transport0 end,
+    server_loop(Parent, Transport);
+server(_, Parent) ->
+    TransportL = receive {transport, Transport0} -> Transport0 end,
+    Transport = syslog:accept(TransportL),
+    server_loop(Parent, TransportL, Transport).
+
+server_loop(Parent, Transport) ->
+    receive
+        stop -> syslog:close(Transport);
+        {udp, _, _, _, Message} ->
+            Parent ! {active, Message},
+            server_loop(Parent, Transport)
+    end.
+
+server_loop(Parent, TransportL, Transport) ->
+    receive
+        stop -> syslog:close(TransportL), syslog:close(Transport);
+        {tcp, _, Message} ->
+            Parent ! {active, Message},
+            server_loop(Parent, TransportL, Transport)
+    end.
+
+server_stop(_, Pid) -> Pid ! stop.
+
+active(_) ->
+        receive
+            {active, Packet} -> Packet
+        after
+            500 -> timeout
+        end.
