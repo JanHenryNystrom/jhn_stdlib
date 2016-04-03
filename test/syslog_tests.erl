@@ -84,10 +84,17 @@ open_1_client_test_() ->
      ?_test(?assertEqual(ok,
                          syslog:close(
                            syslog:open([tls,
-                                        {destination, {127, 0, 0, 1}},
+                                        {destination, "127.0.0.1"},
                                         {destination_port, 6514}])))),
      ?_test(?assertEqual({error, {exit, badarg}},
-                         syslog:open([{opts, [{ip, none}]}])))
+                         syslog:open([{opts, [{ip, none}]}]))),
+     ?_test(?assertMatch({error, _}, syslog:open([tcp]))),
+     ?_test(?assertMatch({error, {exit, _}},
+                         syslog:open([tcp, {opts, [{ip, none}]}]))),
+     ?_test(?assertMatch({error, _},
+                         syslog:open([tls,
+                                      {destination, "::1"},
+                                      {destination_port, 4711}])))
     ]}.
 
 open_1_client_timeout_test_() ->
@@ -117,7 +124,17 @@ open_1_client_timeout_test_() ->
                            syslog:open([tls,
                                         {timeout, 500},
                                         {destination, {127, 0, 0, 1}},
-                                        {destination_port, 6514}]))))
+                                        {destination_port, 6514}])))),
+     ?_test(?assertMatch({error, _}, syslog:open([tcp, {timeout, 500}]))),
+     ?_test(?assertMatch({error, {exit, _}},
+                         syslog:open([tcp,
+                                      {timeout, 500},
+                                      {opts, [{ip, none}]}]))),
+     ?_test(?assertMatch({error, _},
+                         syslog:open([tls,
+                                      {timeout, 500},
+                                      {destination, {0, 0, 0, 0, 0, 0, 0, 1}},
+                                      {destination_port, 4711}])))
     ]}.
 
 open_1_server_test_() ->
@@ -145,7 +162,13 @@ open_1_server_test_() ->
          ?assertMatch(ok,
                       syslog:close(syslog:open([tls, server, {port, 6514}])))),
       ?_test(?assertEqual({error,eacces}, syslog:open([server, udp]))),
-      ?_test(?assertEqual({error,eacces}, syslog:open([server, tcp])))
+      ?_test(?assertEqual({error,eacces}, syslog:open([server, tcp]))),
+      ?_test(?assertMatch({error, {exit, _}},
+                          syslog:open([tcp, server, {opts, [{ip, none}]}]))),
+      ?_test(?assertMatch({error, _},
+                          syslog:open([tls, server, {opts, [{depth, -1}]}]))),
+      ?_test(?assertMatch({error, _},
+                          syslog:open([tls, server, {opts, [{ip, none}]}])))
      ]}.
 
 %%--------------------------------------------------------------------
@@ -179,29 +202,21 @@ send_2_test_() ->
              [application:stop(App) || App <- Apps]
      end,
      [?_test(?assertEqual(true, register(send_2_test_, self()))),
-      ?_test(
-         ?assertMatch(ok,
-                      syslog:send(element(2, hd(ets:lookup(send_2_test, udpc))),
-                                  #{}))),
+      ?_test(?assertMatch(ok, syslog:send(sock(send_2_test, udpc), #{}))),
       ?_test(?assertMatch(#{}, syslog:decode(active(udp)))),
-      ?_test(
-         ?assertMatch(ok,
-                      syslog:send(element(2, hd(ets:lookup(send_2_test, udpc))),
-                                  #{},
-                                  [{destination, {127, 0, 0, 1}},
-                                   {destination_port, 1154}]))),
+      ?_test(?assertMatch(ok,
+                          syslog:send(sock(send_2_test, udpc),
+                                      #{},
+                                      [{destination, {127, 0, 0, 1}},
+                                       {destination_port, 1154}]))),
       ?_test(?assertMatch(#{}, syslog:decode(active(udp)))),
-      ?_test(
-         ?assertMatch(ok,
-                      syslog:send(element(2, hd(ets:lookup(send_2_test, tcpc))),
-                                  #{}))),
+      ?_test(?assertMatch(ok, syslog:send(sock(send_2_test, tcpc), #{}))),
       ?_test(?assertMatch(#{},
                           syslog:decode(
                             element(1, syslog:unframe(tcp, active(tcp)))))),
-      ?_test(
-         ?assertMatch(ok,
-                      syslog:send(element(2, hd(ets:lookup(send_2_test, tlsc))),
-                                  #{}))),
+
+      ?_test(?assertMatch(ok, syslog:send(sock(send_2_test, tlsc), #{}))),
+      ?_test(?assertMatch(#{}, unframe(tls, active(tls)))),
       ?_test(
          ?assertEqual({error, function_clause},
                       syslog:send(#transport{type = udp}, #{}))),
@@ -216,6 +231,53 @@ send_2_test_() ->
       ?_test(
          ?assertEqual({error, function_clause},
                       syslog:send(#transport{type = tls}, #{})))
+     ]}.
+
+%%--------------------------------------------------------------------
+%% recv/0
+%%--------------------------------------------------------------------
+recv_0_test_() ->
+    ets:new(recv_0_test, [named_table, public]),
+    {setup,
+     fun() ->
+             {ok, Apps} = application:ensure_all_started(ssl),
+             UDPS = server_start(udp, 1154, recv_0_test_),
+             UDPC = syslog:open([{destination, {127, 0, 0, 1}},
+                                 {destination_port, 1154}]),
+             true = ets:insert(recv_0_test, {udps, UDPS}),
+             true = ets:insert(recv_0_test, {udpc, UDPC}),
+             TCPS = server_start(tcp, 1601, recv_0_test_),
+             TCPC = syslog:open([tcp,
+                                 {destination, {127, 0, 0, 1}},
+                                 {destination_port, 1601}]),
+             true = ets:insert(recv_0_test, {tcps, TCPS}),
+             true = ets:insert(recv_0_test, {tcpc, TCPC}),
+             TLSS = server_start(tls, 6514, recv_0_test_),
+             TLSC = syslog:open([tls,
+                                 {opts, [{verify, verify_none}]},
+                                 {destination, {127, 0, 0, 1}},
+                                 {destination_port, 6514}]),
+             true = ets:insert(recv_0_test, {tlss, TLSS}),
+             true = ets:insert(recv_0_test, {tlsc, TLSC}),
+             {Apps,
+              [UDPC, TCPC, TLSC],
+              [{udp, UDPS}, {tcp, TCPS}, {tls, TLSS}]}
+     end,
+     fun({Apps, Clients, Servers}) ->
+             [syslog:close(Client) || Client <- Clients],
+             [server_stop(Type, Server) || {Type, Server} <- Servers],
+             [application:stop(App) || App <- Apps]
+     end,
+     [?_test(?assertEqual(true, register(recv_0_test_, self()))),
+      ?_test(?assertMatch(passive, passify(pid(recv_0_test, udps)))),
+      ?_test(?assertMatch(ok, syslog:send(sock(recv_0_test, udpc), #{}))),
+      ?_test(?assertMatch({ok, #{}}, passive(pid(recv_0_test, udps)))),
+      ?_test(?assertMatch(passive, passify(pid(recv_0_test, tcps)))),
+      ?_test(?assertMatch(ok, syslog:send(sock(recv_0_test, tcpc), #{}))),
+      ?_test(?assertMatch(#{}, passive(pid(recv_0_test, tcps)))),
+      ?_test(?assertMatch(passive, passify(pid(recv_0_test, tlss)))),
+      ?_test(?assertMatch(ok, syslog:send(sock(recv_0_test, tlsc), #{}))),
+      ?_test(?assertMatch(#{},passive(pid(recv_0_test, tlss))))
      ]}.
 
 %%--------------------------------------------------------------------
@@ -268,6 +330,28 @@ controlling_process_2_test_() ->
         ?assertEqual({error, function_clause},
                      syslog:controlling_process(#transport{type = tls_listen},
                                                 self())))
+    ].
+
+%%--------------------------------------------------------------------
+%% accept/1
+%%--------------------------------------------------------------------
+accept_1_test_() ->
+    [?_test(?assertEqual({error, function_clause},
+                         syslog:accept(#transport{type = tcp_listen}))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:accept(#transport{type = tls_listen})))
+    ].
+
+%%--------------------------------------------------------------------
+%% accept/2
+%%--------------------------------------------------------------------
+accept_2_test_() ->
+    [?_test(?assertEqual({error, function_clause},
+                         syslog:accept(#transport{type = tcp_listen},
+                                       [{timeout, 500}]))),
+     ?_test(?assertEqual({error, function_clause},
+                         syslog:accept(#transport{type = tls_listen},
+                                       [{timeout, 500}])))
     ].
 
 
@@ -395,25 +479,25 @@ encode_2_decode_1_test_() ->
                                       [binary])))),
       ?_test(
          ?assertMatch(#{structured := [{<<"structured@id">>,
-                                        [{<<"a">>, <<"1">>}]}]},
+                                        [{<<"a">>, <<"]\"1\\ ">>}]}]},
                       syslog:decode(
                         syslog:encode(#{structured =>
                                             [{<<"structured@id">>,
-                                              [{<<"a">>, <<"1">>}]}]},
+                                              [{<<"a">>, "]\"1\\ "}]}]},
                                       [binary])))),
       ?_test(
          ?assertMatch(#{structured := [{<<"structured@id">>,
-                                        [{<<"a">>, <<"1">>},
-                                         {<<"b">>, <<"2">>}]}]},
+                                        [{<<"a">>, <<"[1]">>},
+                                         {<<"b">>, <<"\"2\"">>}]}]},
                       syslog:decode(
                         syslog:encode(#{structured =>
                                             [{<<"structured@id">>,
-                                              [{<<"a">>, <<"1">>},
-                                               {<<"b">>, <<"2">>}]}]},
+                                              [{<<"a">>, <<"[1]">>},
+                                               {<<"b">>, <<"\"2\"">>}]}]},
                                       [binary])))),
       ?_test(
          ?assertMatch(#{structured := [{<<"foo@id">>,
-                                        [{<<"a">>, <<"1">>},
+                                        [{<<"a">>, <<"\\1">>},
                                          {<<"b">>, <<"2">>}]},
                                        {<<"bar@id">>,
                                         [{<<"a">>, <<"1">>},
@@ -421,11 +505,11 @@ encode_2_decode_1_test_() ->
                       syslog:decode(
                         syslog:encode(#{structured =>
                                             [{<<"foo@id">>,
-                                              [{<<"a">>, <<"1">>},
+                                              [{<<"a">>, <<"\\1">>},
                                                {<<"b">>, <<"2">>}]},
                                              {<<"bar@id">>,
-                                              [{<<"a">>, <<"1">>},
-                                               {<<"b">>, <<"2">>}]}]},
+                                              [{<<"a">>, ["1"]},
+                                               {<<"b">>, [<<"2">>]}]}]},
                                       [binary])))),
       ?_test(
          ?assertMatch(#{msg := #{content := <<"foo">>}},
@@ -477,13 +561,13 @@ server_start(tls, Port, Parent) ->
                      {port, Port},
                      {opts, [{certfile, "../test/crt.pem"},
                              {keyfile, "../test/key.pem"}]}]),
-    Pid = spawn_link(fun() ->  server(tls, Parent) end),
+    Pid = spawn_link(fun() -> server(tls, Parent) end),
     ok = syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
     Pid;
 server_start(Type, Port, Parent) ->
     Transport = syslog:open([server, Type, {port, Port}]),
-    Pid = spawn_link(fun() ->  server(Type, Parent) end),
+    Pid = spawn_link(fun() -> server(Type, Parent) end),
     ok = syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
     Pid.
@@ -499,19 +583,55 @@ server(_, Parent) ->
 server_loop(Parent, Transport) ->
     receive
         stop -> syslog:close(Transport);
+        passify ->
+            syslog:setopts(Transport, [{active, false}]),
+            Parent ! passive,
+            server_loop(Parent, Transport);
         {udp, _, _, _, Message} ->
             Parent ! {active, Message},
+            server_loop(Parent, Transport);
+        recv ->
+            Result = syslog:recv(Transport),
+            Parent ! {passive, Result},
             server_loop(Parent, Transport)
     end.
 
 server_loop(Parent, TransportL, Transport) ->
     receive
-        stop -> syslog:close(TransportL), syslog:close(Transport);
+        stop ->
+            syslog:close(TransportL),
+            syslog:close(Transport);
+        passify ->
+            syslog:setopts(Transport, [{active, false}]),
+            Parent ! passive,
+            server_loop(Parent, TransportL, Transport);
         {tcp, _, Message} ->
             Parent ! {active, Message},
-            server_loop(Parent, TransportL, Transport)
+            server_loop(Parent, TransportL, Transport);
+        {ssl, _, Message} ->
+            Parent ! {active, Message},
+            server_loop(Parent, TransportL, Transport);
+        recv ->
+            {ok, Result, Transport1} = syslog:recv(Transport),
+            Parent ! {passive, Result},
+            server_loop(Parent, TransportL, Transport1)
     end.
 
 server_stop(_, Pid) -> Pid ! stop.
 
 active(_) -> receive {active, Packet} -> Packet after 500 -> timeout end.
+
+passify(Server) ->
+    Server ! passify,
+    receive passive -> passive after 500 -> timeout end.
+
+passive(Server) ->
+    Server ! recv,
+    receive {passive, Packet} -> Packet
+    after 500 -> timeout end.
+
+sock(Table, Client) -> element(2, hd(ets:lookup(Table, Client))).
+
+pid(Table, Server) -> element(2, hd(ets:lookup(Table, Server))).
+
+unframe(Type, Frame) -> syslog:decode(element(1, syslog:unframe(Type, Frame))).
