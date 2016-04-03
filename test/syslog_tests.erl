@@ -236,29 +236,29 @@ send_2_test_() ->
 %%--------------------------------------------------------------------
 %% recv/0
 %%--------------------------------------------------------------------
-recv_0_test_() ->
-    ets:new(recv_0_test, [named_table, public]),
+recv_1_test_() ->
+    ets:new(recv_1_test, [named_table, public]),
     {setup,
      fun() ->
              {ok, Apps} = application:ensure_all_started(ssl),
-             UDPS = server_start(udp, 1154, recv_0_test_),
+             UDPS = server_start(udp, 1154, recv_1_test_),
              UDPC = syslog:open([{destination, {127, 0, 0, 1}},
                                  {destination_port, 1154}]),
-             true = ets:insert(recv_0_test, {udps, UDPS}),
-             true = ets:insert(recv_0_test, {udpc, UDPC}),
-             TCPS = server_start(tcp, 1601, recv_0_test_),
+             true = ets:insert(recv_1_test, {udps, UDPS}),
+             true = ets:insert(recv_1_test, {udpc, UDPC}),
+             TCPS = server_start(tcp, 1601, recv_1_test_),
              TCPC = syslog:open([tcp,
                                  {destination, {127, 0, 0, 1}},
                                  {destination_port, 1601}]),
-             true = ets:insert(recv_0_test, {tcps, TCPS}),
-             true = ets:insert(recv_0_test, {tcpc, TCPC}),
-             TLSS = server_start(tls, 6514, recv_0_test_),
+             true = ets:insert(recv_1_test, {tcps, TCPS}),
+             true = ets:insert(recv_1_test, {tcpc, TCPC}),
+             TLSS = server_start(tls, 6514, recv_1_test_),
              TLSC = syslog:open([tls,
                                  {opts, [{verify, verify_none}]},
                                  {destination, {127, 0, 0, 1}},
                                  {destination_port, 6514}]),
-             true = ets:insert(recv_0_test, {tlss, TLSS}),
-             true = ets:insert(recv_0_test, {tlsc, TLSC}),
+             true = ets:insert(recv_1_test, {tlss, TLSS}),
+             true = ets:insert(recv_1_test, {tlsc, TLSC}),
              {Apps,
               [UDPC, TCPC, TLSC],
               [{udp, UDPS}, {tcp, TCPS}, {tls, TLSS}]}
@@ -268,17 +268,43 @@ recv_0_test_() ->
              [server_stop(Type, Server) || {Type, Server} <- Servers],
              [application:stop(App) || App <- Apps]
      end,
-     [?_test(?assertEqual(true, register(recv_0_test_, self()))),
-      ?_test(?assertMatch(passive, passify(pid(recv_0_test, udps)))),
-      ?_test(?assertMatch(ok, syslog:send(sock(recv_0_test, udpc), #{}))),
-      ?_test(?assertMatch({ok, #{}}, passive(pid(recv_0_test, udps)))),
-      ?_test(?assertMatch(passive, passify(pid(recv_0_test, tcps)))),
-      ?_test(?assertMatch(ok, syslog:send(sock(recv_0_test, tcpc), #{}))),
-      ?_test(?assertMatch(#{}, passive(pid(recv_0_test, tcps)))),
-      ?_test(?assertMatch(passive, passify(pid(recv_0_test, tlss)))),
-      ?_test(?assertMatch(ok, syslog:send(sock(recv_0_test, tlsc), #{}))),
-      ?_test(?assertMatch(#{},passive(pid(recv_0_test, tlss))))
+     [?_test(?assertEqual(true, register(recv_1_test_, self()))),
+      ?_test(?assertMatch({error, _},
+                          syslog:recv(sock(recv_1_test, udpc)))),
+      ?_test(?assertMatch(passive, passify(pid(recv_1_test, udps)))),
+      ?_test(?assertMatch(ok, syslog:send(sock(recv_1_test, udpc), #{}))),
+      ?_test(?assertMatch({ok, #{}}, passive(pid(recv_1_test, udps)))),
+      ?_test(?assertMatch({error, _},
+                          syslog:recv(sock(recv_1_test, tcpc)))),
+      ?_test(?assertMatch({error, _},
+                          syslog:recv(sock(recv_1_test, tcpc),
+                                      [{timeout, 5}]))),
+      ?_test(?assertMatch(passive, passify(pid(recv_1_test, tcps)))),
+      ?_test(?assertMatch(ok, syslog:send(sock(recv_1_test, tcpc), #{}))),
+      ?_test(?assertMatch(#{}, passive(pid(recv_1_test, tcps)))),
+      ?_test(?assertMatch({error, _},
+                          syslog:recv(sock(recv_1_test, tlsc)))),
+      ?_test(?assertMatch({error, _},
+                          syslog:recv(sock(recv_1_test, tlsc),
+                                      [{timeout, 5}]))),
+      ?_test(?assertMatch(passive, passify(pid(recv_1_test, tlss)))),
+      ?_test(?assertMatch(ok, syslog:send(sock(recv_1_test, tlsc), #{}))),
+      ?_test(?assertMatch(#{},passive(pid(recv_1_test, tlss)))),
+      ?_test(?assertMatch({error, _}, syslog:recv(#transport{type = udp}))),
+      ?_test(?assertMatch({error, _}, syslog:recv(#transport{type = tcp}))),
+      ?_test(?assertMatch({error, _}, syslog:recv(#transport{type = tls})))
      ]}.
+
+recv_2_test_() ->
+    [?_test(?assertMatch({error, _},
+                         syslog:recv(#transport{type = udp}, [{timeout, 5}]))),
+     ?_test(?assertMatch({error, _},
+                         syslog:recv(syslog:open(), [{timeout, 5}]))),
+     ?_test(?assertMatch({error, _},
+                         syslog:recv(#transport{type = tcp}, [{timeout, 5}]))),
+     ?_test(?assertMatch({error, _},
+                         syslog:recv(#transport{type = tls}, [{timeout, 5}])))
+    ].
 
 %%--------------------------------------------------------------------
 %% close/1
@@ -545,10 +571,8 @@ encode_2_decode_1_test_() ->
 %% ===================================================================
 %% Bad options
 %% ===================================================================
-%% bad_option_test_() ->
-%%     [?_test(?IS_BADARG(json:encode({}, [Option]))) || Option <- ?BAD_OPTS] ++
-%%         [?_test(?IS_BADARG(json:decode(<<"{}">>, [Option]))) ||
-%%             Option <- ?BAD_OPTS].
+bad_option_test_() ->
+    [?_test(?assertError(badarg, syslog:open([oops])))].
 
 %% ===================================================================
 %% Internal functions.
