@@ -31,17 +31,72 @@
 %% Defines
 -define(IPv4, ["127.0.0.1", "8.8.8.8"]).
 -define(IPv6, ["1:2:3:4:5:6:7:8", "8:8:8:8:8:8:8:8",
-               "a:b:c:d:e:f:16:17"
+               "a:b:c:d:e:f:9:0"
               ]).
+-define(IPv4_RANGES, lists:seq(1, 31)).
+-define(IPv6_RANGES, lists:seq(1, 127)).
 
 %% ===================================================================
 %% Tests.
 %% ===================================================================
 
 %%--------------------------------------------------------------------
+%% Encode
+%%--------------------------------------------------------------------
+encode_1_test_() ->
+    [{IP,
+      ?_test(
+         ?assertEqual(
+            IP,
+            ip_addr:encode(ip_addr:decode(
+                            ip_addr:encode(
+                              ip_addr:decode(IP))),
+                           [list])))}
+     || IP <- ?IPv4 ++ ?IPv6
+    ].
+
+encode_1_range_test_() ->
+    [{range(IP, Range),
+      ?_test(
+         ?assertEqual(
+            range(IP, Range),
+            ip_addr:encode(ip_addr:decode(
+                            ip_addr:encode(
+                              ip_addr:decode(range(IP, Range),
+                                            [range])),
+                             [range]),
+                           [list])))}
+     || IP <- ?IPv4 ++ ?IPv6,
+        Range <- ?IPv4_RANGES
+    ].
+
+range(IP, Range) -> IP ++ "/" ++ integer_to_list(Range).
+
+%%--------------------------------------------------------------------
+%% Bounds
+%%--------------------------------------------------------------------
+
+bounds_1_test_() ->
+    [{range(IP, Range),
+      ?_test(?assertMatch({_, _}, ip_addr:bounds(range(IP, Range))))}
+     || IP <- ?IPv4 ++ ?IPv6,
+        Range <- ?IPv4_RANGES
+    ].
+
+%%--------------------------------------------------------------------
 %% Decode/Encode/Decode/Encode
 %%--------------------------------------------------------------------
-encode_decode_encode_decode_test_() ->
+encode_decode_encode_1_decode_1_test_() ->
+    [{IP,
+      ?_test(
+         ?assertEqual(IP,
+                      ip_addr:encode(
+                        ip_addr:decode(
+                          ip_addr:encode(ip_addr:decode(IP))),
+                        [list])))} || IP <- ?IPv4 ++ ?IPv6
+    ].
+
+encode_decode_encode_2_decode_2_test_() ->
     [{IP,
       ?_test(
          ?assertEqual(IP,
