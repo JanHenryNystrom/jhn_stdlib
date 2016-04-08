@@ -23,7 +23,53 @@
 %%%    Textual Conventions for Syslog Management                       (rfc5427)
 %%%    Transmission of Syslog Messages over TCP                        (rfc6587)
 %%%
-%%%    TCP only supports Octet counting framing.
+%%%  SYSLOG line is represented as follows:
+%%%
+%%%  line       : #{header => Header,
+%%%                 structured => Structured,
+%%%                 msg => Message
+%%%                }
+%%%
+%%%  Header     : #{facility => Facility,
+%%%                 severity => Severity,
+%%%                 version => Version,
+%%%                 time_stamp => {{Year, Month, Day}, {Hour, Minute, Second}},
+%%%                 fraction => integer(),
+%%%                 offset_sign => '+' | '-' | 'Z',
+%%%                 offset => {Hour, Minute},
+%%%                 host_name => iodata(),
+%%%                 app_name => iodata(),
+%%%                 proc_id => iodata(),
+%%%                 msg_id => iodata()
+%%%                }
+%%%
+%%%  Facility   : kern | user | mail | daemon | auth | syslog | lpr | news |
+%%%               uucp | cron | authpriv | ftp | ntp | audit | console | cron2 |
+%%%               local0 | local1 | local2 | local3 | local4 | local5 |
+%%%               local6 | local7
+%%%               default: user
+%%%  Severity   : emerg | alert | crit | err | warning | notice | info | debug
+%%%               default: info
+%%%  Version    : integer()
+%%%               default: 1
+%%%  Year, Month, Day, Hour, Minute, Second : integer()
+%%%
+%%%  Structured : [{Id, [{Key, Value}]}]
+%%%  Id, Key, Value : iodata()
+%%%
+%%%  Message    : #{type => utf8 | any,
+%%%                 content => iodata()
+%%%                }
+%%%
+%%%  All part of a map are optional. all iodata is in fact a binary when a line
+%%%  is decoded. All header values that can be represented by the nil element
+%%%  "-" has that as default and when decoded omitted from the returned map.
+%%%
+%%% N.B. TCP only supports Octet counting framing.
+%%%      The TLS transport requires the ssl OTP lib which is not included in
+%%       the application resource file.
+%%%      Only supports R18 and later.
+%%%
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -91,7 +137,7 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: open() -> Transport | Error.
 %% @doc
 %%
 %% @end
@@ -101,7 +147,7 @@
 open() -> open(#opts{}).
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: open(Options) -> Transport | Error.
 %% @doc
 %%
 %% @end
@@ -230,9 +276,9 @@ open(Opts) -> open(parse_opts(Opts)).
 
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: close(Transport) -> ok | Error.
 %% @doc
-%%
+%%   Closes an already established connection.
 %% @end
 %%--------------------------------------------------------------------
 -spec close(transport()) -> ok | {error, _}.
@@ -249,7 +295,7 @@ close(#transport{type = tls, socket = Sock}) ->
     try ssl:close(Sock) catch error:Error -> {error, Error} end.
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: send(Transport, Entry) -> ok | Error.
 %% @doc
 %%
 %% @end
@@ -259,7 +305,7 @@ close(#transport{type = tls, socket = Sock}) ->
 send(Transport, Entry) -> send(Transport, Entry, #opts{}).
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: send(Transport, Entry, Options) -> ok | Error.
 %% @doc
 %%
 %% @end
@@ -288,17 +334,20 @@ send(#transport{type = tls, socket = Sock}, Entry, Opts) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: recv(Transport, Entry) ->
+%%               {ok, Entry} | {ok, Transport, Entry} | Error
 %% @doc
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec recv(transport()) -> {ok, entry(), transport()} | {error, _}.
+-spec recv(transport()) ->
+                  {ok, entry()} | {ok, entry(), transport()} | {error, _}.
 %%--------------------------------------------------------------------
 recv(Transport) -> recv(Transport, #opts{}).
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: recv(Transport, Entry, Options) ->
+%%               {ok, Entry} | {ok, Transport, Entry} | Error
 %% @doc
 %%
 %% @end
@@ -437,22 +486,22 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: accept(Transport) -> Transport | Error.
 %% @doc
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec accept(transport()) -> ok | {error, _}.
+-spec accept(transport()) -> transport() | {error, _}.
 %%--------------------------------------------------------------------
 accept(Transport) -> accept(Transport, []).
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: accept(Transport, Options) -> Transport | Error.
 %% @doc
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec accept(transport(), [opt()]) -> ok | {error, _}.
+-spec accept(transport(), [opt()]) -> transport() | {error, _}.
 %%--------------------------------------------------------------------
 accept(Transport = #transport{type = tcp_listen, listen_socket = LSock},Opts) ->
     case parse_opts(Opts) of
@@ -516,7 +565,7 @@ accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: setopts(Transport, Options) -> ok | Error.
 %% @doc
 %%
 %% @end
@@ -537,7 +586,7 @@ setopts(#transport{type = tls, socket = Sock}, Options) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: setopts(Transport, Pid) -> ok | Error.
 %% @doc
 %%
 %% @end
@@ -657,10 +706,6 @@ unframe1(<<H, T/binary>>, Acc) ->
 
 %% ===================================================================
 %% Internal functions.
-%% ===================================================================
-
-%% ===================================================================
-%% API
 %% ===================================================================
 
 dest(undefined, ipv4) -> {127, 0, 0,1};
@@ -989,8 +1034,8 @@ parse_opt({port, Port}, Opts) -> Opts#opts{port = Port};
 parse_opt({opts, TransportOpts}, Opts) -> Opts#opts{opts = TransportOpts};
 parse_opt(ipv4, Opts) -> Opts#opts{ipv = ipv4};
 parse_opt(ipv6, Opts) -> Opts#opts{ipv = ipv6};
-parse_opt({destination_port, Port}, Opts) -> Opts#opts{dest_port = Port};
 parse_opt({timeout, Timeout}, Opts) -> Opts#opts{timeout = Timeout};
+parse_opt({destination_port, Port}, Opts) -> Opts#opts{dest_port = Port};
 parse_opt({destination, IP = {_, _, _, _}}, Opts) -> Opts#opts{dest = IP};
 parse_opt({destination, IP = {_, _, _, _, _, _, _, _}}, Opts) ->
     Opts#opts{dest = IP};
