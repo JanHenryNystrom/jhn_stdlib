@@ -19,11 +19,11 @@
 %%%  A simple HTTP client based on:
 %%%    Hypertext Transfer Protocol (HTTP/1.1): Message Syntax and Routing
 %%%                                                                    (rfc7230)
-%%%    Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content (rfc7231)
+%%%    Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content   (rfc7231)
 %%%    The Hypertext Transfer Protocol Status Code 308 (Permanent Redirect)
 %%%                                                                    (rfc7538)
-%%%    PATCH Method for HTTP (rfc5789)
-%%%    HTTP Over TLS (rfc2818)
+%%%    PATCH Method for HTTP                                           (rfc5789)
+%%%    HTTP Over TLS                                                   (rfc2818)
 %%%
 %%% Options that are available to open/1, open/2 and all HTTP method functions:
 %%%    timeout -> the time in milliseconds the request is allowed to complete
@@ -52,8 +52,7 @@
 %%%      they will remain and cause a resource leak.
 %%%      For HTTPS requires the ssl OTP lib which is not included in the
 %%%      application resource file.
-%%%
-%%% Only supports R18 and later.
+%%%      Only supports R18 and later.
 %%%
 %%% @end
 %%%

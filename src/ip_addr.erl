@@ -78,7 +78,7 @@
 %%   Equivalent of encode(Term, []) -> IP.
 %% @end
 %%--------------------------------------------------------------------
--spec encode(ip()) -> iolist().
+-spec encode(ip() | {ip(), range()}) -> iolist().
 %%--------------------------------------------------------------------
 encode(Term) -> encode(Term, #opts{}).
 
@@ -98,7 +98,7 @@ encode(Term) -> encode(Term, #opts{}).
 %%     compact -> the most compact encoding of IPv6 used (collapsed zeros)
 %% @end
 %%--------------------------------------------------------------------
--spec encode(ip(), [opt()] | #opts{}) -> iolist() | binary().
+-spec encode(ip() | {ip(), range()}, [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
 encode(Term, Opts = #opts{}) -> do_encode(Term, Opts);
 encode(Term, Opts) ->
@@ -245,7 +245,6 @@ decode_ip(I, Acc, Parts, Opts) ->
         {$:, T} -> decode_ipv6(T, [], [to_binary(Acc) | Parts], Opts);
         {$., T} -> decode_ipv4(T, [], [to_binary(Acc) | Parts], Opts);
         {H, T} when ?IS_INT(H) -> decode_ip(T, [H | Acc], Parts, Opts);
-        {H, T} when ?IS_HEX(H) -> decode_ipv6(T, [H | Acc], Parts, Opts);
         {H, T} when ?IS_HEX(H) -> decode_ipv6(T, [H | Acc], Parts, Opts)
     end.
 
