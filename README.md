@@ -44,8 +44,8 @@ Features/Modules
     * A simple HTTP client -- shttpc [rfc7230][19], [rfc7231][20],
                                      [rfc7538][21], [rfc5789][22],
                                      [rfc2818][23]
-    * Server/client for Syslog -- syslog [rfc5425][y24], [rfc5426][y25],
-                                         [rfc6587][y26]
+    * Server/client for Syslog -- syslog [rfc5425][24], [rfc5426][25],
+                                         [rfc6587][26]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
   * Data structures
