@@ -242,7 +242,7 @@ recv_1_test_() ->
      fun() ->
              {ok, Apps} = application:ensure_all_started(ssl),
              UDPS = server_start(udp, 1154, recv_1_test_),
-             UDPC = syslog:open([{destination, {127, 0, 0, 1}},
+             UDPC = syslog:open([{destination, "127.0.0.1"},
                                  {destination_port, 1154}]),
              true = ets:insert(recv_1_test, {udps, UDPS}),
              true = ets:insert(recv_1_test, {udpc, UDPC}),

@@ -61,9 +61,10 @@
 %%%                 content => iodata()
 %%%                }
 %%%
-%%%  All part of a map are optional. all iodata is in fact a binary when a line
-%%%  is decoded. All header values that can be represented by the nil element
-%%%  "-" has that as default and when decoded omitted from the returned map.
+%%%  All part of the map are optional. All iodata is in fact a binary when a
+%%%  line is decoded. All header values that can be represented by the nil
+%%%  element "-" has that as default and when decoded omitted from the
+%%   returned map.
 %%%
 %%% N.B. TCP only supports Octet counting framing.
 %%%      The TLS transport requires the ssl OTP lib which is not included in
@@ -80,10 +81,11 @@
 
 %% API
 -export([open/0, open/1,
-         accept/1, accept/2, setopts/2, controlling_process/2,
-         close/1,
+         accept/1, accept/2,
          send/2, send/3,
-         recv/1, recv/2
+         recv/1, recv/2,
+         setopts/2, controlling_process/2,
+         close/1
         ]).
 
 %% Library functions
@@ -93,12 +95,12 @@
         ]).
 
 %% Exported types
--export_type([transport/0, entry/0]).
+-export_type([transport/0, line/0]).
 
 %% Includes
 
 %% Records
--record(opts, {type        = udp    :: udp | tcp | tls,
+-record(opts, {type        = udp    :: type(),
                role        = client :: client | server,
                port                 :: integer(),
                opts        = []     :: [{atom(), _}],
@@ -108,9 +110,7 @@
                timeout              :: integer(),
                return_type = iolist :: iolist | binary}).
 
--record(transport, {type                 :: udp |
-                                            tcp_listen | tls_listen |
-                                            tcp | tls,
+-record(transport, {type                 :: type() | tcp_listen | tls_listen,
                     role                 :: client | server,
                     port                 :: inet:port(),
                     ipv                  :: ipv4 | ipv6,
@@ -124,9 +124,10 @@
                    }).
 
 %% Types
--type opt() :: none.
+-type opt() :: _.
 -type transport() :: #transport{}.
--type entry() :: map().
+-type line() :: map().
+-type type() :: udp | tcp | tls.
 -type socket_options() :: gen_udp:option() | gen_tcp:option() | ssl:option().
 
 %% Defines
@@ -139,7 +140,8 @@
 %%--------------------------------------------------------------------
 %% Function: open() -> Transport | Error.
 %% @doc
-%%
+%%   Opens an UDP client or server transport.
+%%   Equivalent to open([]).
 %% @end
 %%--------------------------------------------------------------------
 -spec open() -> transport() | {error, _}.
@@ -149,7 +151,29 @@ open() -> open(#opts{}).
 %%--------------------------------------------------------------------
 %% Function: open(Options) -> Transport | Error.
 %% @doc
+%%   Opens a Transport returning a connected client connection or a listen
+%%   port for TCP and TLS for the server, UDP the difference is quite moot.
 %%
+%%   Options are:
+%%     client -> opens a client transport (default)
+%%     server -> open a server transport
+%%     udp -> uses the UDP protocol (default)
+%%     tcp -> uses the TCP protocol
+%%     tls -> uses TLS v1.2 over TCP
+%%     ipv4 -> IPv4 addresses are used (default)
+%%     ipv6 -> IPv6 addresses are used
+%%     port -> The port used by client or server with the default in the
+%%             client case is 0 (the underlying OS assigns an available
+%%             port number) for the server the default ports are as follows:
+%%             UDP/154, TCP/601, TLS/6514
+%%     destination -> the IP address or hostname of the server to connect
+%%                    to in the case TCP and TLS and the default server for
+%%                    the UDP case
+%%     destination_port -> the port of the server to connect to in the case
+%%                         TCP and TLS and the default server for the UDP case
+%%     opts -> options to the transport's UDP, TCP, or TLS, see the
+%%             documentation of gen_udp, gen_tcp, ssl respectively
+%%     timeout -> the time in milliseconds the request is allowed to complete
 %% @end
 %%--------------------------------------------------------------------
 -spec open([opt()] | #opts{}) -> transport() | {error, _}.
@@ -274,86 +298,164 @@ open(Opts = #opts{type = tls}) ->
     end;
 open(Opts) -> open(parse_opts(Opts)).
 
-
 %%--------------------------------------------------------------------
-%% Function: close(Transport) -> ok | Error.
+%% Function: accept(Transport) -> Transport | Error.
 %% @doc
-%%   Closes an already established connection.
+%%   Accepts an incoming connection request on an opened server transport
+%%   for the TCP and TLS, it returns a connected transport.
+%%   Equivalent to accept(Transport, []).
 %% @end
 %%--------------------------------------------------------------------
--spec close(transport()) -> ok | {error, _}.
+-spec accept(transport()) -> transport() | {error, _}.
 %%--------------------------------------------------------------------
-close(#transport{type = udp, socket = Sock}) ->
-    try gen_udp:close(Sock) catch error:Error -> {error, Error} end;
-close(#transport{type = tcp_listen, listen_socket = Sock}) ->
-    try gen_tcp:close(Sock) catch error:Error -> {error, Error} end;
-close(#transport{type = tcp, socket = Sock}) ->
-    try gen_tcp:close(Sock) catch error:Error -> {error, Error} end;
-close(#transport{type = tls_listen, listen_socket = Sock}) ->
-    try ssl:close(Sock) catch error:Error -> {error, Error} end;
-close(#transport{type = tls, socket = Sock}) ->
-    try ssl:close(Sock) catch error:Error -> {error, Error} end.
+accept(Transport) -> accept(Transport, []).
 
 %%--------------------------------------------------------------------
-%% Function: send(Transport, Entry) -> ok | Error.
+%% Function: accept(Transport, Options) -> Transport | Error.
 %% @doc
+%%   Accepts an incoming connection request on an opened server transport
+%%   for the TCP and TLS, it returns a connected transport.
 %%
+%%   Options are:
+%%     timeout -> the time in milliseconds the request is allowed to complete
 %% @end
 %%--------------------------------------------------------------------
--spec send(transport(), entry()) -> ok | {error, _}.
+-spec accept(transport(), [opt()]) -> transport() | {error, _}.
 %%--------------------------------------------------------------------
-send(Transport, Entry) -> send(Transport, Entry, #opts{}).
+accept(Transport = #transport{type = tcp_listen, listen_socket = LSock},Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try gen_tcp:accept(LSock) of
+                {ok, Sock}  ->
+                    Transport#transport{type = tcp,
+                                        socket = Sock,
+                                        listen_socket = undefined};
+                Error ->
+                    Error
+            catch
+                error:Error -> {error, Error}
+            end;
+        #opts{timeout = Timeout} ->
+            try gen_tcp:accept(LSock, Timeout) of
+                {ok, Sock}  ->
+                    Transport#transport{type = tcp,
+                                        socket = Sock,
+                                        listen_socket = undefined};
+                Error ->
+                    Error
+            catch
+                error:Error -> {error, Error}
+            end
+    end;
+accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try ssl:transport_accept(LSock) of
+                {ok, Sock}  ->
+                    case ssl:ssl_accept(Sock) of
+                        ok ->
+                            Transport#transport{type = tls,
+                                                socket = Sock,
+                                                listen_socket = undefined};
+                        Error ->
+                            Error
+                    end;
+                Error ->
+                    Error
+            catch
+                error:Error -> {error, Error}
+            end;
+        #opts{timeout = Timeout} ->
+            try ssl:transport_accept(LSock, Timeout) of
+                {ok, Sock}  ->
+                    case ssl:ssl_accept(Sock) of
+                        ok ->
+                            Transport#transport{type = tls,
+                                                socket = Sock,
+                                                listen_socket = Sock};
+                        Error ->
+                            Error
+                    end;
+                Error ->
+                    Error
+            catch
+                error:Error -> {error, Error}
+            end
+    end.
 
 %%--------------------------------------------------------------------
-%% Function: send(Transport, Entry, Options) -> ok | Error.
+%% Function: send(Transport, Line) -> ok | Error.
 %% @doc
-%%
+%%   Sends a message over the transport.
+%%   Equivalent to Send(Transport, Line).
 %% @end
 %%--------------------------------------------------------------------
--spec send(transport(), entry(), [opt()] | #opts{}) -> ok | {error, _}.
+-spec send(transport(), line()) -> ok | {error, _}.
 %%--------------------------------------------------------------------
-send(Transport = #transport{type = udp, socket = Sock}, Entry, Opts) ->
+send(Transport, Line) -> send(Transport, Line, #opts{}).
+
+%%--------------------------------------------------------------------
+%% Function: send(Transport, Line, Options) -> ok | Error.
+%% @doc
+%%   Sends a message over the transport.
+%%
+%%   Options are:
+%%     destination -> the IP address or hostname of the peer to send to
+%%                    in the UDP case, otherwise the default provided in open
+%%                    is used
+%%     destination_port -> the port of the peer in the UDP case
+%% @end
+%%--------------------------------------------------------------------
+-spec send(transport(), line(), [opt()] | #opts{}) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+send(Transport = #transport{type = udp, socket = Sock}, Line, Opts) ->
     case parse_opts(Opts) of
         ParsedOpts = #opts{dest = undefined} ->
             #transport{dest = Dest, dest_port = Port} = Transport,
-            try gen_udp:send(Sock, Dest, Port, encode(Entry, ParsedOpts))
+            try gen_udp:send(Sock, Dest, Port, encode(Line, ParsedOpts))
             catch error:Error -> {error, Error}
             end;
         ParsedOpts  = #opts{dest = Dest, dest_port = Port}->
-            try gen_udp:send(Sock, Dest, Port, encode(Entry, ParsedOpts))
+            try gen_udp:send(Sock, Dest, Port, encode(Line, ParsedOpts))
             catch error:Error -> {error, Error}
             end
     end;
-send(#transport{type = tcp, socket = Sock}, Entry, Opts) ->
-    try gen_tcp:send(Sock, frame(tcp, encode(Entry, Opts)))
+send(#transport{type = tcp, socket = Sock}, Line, Opts) ->
+    try gen_tcp:send(Sock, frame(tcp, encode(Line, Opts)))
     catch error:Error -> {error, Error}
     end;
-send(#transport{type = tls, socket = Sock}, Entry, Opts) ->
-    try ssl:send(Sock, frame(tls, encode(Entry, Opts)))
+send(#transport{type = tls, socket = Sock}, Line, Opts) ->
+    try ssl:send(Sock, frame(tls, encode(Line, Opts)))
     catch error:Error -> {error, Error}
     end.
 
 %%--------------------------------------------------------------------
-%% Function: recv(Transport, Entry) ->
-%%               {ok, Entry} | {ok, Transport, Entry} | Error
+%% Function: recv(Transport) ->
+%%               {ok, Line} | {ok, Transport, Line} | Error
 %% @doc
-%%
+%%   Receives a packet from a Transport socket in passive mode.
+%%   A closed socket is indicated by a return value {error, closed}.
+%%   Equivalent to recv(Line, []).
 %% @end
 %%--------------------------------------------------------------------
 -spec recv(transport()) ->
-                  {ok, entry()} | {ok, entry(), transport()} | {error, _}.
+                  {ok, line()} | {ok, line(), transport()} | {error, _}.
 %%--------------------------------------------------------------------
 recv(Transport) -> recv(Transport, #opts{}).
 
 %%--------------------------------------------------------------------
-%% Function: recv(Transport, Entry, Options) ->
-%%               {ok, Entry} | {ok, Transport, Entry} | Error
+%% Function: recv(Transport, Options) ->
+%%               {ok, Line} | {ok, Transport, Line} | Error
 %% @doc
+%%   Receives a packet from a Transport socket in passive mode.
+%%   A closed socket is indicated by a return value {error, closed}.
 %%
+%%   Options are:
+%%     timeout -> the time in milliseconds the request is allowed to complete
 %% @end
 %%--------------------------------------------------------------------
 -spec recv(transport(), [opt()] | #opts{}) ->
-                  {ok, entry()} | {ok, entry(), transport()} | {error, _}.
+                  {ok, line()} | {ok, line(), transport()} | {error, _}.
 %%--------------------------------------------------------------------
 recv(#transport{type = udp, socket = Sock}, Opts) ->
     case parse_opts(Opts) of
@@ -486,88 +588,9 @@ recv(Transport = #transport{type = tls, socket = Sock, buf = Buf}, Opts) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: accept(Transport) -> Transport | Error.
-%% @doc
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec accept(transport()) -> transport() | {error, _}.
-%%--------------------------------------------------------------------
-accept(Transport) -> accept(Transport, []).
-
-%%--------------------------------------------------------------------
-%% Function: accept(Transport, Options) -> Transport | Error.
-%% @doc
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec accept(transport(), [opt()]) -> transport() | {error, _}.
-%%--------------------------------------------------------------------
-accept(Transport = #transport{type = tcp_listen, listen_socket = LSock},Opts) ->
-    case parse_opts(Opts) of
-        #opts{timeout = undefined} ->
-            try gen_tcp:accept(LSock) of
-                {ok, Sock}  ->
-                    Transport#transport{type = tcp,
-                                        socket = Sock,
-                                        listen_socket = undefined};
-                Error ->
-                    Error
-            catch
-                error:Error -> {error, Error}
-            end;
-        #opts{timeout = Timeout} ->
-            try gen_tcp:accept(LSock, Timeout) of
-                {ok, Sock}  ->
-                    Transport#transport{type = tcp,
-                                        socket = Sock,
-                                        listen_socket = undefined};
-                Error ->
-                    Error
-            catch
-                error:Error -> {error, Error}
-            end
-    end;
-accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
-    case parse_opts(Opts) of
-        #opts{timeout = undefined} ->
-            try ssl:transport_accept(LSock) of
-                {ok, Sock}  ->
-                    case ssl:ssl_accept(Sock) of
-                        ok ->
-                            Transport#transport{type = tls,
-                                                socket = Sock,
-                                                listen_socket = undefined};
-                        Error ->
-                            Error
-                    end;
-                Error ->
-                    Error
-            catch
-                error:Error -> {error, Error}
-            end;
-        #opts{timeout = Timeout} ->
-            try ssl:transport_accept(LSock, Timeout) of
-                {ok, Sock}  ->
-                    case ssl:ssl_accept(Sock) of
-                        ok ->
-                            Transport#transport{type = tls,
-                                                socket = Sock,
-                                                listen_socket = Sock};
-                        Error ->
-                            Error
-                    end;
-                Error ->
-                    Error
-            catch
-                error:Error -> {error, Error}
-            end
-    end.
-
-%%--------------------------------------------------------------------
 %% Function: setopts(Transport, Options) -> ok | Error.
 %% @doc
-%%
+%%   Sets one or more options for a transport socket according to the transport.
 %% @end
 %%--------------------------------------------------------------------
 -spec setopts(transport(), socket_options()) -> ok | {error, _}.
@@ -586,9 +609,9 @@ setopts(#transport{type = tls, socket = Sock}, Options) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: setopts(Transport, Pid) -> ok | Error.
+%% Function: controlling_process(Transport, Pid) -> ok | Error.
 %% @doc
-%%
+%%   Assigns a new controlling process Pid to the Transport socket.
 %% @end
 %%--------------------------------------------------------------------
 -spec controlling_process(transport(), pid()) -> ok | {error, _}.
@@ -614,23 +637,42 @@ controlling_process(#transport{type = tls_listen, listen_socket = Sock}, Pid) ->
     catch error:Error -> {error, Error}
     end.
 
+%%--------------------------------------------------------------------
+%% Function: close(Transport) -> ok | Error.
+%% @doc
+%%   Closes an already established transport.
+%% @end
+%%--------------------------------------------------------------------
+-spec close(transport()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+close(#transport{type = udp, socket = Sock}) ->
+    try gen_udp:close(Sock) catch error:Error -> {error, Error} end;
+close(#transport{type = tcp_listen, listen_socket = Sock}) ->
+    try gen_tcp:close(Sock) catch error:Error -> {error, Error} end;
+close(#transport{type = tcp, socket = Sock}) ->
+    try gen_tcp:close(Sock) catch error:Error -> {error, Error} end;
+close(#transport{type = tls_listen, listen_socket = Sock}) ->
+    try ssl:close(Sock) catch error:Error -> {error, Error} end;
+close(#transport{type = tls, socket = Sock}) ->
+    try ssl:close(Sock) catch error:Error -> {error, Error} end.
+
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: encode(Entry) -> Syslog entry.
+%% Function: encode(Line) -> Syslog line.
 %% @doc
 %%   Encodes the structured Erlang term as an iolist.
-%%   Equivalent of encode(Entry, []) -> Syslog encode.
+%%   Equivalent to encode(Line, []).
 %% @end
 %%--------------------------------------------------------------------
--spec encode(entry()) -> iolist().
+-spec encode(line()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Entry) -> encode(Entry, #opts{}).
+encode(Line) -> encode(Line, #opts{}).
 
 %%--------------------------------------------------------------------
-%% Function: encode(Entry, Options) -> Syslog entry
+%% Function: encode(Line, Options) -> Syslog line
 %% @doc
 %%   Encodes the structured Erlang term as an iolist or binary.
 %%   Encode will give an exception if the erlang term is not well formed.
@@ -639,58 +681,59 @@ encode(Entry) -> encode(Entry, #opts{}).
 %%     iolist -> a iolist is returned
 %% @end
 %%--------------------------------------------------------------------
--spec encode(entry(), [opt()] | #opts{}) -> iolist() | binary().
+-spec encode(line(), [opt()] | #opts{}) -> iolist() | binary().
 %%--------------------------------------------------------------------
-encode(Entry, Opts = #opts{}) -> do_encode(Entry, Opts);
-encode(Entry, Opts) ->
+encode(Line, Opts = #opts{}) -> do_encode(Line, Opts);
+encode(Line, Opts) ->
     ParsedOpts = parse_opts(Opts, #opts{}),
     case ParsedOpts#opts.return_type of
-        iolist-> do_encode(Entry, ParsedOpts);
-        binary -> iolist_to_binary(do_encode(Entry, ParsedOpts))
+        iolist-> do_encode(Line, ParsedOpts);
+        binary -> iolist_to_binary(do_encode(Line, ParsedOpts))
     end.
 
 %%--------------------------------------------------------------------
-%% Function: decode(Binary) -> Entry.
+%% Function: decode(Binary) -> Line.
 %% @doc
 %%   Decodes the binary into a structured Erlang term.
-%%   Equivalent of decode(Binary, []) -> URI.
+%%   Equivalent to decode(Binary, [])
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary()) -> entry().
+-spec decode(binary()) -> line().
 %%--------------------------------------------------------------------
 decode(Binary) -> decode(Binary, #opts{}).
 
 %%--------------------------------------------------------------------
-%% Function: decode(Binary, Options) -> Entry.
+%% Function: decode(Binary, Options) -> Line.
 %% @doc
 %%   Decodes the binary into a structured Erlang.
 %%   Decode will give an exception if the binary is not well formed
-%%   Syslog entry.
-%%   Options are:
+%%   Syslog line.
+
+%%   Options are: currently none
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), [opt()] | #opts{}) -> entry().
+-spec decode(binary(), [opt()] | #opts{}) -> line().
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: frame(TransportType, Line) -> Frame.
 %% @doc
-%%
+%%   Encloses an encoded line in an octet counting frame.
 %% @end
 %%--------------------------------------------------------------------
--spec frame(atom(), iodata()) -> iodata().
+-spec frame(type(), iodata()) -> iodata().
 %%--------------------------------------------------------------------
 frame(_, Data) -> [integer_to_binary(iolist_size(Data)), $\s, Data].
 
 %%--------------------------------------------------------------------
-%% Function:
+%% Function: unframe(TransportType, Frame) -> Line.
 %% @doc
-%%
+%%   Extracts the line from an octet counting frame.
 %% @end
 %%--------------------------------------------------------------------
--spec unframe(atom(), iodata()) -> iodata().
+-spec unframe(type(), iodata()) -> iodata().
 %%--------------------------------------------------------------------
 unframe(_, Data) -> unframe1(Data, <<>>).
 
@@ -725,13 +768,13 @@ inverse(server) -> client.
 %% Encoding
 %% ===================================================================
 
-do_encode(Entry, _) ->
-    [encode_header(Entry), $\s,
-     encode_structured_data(Entry),
-     encode_msg(Entry)].
+do_encode(Line, _) ->
+    [encode_header(Line), $\s,
+     encode_structured_data(Line),
+     encode_msg(Line)].
 
-encode_header(Entry) ->
-    Header = maps:get(header, Entry, #{}),
+encode_header(Line) ->
+    Header = maps:get(header, Line, #{}),
     Severity = encode_severity(maps:get(severity, Header, info)),
     Facility = encode_facility(maps:get(facility, Header, user)),
     Version = integer_to_binary(maps:get(version, Header, 1)),
@@ -1039,7 +1082,17 @@ parse_opt({destination_port, Port}, Opts) -> Opts#opts{dest_port = Port};
 parse_opt({destination, IP = {_, _, _, _}}, Opts) -> Opts#opts{dest = IP};
 parse_opt({destination, IP = {_, _, _, _, _, _, _, _}}, Opts) ->
     Opts#opts{dest = IP};
-parse_opt({destination, Destination}, Opts) ->
-    Opts#opts{dest = ip_addr:decode(Destination, [tuple])};
+parse_opt({destination, Dest = [C | _]}, Opts) when C >= $0, C =< $: ->
+    try ip_addr:decode(Dest, [tuple]) of
+        Dest1 -> Opts#opts{dest = Dest1}
+    catch _:_ -> Opts#opts{dest = Dest}
+    end;
+parse_opt({destination, Dest = <<C,_/binary>>},Opts) when C >= $0,C =< $: ->
+    try ip_addr:decode(Dest, [tuple]) of
+        Dest1 -> Opts#opts{dest = Dest1}
+    catch _:_ -> Opts#opts{dest = Dest}
+    end;
+parse_opt({destination, Dest}, Opts) ->
+    Opts#opts{dest = Dest};
 parse_opt(_, Opts) ->
     erlang:error(badarg, Opts).
