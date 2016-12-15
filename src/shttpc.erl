@@ -880,6 +880,7 @@ format_host(Host, Port) ->
 
 read_response(State = #state{transport = Transport, socket = Socket}) ->
     try read_response(State, undefined, {undefined, undefined}, []) of
+        closed -> {error, closed};
         {false, Response = #{}}  ->
             Response#{connection => #connection{transport = Transport,
                                                 socket = Socket}};
@@ -903,6 +904,7 @@ read_response(State = #state{transport = Transport, socket = Socket}) ->
 
 read_response(State, Vsn, Status = {Code, _}, Headers) ->
     case recv(State) of
+        closed -> closed;
         {ok, {http_response, Vsn1, Code1, Reason}} ->
             read_response(State, Vsn1, {Code1, Reason}, Headers);
         {ok, {http_header, _, Name, _, Value}} ->
