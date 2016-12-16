@@ -431,7 +431,7 @@ strip(Binary, both, Char) when is_binary(Binary), is_integer(Char) ->
 %% strip(Bin, strip_left, strip_right, Char, Acc, RightSofar)
 strip(<<>>, _, _, _, Acc, RightSofar) -> <<Acc/binary, RightSofar/binary>>;
 strip(<<Char, T/binary>>, true, Right, Char, Acc, RightSofar) ->
-    strip(T, false, Right, Char, Acc, RightSofar);
+    strip(T, true, Right, Char, Acc, RightSofar);
 strip(Binary, true, false, _, _, _) ->
     Binary;
 strip(Binary, true, true, Char, Acc, RightSofar) ->

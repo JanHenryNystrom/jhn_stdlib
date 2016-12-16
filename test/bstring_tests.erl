@@ -1,4 +1,3 @@
-%% -*-erlang-*-
 %%==============================================================================
 %% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
@@ -17,17 +16,29 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%   This is like the stdlib a mix of lib modules, in this case a few
-%%%   of my thought experiments made solid as code.
+%%%   eunit unit tests for the bstring library module.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
-{application, jhn_stdlib,
- [{description, "Jan Henry Nystrom's standard library"},
-  {vsn, "3.2.2"},
-  {registered, []},
-  {applications, [kernel, stdlib]},
-  {env, []}
- ]}.
+-module(bstring_tests).
+-copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
+
+%% Includes
+-include_lib("eunit/include/eunit.hrl").
+
+%% ===================================================================
+%% Tests.
+%% ===================================================================
+
+%%--------------------------------------------------------------------
+%% strip/1
+%%--------------------------------------------------------------------
+strip_1_test_() ->
+    [?_test(?assertEqual(<<"foo">>, bstring:strip(<<"  foo  ">>)))].
+
+%% ===================================================================
+%% Internal functions.
+%% ===================================================================
+
