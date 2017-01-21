@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013-2016 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2017 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2016, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2017, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -820,7 +820,7 @@ unescape(Binary, Acc, State = #state{encoding = Encoding}) ->
     case next(Binary, State) of
         {$\\, T} -> unescape_solid(T, Acc, State);
         {$", T} -> {Acc, T};
-        {H, T} when Encoding == utf8 -> unescape(T, <<Acc/binary, H/utf8>>, State);
+        {H, T} when Encoding == utf8 -> unescape(T,<<Acc/binary,H/utf8>>,State);
         _ when Encoding == ?UTF16L; Encoding == ?UTF16B ->
             <<H:16, T/binary>> = Binary,
             unescape(T, <<Acc/binary, H:16>>, State);

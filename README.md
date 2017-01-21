@@ -28,6 +28,7 @@ Features/Modules
   * String Processing Functions for binary encoded strings
     * blist -- drop in replacement for the lists module in stdlib
     * bstring -- drop in replacement for the string module in stdlib
+    * mustache -- Mustache template rendering
   * Protocols
     * Encoding/decoding JSON/Erlang  -- json [rfc4627][6], [rfc7159][7]
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- json [rfc6901][8]
