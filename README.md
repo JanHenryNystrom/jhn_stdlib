@@ -41,12 +41,14 @@ Features/Modules
     * Encoding/decoding IP addresses/Erlang -- ip_addr [rfc4291][16],
                                                        [rfc5952][17],
                                                        [rfc4632][18]
+    * Generating/encoding/decoding Timestamps Posix/Erlang -- timestamp
+                                                              [rfc3339][19]
   * Clients
-    * A simple HTTP client -- shttpc [rfc7230][19], [rfc7231][20],
-                                     [rfc7538][21], [rfc5789][22],
-                                     [rfc2818][23]
-    * Server/client for Syslog -- syslog [rfc5425][24], [rfc5426][25],
-                                         [rfc6587][26]
+    * A simple HTTP client -- shttpc [rfc7230][20], [rfc7231][21],
+                                     [rfc7538][22], [rfc5789][23],
+                                     [rfc2818][24]
+    * Server/client for Syslog -- syslog [rfc5425][25], [rfc5426][26],
+                                         [rfc6587][27]
   * Pull oriented data source abstraction
     * lazy -- abstracts different data sources as uniform lazy data
   * Data structures
@@ -147,19 +149,21 @@ I know I really should.
        "A Recommendation for IPv6 Address Text Representation"
   [18]: http://www.ietf.org/rfc/rfc4632.txt
        "Classless Inter-domain Routing (CIDR): The Internet Address Assignment and Aggregation Plan"
-  [19]: http://www.ietf.org/rfc/rfc7230.txt
+  [19]: http://www.ietf.org/rfc/rfc3339.txt
+       "Date and Time on the Internet: Timestamps"
+  [20]: http://www.ietf.org/rfc/rfc7230.txt
        "Hypertext Transfer Protocol (HTTP/1.1): Message Syntax and Routing"
-  [20]: http://www.ietf.org/rfc/rfc7231.txt
+  [21]: http://www.ietf.org/rfc/rfc7231.txt
        "Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content"
-  [21]: http://www.ietf.org/rfc/rfc7538.txt
+  [22]: http://www.ietf.org/rfc/rfc7538.txt
        "The Hypertext Transfer Protocol Status Code 308 (Permanent Redirect)"
-  [22]: http://www.ietf.org/rfc/rfc5789.txt
+  [23]: http://www.ietf.org/rfc/rfc5789.txt
        "PATCH Method for HTTP"
-  [23]: http://www.ietf.org/rfc/rfc2818.txt
+  [24]: http://www.ietf.org/rfc/rfc2818.txt
        "HTTP Over TLS (rfc2818)"
-  [24]: http://www.ietf.org/rfc/rfc5425.txt
+  [25]: http://www.ietf.org/rfc/rfc5425.txt
        "Transport Layer Security (TLS) Transport Mapping for Syslog"
-  [25]: http://www.ietf.org/rfc/rfc5426.txt
+  [26]: http://www.ietf.org/rfc/rfc5426.txt
        "Transmission of Syslog Messages over UDP"
-  [26]: http://www.ietf.org/rfc/rfc6587.txt
+  [27]: http://www.ietf.org/rfc/rfc6587.txt
        "Transmission of Syslog Messages over TCP"
