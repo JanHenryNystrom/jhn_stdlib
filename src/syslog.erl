@@ -165,7 +165,7 @@ open() -> open(#opts{}).
 %%     port -> The port used by client or server with the default in the
 %%             client case is 0 (the underlying OS assigns an available
 %%             port number) for the server the default ports are as follows:
-%%             UDP/154, TCP/601, TLS/6514
+%%             UDP/514, TCP/601, TLS/6514
 %%     destination -> the IP address or hostname of the server to connect
 %%                    to in the case TCP and TLS and the default server for
 %%                    the UDP case
@@ -755,7 +755,7 @@ dest(undefined, ipv4) -> {127, 0, 0,1};
 dest(undefined, ipv6) -> {0, 0, 0, 0, 0, 0, 0, 1};
 dest(Address, _) -> Address.
 
-port(udp, undefined, server) -> 154;
+port(udp, undefined, server) -> 514;
 port(tcp, undefined, server) -> 601;
 port(tls, undefined, server) -> 6514;
 port(_, undefined, client) -> 0;
