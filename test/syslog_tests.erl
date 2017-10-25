@@ -449,8 +449,8 @@ encode_2_decode_1_test_() ->
                syslog:encode(#{header =>
                                    #{time_stamp => {{2016, 4, 1}, {18, 11, 42}},
                                      fraction => Fraction}},
-                             [binary])))) ||
-          Fraction <- [0, 1, 10, 12, 123, 6666]],
+                             [binary, milli])))) ||
+          Fraction <- [0, 1, 10, 12, 123]],
       [?_test(
           ?assertMatch(
              #{header := #{time_stamp := {{2016, 4, 1}, {18, 11, 42}},
@@ -462,7 +462,18 @@ encode_2_decode_1_test_() ->
                                      offset_sign => Sign,
                                      offset => Offset}},
                              [binary])))) ||
-          Sign <- ['-', '+'], Offset <- [{0, 0}, {7, 30}, {0, 10}]],
+          Sign <- ['-', '+'], Offset <- [{7, 30}, {0, 10}]],
+      [?_test(
+          ?assertMatch(
+             #{header := #{time_stamp := {{2016, 4, 1}, {18, 11, 42}},
+                           offset_sign := '-',
+                           offset := {0, 0}}},
+             syslog:decode(
+               syslog:encode(#{header =>
+                                   #{time_stamp => {{2016, 4, 1}, {18, 11, 42}},
+                                     offset_sign => '-',
+                                     offset => {0, 0}}},
+                             [binary]))))],
       [?_test(
           ?assertMatch(
              #{header := #{time_stamp := {{2016, 4, 1}, {18, 11, 42}},
@@ -475,7 +486,7 @@ encode_2_decode_1_test_() ->
                                      fraction => 123,
                                      offset_sign => Sign,
                                      offset => {2, 0}}},
-                             [binary])))) ||
+                             [binary, milli])))) ||
           Sign <- ['-', '+']],
       ?_test(
          ?assertMatch(

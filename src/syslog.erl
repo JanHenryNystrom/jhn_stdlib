@@ -33,7 +33,7 @@
 %%%  Header     : #{facility => Facility,
 %%%                 severity => Severity,
 %%%                 version => Version,
-%%%                 time_stamp => {{Year, Month, Day}, {Hour, Minute, Second}},
+%%%                 time_stamp => TimeStamp,
 %%%                 fraction => integer(),
 %%%                 offset_sign => '+' | '-' | 'Z',
 %%%                 offset => {Hour, Minute},
@@ -52,6 +52,10 @@
 %%%               default: info
 %%%  Version    : integer()
 %%%               default: 1
+%%%  TimeStamp  : binary() |
+%%%               {{Year, Month, Day}, {Hour, Minute, Second}} |
+%%%               #{year => Year, month => Month, day => Day,
+%%%                 hour =>Hour, minute => Minute, second => Second}
 %%%  Year, Month, Day, Hour, Minute, Second : integer()
 %%%
 %%%  Structured : [{Id, [{Key, Value}]}]
@@ -100,15 +104,16 @@
 %% Includes
 
 %% Records
--record(opts, {type        = udp    :: type(),
-               role        = client :: client | server,
-               port                 :: integer(),
-               opts        = []     :: [{atom(), _}],
-               ipv         = ipv4   :: ipv4 | ipv6,
-               dest                 :: inet:ip_address() | inet:hostname(),
-               dest_port            :: inet:port(),
-               timeout              :: integer(),
-               return_type = iolist :: iolist | binary}).
+-record(opts, {type        = udp     :: type(),
+               role        = client  :: client | server,
+               port                  :: integer(),
+               opts        = []      :: [{atom(), _}],
+               ipv         = ipv4    :: ipv4 | ipv6,
+               dest                  :: inet:ip_address() | inet:hostname(),
+               dest_port             :: inet:port(),
+               precision   = seconds :: seconds | milli | micro,
+               timeout               :: integer(),
+               return_type = iolist  :: iolist | binary}).
 
 -record(transport, {type                 :: type() | tcp_listen | tls_listen,
                     role                 :: client | server,
@@ -400,6 +405,9 @@ send(Transport, Line) -> send(Transport, Line, #opts{}).
 %%   Sends a message over the transport.
 %%
 %%   Options are:
+%%     seconds (default) -> second precision
+%%     milli -> milli second precision
+%%     micro -> micro second precision
 %%     destination -> the IP address or hostname of the peer to send to
 %%                    in the UDP case, otherwise the default provided in open
 %%                    is used
@@ -677,6 +685,9 @@ encode(Line) -> encode(Line, #opts{}).
 %%   Encodes the structured Erlang term as an iolist or binary.
 %%   Encode will give an exception if the erlang term is not well formed.
 %%   Options are:
+%%     seconds (default) -> second precision
+%%     milli -> milli second precision
+%%     micro -> micro second precision
 %%     binary -> a binary is returned
 %%     iolist -> a iolist is returned
 %% @end
@@ -708,8 +719,9 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%   Decodes the binary into a structured Erlang.
 %%   Decode will give an exception if the binary is not well formed
 %%   Syslog line.
-
+%%
 %%   Options are: currently none
+%%   N.B. the timestamp is decode into a date time tuple.
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary(), [opt()] | #opts{}) -> line().
@@ -768,17 +780,18 @@ inverse(server) -> client.
 %% Encoding
 %% ===================================================================
 
-do_encode(Line, _) ->
-    [encode_header(Line), $\s,
+do_encode(Line, Opts) ->
+    [encode_header(Line, Opts), $\s,
      encode_structured_data(Line),
      encode_msg(Line)].
 
-encode_header(Line) ->
+encode_header(Line, #opts{precision = Precision}) ->
     Header = maps:get(header, Line, #{}),
     Severity = encode_severity(maps:get(severity, Header, info)),
     Facility = encode_facility(maps:get(facility, Header, user)),
     Version = integer_to_binary(maps:get(version, Header, 1)),
-    Timestamp = encode_time_stamp(maps:get(time_stamp, Header, '-'), Header),
+    Timestamp =
+        encode_time_stamp(maps:get(time_stamp, Header, '-'), Header, Precision),
     HostName = maps:get(host_name, Header, "-"),
     AppName = maps:get(app_name, Header, "-"),
     ProcId = maps:get(proc_id, Header, "-"),
@@ -820,33 +833,26 @@ encode_facility(local5) -> 168;
 encode_facility(local6) -> 176;
 encode_facility(local7) -> 184.
 
-encode_time_stamp('-', _) -> "-";
-encode_time_stamp({{Y, M , D}, {H, Mi, S}}, Header) ->
-    [integer_to_binary(Y), $-,
-     integer_to_binary_pad(M), $-,
-     integer_to_binary_pad(D), $T,
-     integer_to_binary_pad(H), $:,
-     integer_to_binary_pad(Mi), $:,
-     integer_to_binary_pad(S),
-     case maps:get(fraction, Header, undefined) of
-         undefined -> [];
-         Fraction -> [$., integer_to_binary(Fraction)]
-     end,
-     case maps:get(offset_sign, Header, undefined) of
-         undefined -> [$Z];
-         'Z' -> [$Z];
-         '+' ->
-             {HO, MiO} = maps:get(offset, Header),
-             [$+, integer_to_binary_pad(HO), $:, integer_to_binary_pad(MiO)];
-         '-' ->
-             {HO, MiO} = maps:get(offset, Header),
-             [$-, integer_to_binary_pad(HO), $:, integer_to_binary_pad(MiO)]
-     end].
-
-integer_to_binary_pad(N) ->
-    case integer_to_binary(N) of
-        <<D>> -> <<$0, D>>;
-        D -> D
+encode_time_stamp('-', _, _) -> "-";
+encode_time_stamp(Bin, _, _) when is_binary(Bin) -> Bin;
+encode_time_stamp(Map = #{}, Header, Precision) ->
+    case maps:get(offset_sign, Header, 'Z') of
+        'Z' -> timestamp:encode(Map, [Precision]);
+        Sign ->
+            {HO, MiO} = maps:get(offset, Header),
+            T = Map#{offset => #{sign => Sign, hours => HO, minutes => MiO}},
+            timestamp:encode(T, [Precision])
+    end;
+encode_time_stamp({{Y, M , D}, {H, Mi, S}}, Header, Precision) ->
+    T = #{year => Y, month => M, day => D,
+          hour => H, minute => Mi,second => S,
+          fraction => maps:get(fraction, Header, 0)},
+    case maps:get(offset_sign, Header, 'Z') of
+        'Z' -> timestamp:encode(T, [Precision]);
+        Sign ->
+            {HO, MiO} = maps:get(offset, Header),
+            T1 = T#{offset => #{sign => Sign, hours => HO, minutes => MiO}},
+            timestamp:encode(T1, [Precision])
     end.
 
 encode_structured_data(#{structured := Structured}) ->
@@ -915,43 +921,17 @@ decode_version(<<H, T/binary>>, Header, Acc) ->
     decode_version(T, Header, <<Acc/binary ,H>>).
 
 decode_timestamp(<<$-, $\s, T/binary>>, Header) -> decode_hostname(T, Header);
-decode_timestamp(<<Y:4/bytes, $-, M:2/bytes, $-, D:2/bytes, $T,
-                   H:2/bytes, $:, Mi:2/bytes, $:, S:2/bytes,
-                   T/binary>>,
-                 Header) ->
-    Header1 = Header#{time_stamp => {{binary_to_integer(Y),
-                                      binary_to_integer(M),
-                                      binary_to_integer(D)},
-                                     {binary_to_integer(H),
-                                      binary_to_integer(Mi),
-                                      binary_to_integer(S)}}},
-    decode_timestamp1(T, Header1).
-
-decode_timestamp1(<<$Z, $\s, T/binary>>, Header) -> decode_hostname(T, Header);
-decode_timestamp1(<<$., T/binary>>, Header) -> decode_fraction(T, Header, <<>>);
-decode_timestamp1(<<$+, T/binary>>, Header) ->
-    decode_offset(T, Header#{offset_sign => '+'});
-decode_timestamp1(<<$-, T/binary>>, Header) ->
-    decode_offset(T, Header#{offset_sign => '-'}).
-
-decode_fraction(<<$Z, $\s, T/binary>>, Header, Acc) ->
-    decode_hostname(T, Header#{fraction => binary_to_integer(Acc)});
-decode_fraction(<<$+, T/binary>>, Header, Acc) ->
-    decode_offset(T,
-                  Header#{fraction => binary_to_integer(Acc),
-                          offset_sign => '+'});
-decode_fraction(<<$-, T/binary>>, Header, Acc) ->
-    decode_offset(T,
-                  Header#{fraction => binary_to_integer(Acc),
-                          offset_sign => '-'});
-decode_fraction(<<H, T/binary>>, Header, Acc) ->
-    decode_fraction(T, Header, <<Acc/binary, H>>).
-
-
-decode_offset(<<H:2/bytes, $:, M:2/bytes, $\s, T/binary>>, Header) ->
-    decode_hostname(T,
-                    Header#{offset =>
-                                {binary_to_integer(H), binary_to_integer(M)}}).
+decode_timestamp(T, Header) ->
+    {#{year := Y, month := M, day := D, hour := H, minute := Mi, second := S,
+       fraction := Fraction, offset := Offset},
+     T1}
+        = timestamp:decode(T, [continue]),
+    Header1 = Header#{time_stamp => {{Y, M, D}, {H,Mi,S}},fraction => Fraction},
+    case Offset of
+        'Z' -> decode_hostname(T1, Header1);
+        #{sign := Sign,  hours := HO, minutes := MO} ->
+            decode_hostname(T1,Header1#{offset_sign => Sign,offset => {HO, MO}})
+    end.
 
 decode_hostname(<<$-, $\s, T/binary>>, Header) -> decode_appname(T, Header);
 decode_hostname(Bin, Header) ->
@@ -1068,6 +1048,9 @@ parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt(seconds, Opts) -> Opts#opts{precision = seconds};
+parse_opt(milli, Opts) -> Opts#opts{precision = milli};
+parse_opt(micro, Opts) -> Opts#opts{precision = micro};
 parse_opt(udp, Opts) -> Opts#opts{type = udp};
 parse_opt(tcp, Opts) -> Opts#opts{type = tcp};
 parse_opt(tls, Opts) -> Opts#opts{type = tls};

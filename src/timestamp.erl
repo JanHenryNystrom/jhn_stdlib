@@ -32,7 +32,7 @@
 %%%             fraction => integer(),
 %%%             offset => Offset
 %%%            }
-%%%  Offset : 'Z' | #{direction => '+' | '-',
+%%%  Offset : 'Z' | #{sign => '+' | '-',
 %%%                   hours => integer(),
 %%%                   minutes => integer()}
 %%%
