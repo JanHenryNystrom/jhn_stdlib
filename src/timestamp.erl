@@ -356,6 +356,8 @@ year1(Y) ->
 date(Day) when Day < 31 -> {1, Day + 1};
 date(Day) when Day < 59 -> {2, Day - 30};
 date(Day) when Day < 90 -> {3, Day - 58};
+date(Day) when Day < 120 -> {4, Day - 89};
+date(Day) when Day < 151 -> {5, Day - 119};
 date(Day) when Day < 181 -> {6, Day - 150};
 date(Day) when Day < 212 -> {7, Day - 180};
 date(Day) when Day < 243 -> {8, Day - 211};
