@@ -57,7 +57,7 @@
 %%   Renders a mustache template, the same as render(Template, Context, iolist).
 %% @end
 %%--------------------------------------------------------------------
--spec render(template(), context()) -> binary().
+-spec render(template(), context()) -> iolist().
 %%--------------------------------------------------------------------
 render(Template, Context) -> render(Template, Context, iolist).
 
@@ -70,7 +70,7 @@ render(Template, Context) -> render(Template, Context, iolist).
 %%     iolist -> an iolist is returned (default)
 %% @end
 %%--------------------------------------------------------------------
--spec render(template(), context(), option()) -> binary().
+-spec render(template(), context(), option()) -> iolist() | binary().
 %%--------------------------------------------------------------------
 render(Template, Context, iolist) -> do_render(Template, Context);
 render(Template, Context, binary) ->

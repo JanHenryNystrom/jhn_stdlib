@@ -777,8 +777,12 @@ send_request(State, Data) ->
             safe_close(State),
             Error
     catch
-        error:Error -> {error, Error};
-        Class:Error -> {error, {Class, Error}}
+        error:Error ->
+            safe_close(State),
+            {error, Error};
+        Class:Error ->
+            safe_close(State),
+            {error, {Class, Error}}
     end.
 
 send(#state{transport = tcp, socket = Sock, limit = infinity}, Data) ->
