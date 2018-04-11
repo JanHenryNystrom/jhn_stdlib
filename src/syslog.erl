@@ -924,7 +924,7 @@ decode_timestamp(<<$-, $\s, T/binary>>, Header) -> decode_hostname(T, Header);
 decode_timestamp(T, Header) ->
     {#{year := Y, month := M, day := D, hour := H, minute := Mi, second := S,
        fraction := Fraction, offset := Offset},
-     T1}
+     <<_, T1/binary>>}
         = timestamp:decode(T, [continue]),
     Header1 = Header#{time_stamp => {{Y, M, D}, {H,Mi,S}},fraction => Fraction},
     case Offset of
