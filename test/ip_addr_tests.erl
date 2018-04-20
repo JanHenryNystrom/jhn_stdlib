@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2016-2017 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2016-2018 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%   eunit unit tests for the plist library module.
+%%%   eunit unit tests for the ip_add library module.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2016-2017, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2016-2018, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(ip_addr_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').

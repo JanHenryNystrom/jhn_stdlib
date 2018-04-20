@@ -35,6 +35,7 @@ Features/Modules
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
                                      [draft-fge-json-schema-validation-00][11]
     * MessagePack -- msgpack [MessagePack][12]/Erlang
+    * Bencoding -- bencoding
     * Encoding/decoding Syslog/Erlang -- syslog [rfc5424][13], [rfc5427][14]
   * Standards
     * Encoding/decoding URI/Erlang -- uri [rfc3986][15]
