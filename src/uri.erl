@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2015-2017 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2015-2018 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2015-2017, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2015-2018, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(uri).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -185,9 +185,10 @@ do_encode(URI = #uri{}, Opts) ->
          path = Path,
          query = Query,
          fragment = Fragment} = URI,
-    S = case Scheme of
+    S = case double_slash(Scheme) of
             undefined -> [];
-            _ -> [atom_to_binary(Scheme, utf8), "://"]
+            true -> [atom_to_binary(Scheme, utf8), "://"];
+            false -> [atom_to_binary(Scheme, utf8), ":"]
         end,
     I  = case UserInfo of
              [] -> [];
@@ -247,8 +248,12 @@ decode_scheme(I, Acc, Opts) ->
     case next(I) of
         eos -> #uri{path = [to_binary(Acc)]};
         {$:, T} ->
-            URI = #uri{scheme = to_scheme(Acc, [])},
-            decode_authority_or_path(T, [], URI, Opts);
+            Scheme = to_scheme(Acc, []),
+            URI = #uri{scheme = Scheme},
+            case double_slash(Scheme) of
+                true -> decode_authority_or_path(T, [], URI, Opts);
+                false -> decode_authority(T, [], URI, Opts)
+            end;
         {$%, T} ->
             {H, T1} = decode_escaped(T),
             decode_nc(T1, [H | Acc], Opts);
@@ -498,6 +503,13 @@ unhex($f) -> 15.
 %% ===================================================================
 %% Common parts
 %% ===================================================================
+
+double_slash(undefined) -> undefined;
+double_slash(sip) -> false;
+double_slash(sips) -> false;
+double_slash(mailto) -> false;
+double_slash(_) -> true.
+
 
 parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
