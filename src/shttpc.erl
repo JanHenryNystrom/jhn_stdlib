@@ -518,7 +518,7 @@ request(Req) ->
               body := Body,
               redirect := Redirect,
               limit := Limit} = Req2,
-            State = #state{host = host_to_address(Host),
+            State = #state{host = Host,
                            port = port(Scheme, Port),
                            transport = transport(Scheme),
                            method = Method,
@@ -549,7 +549,7 @@ request(Req) ->
               options := Options,
               redirect := Redirect,
               limit := Limit} = Req2,
-            State = #state{host = host_to_address(Host),
+            State = #state{host = Host,
                            port = port(Scheme, Port),
                            transport = transport(Scheme),
                            method = Method,
@@ -586,7 +586,6 @@ validate(body, _, Req = #{method := 'POST'}) -> Req;
 validate(body, _, Req = #{method := 'PUT'}) -> Req;
 validate(body, _, Req = #{method := 'PATCH'}) -> Req;
 validate(body, <<>>, Req) -> Req;
-validate(uri, #uri{}, Req) -> Req;
 validate(uri, URI, Req) -> decode(URI, Req);
 validate(headers, Headers, Req) when is_map(Headers) -> Req;
 validate(options, Opts, Req) when is_list(Opts) -> Req;
@@ -611,13 +610,13 @@ validate(connection, #connection{transport = ssl, socket = Sock}, Req) ->
 validate(Opt, Value, _) -> erlang:error({bad_option, {Opt, Value}}).
 
 decode(URI, Req = #{connection := #connection{transport = Transport}}) ->
-    U  = #uri{scheme = Scheme} = uri:decode(URI),
+    U  = #uri{scheme = Scheme} = uri(URI),
     case transport(Scheme) of
         Transport -> Req#{uri => U};
         _ -> erlang:error({bad_option, {uri, URI}})
     end;
 decode(URI, Req = #{method := Method}) ->
-    case uri:decode(URI) of
+    case uri(URI) of
         U  = #uri{userinfo = []} -> Req#{uri => U};
         U  = #uri{userinfo = UserInfo} when Method == 'CONNECT' ->
             Headers = maps:get(headers, Req, #{}),
@@ -653,9 +652,6 @@ transport(https) -> ssl.
 limit(infinity) -> infinity;
 limit(Timeout) -> erlang:system_time(milli_seconds) + Timeout.
 
-host_to_address(Bin) when is_binary(Bin) -> binary_to_list(Bin);
-host_to_address(Tuple) ->  Tuple.
-
 %%------------------------------------------------------------------------------
 %% options
 %%------------------------------------------------------------------------------
@@ -676,16 +672,7 @@ inet_opt([inet6| _]) -> true;
 inet_opt([_ | T]) -> inet_opt(T).
 
 ipv6_host({_, _, _, _, _, _, _, _}) -> true;
-ipv6_host({_, _, _, _}) -> false;
-ipv6_host(Host) ->
-    case inet:getaddr(Host, inet) of
-        {ok, _} -> false;
-        _ ->
-            case inet:getaddr(Host, inet6) of
-                {ok, _} -> true;
-                _ -> false
-            end
-    end.
+ipv6_host(_) -> false.
 
 %%------------------------------------------------------------------------------
 %% Headers
@@ -1063,13 +1050,13 @@ redirect(State = #state{redirections = Redirections}, Headers) ->
                  port = Port,
                  path = Path,
                  fragment = Fragment,
-                 query = Query} = uri:decode(URI),
+                 query = Query} = uri(URI),
             Redirect = {Scheme, Host, Port, Path},
             case lists:member(Redirect, Redirections) of
                 true -> erlang:error(redirection_loop);
                 false ->
                     State1 =
-                        State#state{host = host_to_address(Host),
+                        State#state{host = Host,
                                     port = port(Scheme, Port),
                                     transport = transport(Scheme),
                                     path = Path,
@@ -1086,3 +1073,18 @@ redirect(State = #state{redirections = Redirections}, Headers) ->
                     end
             end
     end.
+
+%%------------------------------------------------------------------------------
+%% URI
+%%------------------------------------------------------------------------------
+
+uri(U = #uri{host = Host}) -> U#uri{host = host_to_address(Host)};
+uri(IoData) -> uri(uri:decode(IoData)).
+
+host_to_address(T = {_, _, _, _}) -> T;
+host_to_address(T = {_, _, _, _, _, _, _, _}) -> T;
+host_to_address(Binary) ->
+    try ip_addr:decode(Binary, [tuple])
+    catch _:_ -> binary_to_list(Binary)
+    end.
+
