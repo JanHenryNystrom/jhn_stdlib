@@ -790,11 +790,11 @@ decode_number(Binary, Stage, Phase, Acc, State) ->
         {{$0, T}, pre, int} -> decode_number(T, zero, int, [$0 | Acc], State);
         {{H, T}, pre, exp}  when ?IS_SIGN(H) ->
             decode_number(T, sign, exp, [H | Acc], State);
-        {{H, T}, pre, float} when ?IS_INT(H) ->
-            decode_number(T, post, float, [H | Acc], State);
+        {{H, T}, pre, exp} when ?IS_INT(H) ->
+            decode_number(T, post, exp, [H | Acc], State);
         {{H, T}, pre, _} when ?IS_POS_INT(H) ->
             decode_number(T, post, Phase, [H | Acc], State);
-        {{H, T}, sign, _} when ?IS_POS_INT(H) ->
+        {{H, T}, sign, _} when ?IS_INT(H) ->
             decode_number(T, post, Phase, [H | Acc], State);
         {{H, T}, post, _} when ?IS_INT(H) ->
             decode_number(T, post, Phase, [H | Acc], State);
@@ -1288,11 +1288,13 @@ skip_number(Binary, Stage, Phase, State) ->
         {{$0, T}, pre, int} -> skip_number(T, zero, int, inc(State));
         {{H, T}, pre, exp} when ?IS_SIGN(H) ->
             skip_number(T, sign, exp, inc(State));
+        {{H, T}, pre, exp} when ?IS_INT(H) ->
+            skip_number(T, post, exp, inc(State));
         {{H, T}, pre, float} when ?IS_INT(H) ->
             skip_number(T, post, float, inc(State));
         {{H, T}, pre, _} when ?IS_POS_INT(H) ->
             skip_number(T, post, Phase, inc(State));
-        {{H, T}, sign, _} when ?IS_POS_INT(H) ->
+        {{H, T}, sign, _} when ?IS_INT(H) ->
             skip_number(T, post, Phase, inc(State));
         {{H, T}, post, _} when ?IS_INT(H) ->
             skip_number(T, post, Phase, inc(State));
