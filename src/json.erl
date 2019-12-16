@@ -792,6 +792,8 @@ decode_number(Binary, Stage, Phase, Acc, State) ->
             decode_number(T, sign, exp, [H | Acc], State);
         {{H, T}, pre, exp} when ?IS_INT(H) ->
             decode_number(T, post, exp, [H | Acc], State);
+        {{H, T}, pre, float} when ?IS_INT(H) ->
+            decode_number(T, post, float, [H | Acc], State);
         {{H, T}, pre, _} when ?IS_POS_INT(H) ->
             decode_number(T, post, Phase, [H | Acc], State);
         {{H, T}, sign, _} when ?IS_INT(H) ->
