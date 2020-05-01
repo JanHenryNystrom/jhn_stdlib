@@ -22,12 +22,16 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2019, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2020, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 {application, jhn_stdlib,
  [{description, "Jan Henry Nystrom's standard library"},
-  {vsn, "3.4.3"},
+  {vsn, "3.4.4"},
   {registered, []},
   {applications, [kernel, stdlib]},
-  {env, []}
+  {env, []},
+  %% HEX configs
+  {licenses, ["Apache-2.0"]},
+  {pkg_name, "JHNStdLib"},
+  {links, [{"GitHub", "https://github.com/JanHenryNystrom/jhn_stdlib.git"}]}
  ]}.
