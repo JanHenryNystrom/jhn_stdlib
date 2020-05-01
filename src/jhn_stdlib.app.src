@@ -32,6 +32,5 @@
   {env, []},
   %% HEX configs
   {licenses, ["Apache-2.0"]},
-  {pkg_name, 'JHNStdLib'},
   {links, [{"GitHub", "https://github.com/JanHenryNystrom/jhn_stdlib.git"}]}
  ]}.
