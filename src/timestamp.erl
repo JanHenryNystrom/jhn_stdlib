@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2017 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2017-2020 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2017, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2017-2020, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(timestamp).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').

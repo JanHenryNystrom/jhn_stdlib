@@ -4,8 +4,9 @@ ebin
 *.o
 *.beam
 *.plt
-rebar
-.rebar
+rebar3
+rebar.lock
+.build
 doc/*.html
 doc/*.png
 doc/*.css

@@ -1,5 +1,5 @@
 #==============================================================================
-# Copyright 2013-2017 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+# Copyright 2013-2020 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,25 +22,4 @@ ifeq (${BASE},)
                    git clone https://github.com/JanHenryNystrom/makefiles)
 endif
 
-include deps/makefiles/erlang.mk
-
-.PHONY: dialyzer clean-plt
-
-DIALYZER_OPTIONS = -Werror_handling -Wrace_conditions
-
-PLTS_DIR = ./.plts
-
-OTP_PLT = $(PLTS_DIR)/otp.plt
-
-OTP_DEPS = crypto compiler
-
-$(OTP_PLT):
-	$(VERBOSE) mkdir -p $(PLTS_DIR)
-	dialyzer --build_plt --apps erts kernel stdlib $(OTP_DEPS) \
-                 --output_plt $(OTP_PLT)
-
-dialyzer: compile $(OTP_PLT)
-	dialyzer $(DIALYZER_OPTIONS) ebin/*.beam --plt $(OTP_PLT)
-
-clean-plt:
-	-rm -fr $(PLTS_DIR)
+include deps/makefiles/erlang3.mk

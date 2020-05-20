@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013-2017 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2020 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -76,11 +76,10 @@
 %%%
 %%%  UTF formats are defined in Unicode 5.0 (ISBN 0-321-48091-0).
 %%%
-%%% Only supports R17 and later.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2017, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2020, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').

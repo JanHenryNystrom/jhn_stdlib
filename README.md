@@ -31,6 +31,7 @@ Features/Modules
     * mustache -- Mustache template rendering
   * Protocols
     * Encoding/decoding JSON/Erlang  -- json [rfc4627][6], [rfc7159][7]
+    * Encoding/decoding stream JSON/Erlang  -- jstream [rfc7159][7]
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- json [rfc6901][8]
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
                                      [draft-fge-json-schema-validation-00][11]
