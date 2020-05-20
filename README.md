@@ -57,6 +57,7 @@ Features/Modules
     * Bloom filters -- bloom
     * Property lists -- plist
     * Prefix trees -- p_tree
+    * Binary(UTF-8) Prefix trees -- pb_tree
     * Range trees -- r_tree
     * T-trees -- t_tree
   * Algorithms

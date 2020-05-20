@@ -719,10 +719,15 @@ redirect_response(Module, Socket, _, _, Body) ->
 %% Webserver
 %%------------------------------------------------------------------------------
 
+dir() -> code:lib_dir(jhn_stdlib, test).
+
+file(File) -> filename:join([dir(), File]).
+
+
 -define(TCP, [{packet, http}, binary, {active, false}]).
 -define(SSL, [{verify, 0},
-              {keyfile, "../test/key.pem"},
-              {certfile, "../test/crt.pem"} | ?TCP]).
+              {keyfile, file("key.pem")},
+              {certfile, file("crt.pem")} | ?TCP]).
 
 start(Mod, Responders) -> start(Mod, Responders, inet).
 

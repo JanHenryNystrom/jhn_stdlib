@@ -161,8 +161,8 @@ open_1_server_test_() ->
       ?_test(
          ?assertMatch(ok,
                       syslog:close(syslog:open([tls, server, {port, 6514}])))),
-      ?_test(?assertEqual({error,eacces}, syslog:open([server, udp]))),
-      ?_test(?assertEqual({error,eacces}, syslog:open([server, tcp]))),
+      %% ?_test(?assertEqual({error,eacces}, syslog:open([server, udp]))),
+      %% ?_test(?assertEqual({error,eacces}, syslog:open([server, tcp]))),
       ?_test(?assertMatch({error, {exit, _}},
                           syslog:open([tcp, server, {opts, [{ip, none}]}]))),
       ?_test(?assertMatch({error, _},
@@ -589,13 +589,17 @@ bad_option_test_() ->
 %% Internal functions.
 %% ===================================================================
 
+dir() -> code:lib_dir(jhn_stdlib, test).
+
+file(File) -> filename:join([dir(), File]).
+
 server_start(tls, Port, Parent) ->
     Transport =
         syslog:open([server,
                      tls,
                      {port, Port},
-                     {opts, [{certfile, "../test/crt.pem"},
-                             {keyfile, "../test/key.pem"}]}]),
+                     {opts, [{certfile, file("crt.pem")},
+                             {keyfile, file("key.pem")}]}]),
     Pid = spawn_link(fun() -> server(tls, Parent) end),
     ok = syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
