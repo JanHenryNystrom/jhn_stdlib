@@ -46,6 +46,7 @@
 %% @copyright (C) 2020, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(jstream).
+-copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% Library functions
 -export([encode/1, encode/2,
