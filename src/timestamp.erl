@@ -55,7 +55,7 @@
 -export_type([posix/0, stamp/0]).
 
 %% Records
--record(opts, {precision = seconds :: seconds | milli | micro,
+-record(opts, {precision = seconds :: seconds | milli | micro | nano,
                continue = false :: boolean(),
                return_type = iolist :: iolist | binary | list | posix}).
 
@@ -64,7 +64,8 @@
 -type stamp() :: #{}.
 
 
--type opt() :: [seconds | milli | micro | iolist | binary | list | posix].
+-type opt() :: [seconds | milli | micro | nano |
+                iolist | binary | list | posix].
 
 %% Defines
 -define(SECONDS_PER_MINUTE, 60).
@@ -98,6 +99,7 @@ gen() -> gen([]).
 %%     seconds (default) -> second precision
 %%     milli -> milli second precision
 %%     micro -> micro second precision
+%%     nano -> nano second precision
 %%     binary -> a binary is returned
 %%     list -> a flat list is returned
 %%     iolist (default) -> an iolist is returned
@@ -133,6 +135,7 @@ encode(Stamp) -> encode(Stamp, #opts{}).
 %%     seconds (default) -> second precision (no fraction generated)
 %%     milli -> milli second precision
 %%     micro -> micro second precision
+%%     nano -> nano second precision
 %%     binary -> a binary is returned
 %%     list -> a flat list is returned
 %%     iolist -> an iolist is returned
@@ -174,6 +177,7 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%     seconds (default) -> second precision
 %%     milli -> milli second precision
 %%     micro -> micro second precision
+%%     nano -> nano second precision
 %%     continue -> all remaining indata is returned when decoding a binary
 %% @end
 %%--------------------------------------------------------------------
@@ -192,7 +196,8 @@ decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
 
 precision(seconds) -> seconds;
 precision(milli) -> milli_seconds;
-precision(micro) -> micro_seconds.
+precision(micro) -> micro_seconds;
+precision(nano) -> nano_seconds.
 
 %% ===================================================================
 %% Encoding
@@ -211,7 +216,8 @@ do_encode(Map, #opts{return_type = posix, precision = P}) ->
     case P of
         seconds -> Seconds;
         milli -> Seconds * 1000 + Fraction;
-        micro -> Seconds * 1000000 + Fraction
+        micro -> Seconds * 1000000 + Fraction;
+        nano -> Seconds * 1000000000 + Fraction
     end;
 do_encode(Map = #{}, #opts{precision = Precision}) ->
     #{year := Year, month := Month, day := Day,
@@ -219,7 +225,8 @@ do_encode(Map = #{}, #opts{precision = Precision}) ->
     Fraction = case {Precision, maps:get(fraction, Map, 0)} of
                    {seconds, _} -> "";
                    {milli, Fraction0} -> [$., pad(Fraction0, 3)];
-                   {micro, Fraction0} -> [$., pad(Fraction0, 6)]
+                   {micro, Fraction0} -> [$., pad(Fraction0, 6)];
+                   {nano, Fraction0} -> [$., pad(Fraction0, 9)]
                end,
     Offset = case maps:get(offset, Map, 'Z') of
                  'Z' -> "Z";
@@ -237,7 +244,9 @@ do_encode(Seconds, Opts = #opts{precision = seconds}) ->
 do_encode(Milli, Opts = #opts{precision = milli}) ->
     do_encode(decode_posix(Milli div 1000, Milli rem 1000), Opts);
 do_encode(Micro, Opts = #opts{precision = micro}) ->
-    do_encode(decode_posix(Micro div 1000000, Micro rem 1000000), Opts).
+    do_encode(decode_posix(Micro div 1000000, Micro rem 1000000), Opts);
+do_encode(Nano, Opts = #opts{precision = nano}) ->
+    do_encode(decode_posix(Nano div 1000000000, Nano rem 1000000000), Opts).
 
 days(Year, Month, Day) ->
     year1(Year) + month_days(Month) + leap(Year, Month) + Day - 1.
@@ -288,7 +297,9 @@ do_decode(Seconds, #opts{precision = seconds}) ->
 do_decode(Milli, #opts{precision = milli}) ->
     decode_posix(Milli div 1000, Milli rem 1000);
 do_decode(Micro, #opts{precision = micro}) ->
-    decode_posix(Micro div 1000000, Micro rem 1000000).
+    decode_posix(Micro div 1000000, Micro rem 1000000);
+do_decode(Nano, #opts{precision = nano}) ->
+    decode_posix(Nano div 1000000000, Nano rem 1000000000).
 
 decode_digit(0, Binary, Skip, Acc) ->
     {list_to_integer(lists:reverse(Acc)), skip(Skip, Binary)};
@@ -390,6 +401,7 @@ parse_opt(continue, Opts) -> Opts#opts{continue = true};
 parse_opt(seconds, Opts) -> Opts#opts{precision = seconds};
 parse_opt(milli, Opts) -> Opts#opts{precision = milli};
 parse_opt(micro, Opts) -> Opts#opts{precision = micro};
+parse_opt(nano, Opts) -> Opts#opts{precision = nano};
 parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(list, Opts) -> Opts#opts{return_type = list};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
