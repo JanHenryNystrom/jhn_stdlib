@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2016-2020 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2016-2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2016-2020, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2016-2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(syslog).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -357,10 +357,14 @@ accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
         #opts{timeout = undefined} ->
             try ssl:transport_accept(LSock) of
                 {ok, Sock}  ->
-                    case ssl:ssl_accept(Sock) of
-                        ok ->
+                    case ssl:handshake(Sock) of
+                        {ok, SSock} ->
                             Transport#transport{type = tls,
-                                                socket = Sock,
+                                                socket = SSock,
+                                                listen_socket = undefined};
+                        {ok, SSock, _} ->
+                            Transport#transport{type = tls,
+                                                socket = SSock,
                                                 listen_socket = undefined};
                         Error ->
                             Error
@@ -373,10 +377,14 @@ accept(Transport = #transport{type = tls_listen, listen_socket = LSock},Opts) ->
         #opts{timeout = Timeout} ->
             try ssl:transport_accept(LSock, Timeout) of
                 {ok, Sock}  ->
-                    case ssl:ssl_accept(Sock) of
-                        ok ->
+                    case ssl:handshake(Sock) of
+                        {ok, SSock} ->
                             Transport#transport{type = tls,
-                                                socket = Sock,
+                                                socket = SSock,
+                                                listen_socket = Sock};
+                        {ok, SSock, _} ->
+                            Transport#transport{type = tls,
+                                                socket = SSock,
                                                 listen_socket = Sock};
                         Error ->
                             Error

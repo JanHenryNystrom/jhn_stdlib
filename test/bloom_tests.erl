@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2016-2020 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2016-2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2016-2020, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2016-2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(bloom_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -105,6 +105,6 @@ bloom_scalable_test_() ->
 shuffle(L, N) -> lists:sublist(shuffle(L), 1, N).
 shuffle(L) ->
     N = 1000 * length(L),
-    L2 = [{random:uniform(N), E} || E <- L],
+    L2 = [{rand:uniform(N), E} || E <- L],
     {_, L3} = lists:unzip(lists:keysort(1, L2)),
     L3.
