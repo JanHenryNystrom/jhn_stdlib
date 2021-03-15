@@ -727,7 +727,7 @@ file(File) -> filename:join([dir(), File]).
 
 
 -define(TCP, [{packet, http}, binary, {active, false}]).
--define(SSL, [{verify, 0},
+-define(SSL, [{verify, verify_none},
               {keyfile, file("key.pem")},
               {certfile, file("crt.pem")} | ?TCP]).
 
