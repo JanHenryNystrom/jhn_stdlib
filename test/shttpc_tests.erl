@@ -727,7 +727,7 @@ file(File) -> filename:join([dir(), File]).
 
 
 -define(TCP, [{packet, http}, binary, {active, false}]).
--define(SSL, [{verify, 0},
+-define(SSL, [{verify, verify_none},
               {keyfile, file("key.pem")},
               {certfile, file("crt.pem")} | ?TCP]).
 
@@ -776,8 +776,8 @@ listen(Mod, Addr, Family) -> Mod:listen(0, [Family, {ip, Addr} | ?TCP]).
 
 accept(ssl, LS) ->
     {ok, Socket} = ssl:transport_accept(LS, 10000),
-    ok = ssl:ssl_accept(Socket),
-    Socket;
+    {ok, SSocket} = ssl:handshake(Socket),
+    SSocket;
 accept(Mod, LS) -> element(2,  Mod:accept(LS, 1000)).
 
 
