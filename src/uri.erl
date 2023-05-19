@@ -42,7 +42,7 @@
 -record(opts, {format = ipv4 :: ipv4 | ipv6,
                ipv6ipv4 = false :: boolean(),
                compact = false :: boolean(),
-               return_type = iolist :: iolist | binary}).
+               return_type = iolist :: iolist | list | binary}).
 
 %% Types
 -type uri() :: #uri{}.

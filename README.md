@@ -37,7 +37,10 @@ Features/Modules
                                      [draft-fge-json-schema-validation-00][11]
     * MessagePack -- msgpack [MessagePack][12]/Erlang
     * Bencoding -- bencoding
-    * Encoding/decoding Syslog/Erlang -- syslog [rfc5424][13], [rfc5427][14]
+    * Encoding/decoding Syslog/Erlang -- syslog [rfc5424][13],
+                                                [rfc5427][14],
+                                                [rfc6012][29]
+    * Consistent Hashing -- jhn_chash [J. Lamping, Eric Veach][28]
   * Standards
     * Encoding/decoding URI/Erlang -- uri [rfc3986][15]
     * Encoding/decoding IP addresses/Erlang -- ip_addr [rfc4291][16],
@@ -170,3 +173,7 @@ I know I really should.
        "Transmission of Syslog Messages over UDP"
   [27]: http://www.ietf.org/rfc/rfc6587.txt
        "Transmission of Syslog Messages over TCP"
+  [28]: https://arxiv.org/ftp/arxiv/papers/1406/1406.2294.pdf
+       "A Fast, Minimal Memory, Consistent Hash Algorithm, John Lamping, Eric Veach"
+  [29]: http://www.ietf.org/rfc/rfc6012.txt
+        "Datagram Transport Layer Security (DTLS) Transport Mapping for Syslog"

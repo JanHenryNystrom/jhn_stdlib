@@ -63,6 +63,10 @@ gen_1_test_() ->
       ?_test(?assertMatch(#{},
                           timestamp:decode(timestamp:gen([posix, micro]),
                                            [micro])))},
+     {"gen([posix, nano])",
+      ?_test(?assertMatch(#{},
+                          timestamp:decode(timestamp:gen([posix, nano]),
+                                           [nano])))},
      {"gen([iolist])",
       ?_test(?assertMatch(
                 #{fraction := 0},
@@ -82,8 +86,11 @@ gen_1_test_() ->
                           timestamp:decode(timestamp:gen([binary, milli]))))},
      {"gen([binary, micro])",
       ?_test(?assertMatch(#{},
-                          timestamp:decode(timestamp:gen([binary, micro]))))}
-     ].
+                          timestamp:decode(timestamp:gen([binary, micro]))))},
+     {"gen([binary, nano])",
+      ?_test(?assertMatch(#{},
+                          timestamp:decode(timestamp:gen([binary, nano]))))}
+    ].
 
 %%--------------------------------------------------------------------
 %% Encode
@@ -117,6 +124,13 @@ encode_2_test_() ->
                               hour => 0, minute => 0, second => 0,
                               offset => 'Z', fraction => 1},
                             [posix, micro])))},
+     {"2000-01-01T00:00:00Z(946684800000000001)",
+      ?_test(?assertEqual(946684800000000001,
+                          timestamp:encode(
+                            #{year => 2000, month => 1, day => 1,
+                              hour => 0, minute => 0, second => 0,
+                              offset => 'Z', fraction => 1},
+                            [posix, nano])))},
      {"949363200(2000-02-01T00:00:00Z)",
       ?_test(?assertEqual(#{year => 2000, month => 2, day => 1,
                             hour => 0, minute => 0, second => 0,

@@ -42,6 +42,12 @@
                     buf           = <<>> :: binary()
                    }).
 
+-define(UDP, 1601).
+-define(UDPS, 1154).
+-define(TLS, 6514).
+-define(DTLS, 6515).
+
+
 %% ===================================================================
 %% Tests.
 %% ===================================================================
@@ -64,9 +70,10 @@ open_1_client_test_() ->
     {setup,
      fun() ->
              {ok, Apps} = application:ensure_all_started(ssl),
-             TCPS = {tcp, server_start(tcp, 1601, dummy)},
-             TLSS = {tls, server_start(tls, 6514, dummy)},
-             {Apps, [TCPS , TLSS]}
+             TCPS = {tcp, server_start(tcp, ?UDP, dummy)},
+             TLSS = {tls, server_start(tls, ?TLS, dummy)},
+             DTLSS = {dtls, server_start(dtls, ?DTLS, dummy)},
+             {Apps, [TCPS , TLSS, DTLSS]}
      end,
      fun({Apps, Servers}) ->
              [server_stop(Type, Server) || {Type, Server} <- Servers],
@@ -78,32 +85,43 @@ open_1_client_test_() ->
      ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv6])))),
      ?_test(?assertEqual(ok,
                          syslog:close(
+                           syslog:open([dtls,
+                                        {destination, "127.0.0.1"},
+                                        {destination_port, ?DTLS}])))),
+     ?_test(?assertEqual(ok,
+                         syslog:close(
                            syslog:open([tcp,
                                         {destination, {127, 0, 0, 1}},
-                                        {destination_port, 1601}])))),
+                                        {destination_port, ?UDP}])))),
      ?_test(?assertEqual(ok,
                          syslog:close(
                            syslog:open([tls,
                                         {destination, "127.0.0.1"},
-                                        {destination_port, 6514}])))),
+                                        {destination_port, ?TLS}])))),
      ?_test(?assertEqual({error, {exit, badarg}},
                          syslog:open([{opts, [{ip, none}]}]))),
      ?_test(?assertMatch({error, _}, syslog:open([tcp]))),
      ?_test(?assertMatch({error, {exit, _}},
                          syslog:open([tcp, {opts, [{ip, none}]}]))),
+     %% Connect so the server must be there for dlts
+     %% ?_test(?assertMatch({error, _},
+     %%                     syslog:open([dtls,
+     %%                                  {destination, "::1"},
+     %%                                  {destination_port, ?DTLS}]))),
      ?_test(?assertMatch({error, _},
                          syslog:open([tls,
                                       {destination, "::1"},
-                                      {destination_port, 4711}])))
+                                      {destination_port, 4712}])))
     ]}.
 
 open_1_client_timeout_test_() ->
     {setup,
      fun() ->
              {ok, Apps} = application:ensure_all_started(ssl),
-             TCPS = {tcp, server_start(tcp, 1601, dummy)},
-             TLSS = {tls, server_start(tls, 6514, dummy)},
-             {Apps, [TCPS , TLSS]}
+             TCPS = {tcp, server_start(tcp, ?UDP, dummy)},
+             TLSS = {tls, server_start(tls, ?TLS, dummy)},
+             DTLSS = {dtls, server_start(dtls, ?DTLS, dummy)},
+             {Apps, [TCPS , TLSS, DTLSS]}
      end,
      fun({Apps, Servers}) ->
              [server_stop(Type, Server) || {Type, Server} <- Servers],
@@ -115,16 +133,22 @@ open_1_client_timeout_test_() ->
      ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv6])))),
      ?_test(?assertEqual(ok,
                          syslog:close(
+                           syslog:open([dtls,
+                                        {timeout, 500},
+                                        {destination, {127, 0, 0, 1}},
+                                        {destination_port, ?DTLS}])))),
+     ?_test(?assertEqual(ok,
+                         syslog:close(
                            syslog:open([tcp,
                                         {timeout, 500},
                                         {destination, {127, 0, 0, 1}},
-                                        {destination_port, 1601}])))),
+                                        {destination_port, ?UDP}])))),
      ?_test(?assertEqual(ok,
                          syslog:close(
                            syslog:open([tls,
                                         {timeout, 500},
                                         {destination, {127, 0, 0, 1}},
-                                        {destination_port, 6514}])))),
+                                        {destination_port, ?TLS}])))),
      ?_test(?assertMatch({error, _}, syslog:open([tcp, {timeout, 500}]))),
      ?_test(?assertMatch({error, {exit, _}},
                          syslog:open([tcp,
@@ -142,25 +166,25 @@ open_1_server_test_() ->
      fun() -> application:ensure_all_started(ssl) end,
      fun({ok, Apps}) -> [application:stop(App) || App <- Apps] end,
      [?_test(
-         ?assertMatch(ok, syslog:close(syslog:open([server, {port, 1154}])))),
+         ?assertMatch(ok, syslog:close(syslog:open([server, {port, ?UDPS}])))),
       ?_test(
          ?assertMatch(ok,
-                      syslog:close(syslog:open([udp, server, {port, 1154}])))),
-      ?_test(
-         ?assertMatch(ok,
-                      syslog:close(
-                        syslog:open([udp, ipv6, server, {port, 1154}])))),
-      ?_test(
-         ?assertMatch(ok,
-                      syslog:close(syslog:open([tcp, server, {port, 1601}])))),
+                      syslog:close(syslog:open([udp, server, {port, ?UDPS}])))),
       ?_test(
          ?assertMatch(ok,
                       syslog:close(
-                        syslog:open([tcp, server, ipv6, {port, 1601}])))),
+                        syslog:open([udp, ipv6, server, {port, ?UDPS}])))),
+      ?_test(
+         ?assertMatch(ok,
+                      syslog:close(syslog:open([tcp, server, {port, ?UDP}])))),
+      ?_test(
+         ?assertMatch(ok,
+                      syslog:close(
+                        syslog:open([tcp, server, ipv6, {port, ?UDP}])))),
       ?_test(?assertMatch(ok, syslog:close(syslog:open([tls, ipv6, server])))),
       ?_test(
          ?assertMatch(ok,
-                      syslog:close(syslog:open([tls, server, {port, 6514}])))),
+                      syslog:close(syslog:open([tls, server, {port, ?TLS}])))),
       %% ?_test(?assertEqual({error,eacces}, syslog:open([server, udp]))),
       %% ?_test(?assertEqual({error,eacces}, syslog:open([server, tcp]))),
       ?_test(?assertMatch({error, {exit, _}},
@@ -179,20 +203,20 @@ send_2_test_() ->
     {setup,
      fun() ->
              {ok, Apps} = application:ensure_all_started(ssl),
-             UDPS = {udp, server_start(udp, 1154, send_2_test_)},
+             UDPS = {udp, server_start(udp, ?UDPS, send_2_test_)},
              UDPC = syslog:open([{destination, {127, 0, 0, 1}},
-                                 {destination_port, 1154}]),
+                                 {destination_port, ?UDPS}]),
              true = ets:insert(send_2_test, {udpc, UDPC}),
-             TCPS = {tcp, server_start(tcp, 1601, send_2_test_)},
+             TCPS = {tcp, server_start(tcp, ?UDP, send_2_test_)},
              TCPC = syslog:open([tcp,
                                  {destination, {127, 0, 0, 1}},
-                                 {destination_port, 1601}]),
+                                 {destination_port, ?UDP}]),
              true = ets:insert(send_2_test, {tcpc, TCPC}),
-             TLSS = {tls, server_start(tls, 6514, send_2_test_)},
+             TLSS = {tls, server_start(tls, ?TLS, send_2_test_)},
              TLSC = syslog:open([tls,
                                  {opts, [{verify, verify_none}]},
                                  {destination, {127, 0, 0, 1}},
-                                 {destination_port, 6514}]),
+                                 {destination_port, ?TLS}]),
              true = ets:insert(send_2_test, {tlsc, TLSC}),
              {Apps, [UDPC, TCPC, TLSC], [UDPS, TCPS , TLSS]}
      end,
@@ -208,7 +232,7 @@ send_2_test_() ->
                           syslog:send(sock(send_2_test, udpc),
                                       #{},
                                       [{destination, {127, 0, 0, 1}},
-                                       {destination_port, 1154}]))),
+                                       {destination_port, ?UDPS}]))),
       ?_test(?assertMatch(#{}, syslog:decode(active(udp)))),
       ?_test(?assertMatch(ok, syslog:send(sock(send_2_test, tcpc), #{}))),
       ?_test(?assertMatch(#{},
@@ -241,22 +265,22 @@ recv_1_test_() ->
     {setup,
      fun() ->
              {ok, Apps} = application:ensure_all_started(ssl),
-             UDPS = server_start(udp, 1154, recv_1_test_),
+             UDPS = server_start(udp, ?UDPS, recv_1_test_),
              UDPC = syslog:open([{destination, "127.0.0.1"},
-                                 {destination_port, 1154}]),
+                                 {destination_port, ?UDPS}]),
              true = ets:insert(recv_1_test, {udps, UDPS}),
              true = ets:insert(recv_1_test, {udpc, UDPC}),
-             TCPS = server_start(tcp, 1601, recv_1_test_),
+             TCPS = server_start(tcp, ?UDP, recv_1_test_),
              TCPC = syslog:open([tcp,
                                  {destination, {127, 0, 0, 1}},
-                                 {destination_port, 1601}]),
+                                 {destination_port, ?UDP}]),
              true = ets:insert(recv_1_test, {tcps, TCPS}),
              true = ets:insert(recv_1_test, {tcpc, TCPC}),
-             TLSS = server_start(tls, 6514, recv_1_test_),
+             TLSS = server_start(tls, ?TLS, recv_1_test_),
              TLSC = syslog:open([tls,
                                  {opts, [{verify, verify_none}]},
                                  {destination, {127, 0, 0, 1}},
-                                 {destination_port, 6514}]),
+                                 {destination_port, ?TLS}]),
              true = ets:insert(recv_1_test, {tlss, TLSS}),
              true = ets:insert(recv_1_test, {tlsc, TLSC}),
              {Apps,
@@ -601,6 +625,17 @@ server_start(tls, Port, Parent) ->
                      {opts, [{certfile, file("crt.pem")},
                              {keyfile, file("key.pem")}]}]),
     Pid = spawn_link(fun() -> server(tls, Parent) end),
+    ok = syslog:controlling_process(Transport, Pid),
+    Pid ! {transport, Transport},
+    Pid;
+server_start(dtls, Port, Parent) ->
+    Transport =
+        syslog:open([server,
+                     dtls,
+                     {port, Port},
+                     {opts, [{certfile, file("crt.pem")},
+                             {keyfile, file("key.pem")}]}]),
+    Pid = spawn_link(fun() -> server(dtls, Parent) end),
     ok = syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
     Pid;
