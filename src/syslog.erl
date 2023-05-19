@@ -22,6 +22,8 @@
 %%%    Transmission of Syslog Messages over UDP                        (rfc5426)
 %%%    Textual Conventions for Syslog Management                       (rfc5427)
 %%%    Transmission of Syslog Messages over TCP                        (rfc6587)
+%%%    Datagram Transport Layer Security (DTLS) Transport Mapping for Syslog
+%%%                                                                    (rfc6012)
 %%%
 %%%  SYSLOG line is represented as follows:
 %%%
@@ -73,7 +75,8 @@
 %%% N.B. TCP only supports Octet counting framing.
 %%%      The TLS transport requires the ssl OTP lib which is not included in
 %%       the application resource file.
-%%%      Only supports R18 and later.
+%%%      The DTLS transport requires the ssl OTP lib which is not included in
+%%       the application resource file.
 %%%
 %%% @end
 %%%
@@ -104,18 +107,19 @@
 %% Includes
 
 %% Records
--record(opts, {type        = udp     :: type(),
-               role        = client  :: client | server,
-               port                  :: integer(),
-               opts        = []      :: [{atom(), _}],
-               ipv         = ipv4    :: ipv4 | ipv6,
-               dest                  :: inet:ip_address() | inet:hostname(),
-               dest_port             :: inet:port(),
-               precision   = seconds :: seconds | milli | micro,
-               timeout               :: integer(),
-               return_type = iolist  :: iolist | binary}).
+-record(opts, {type        = udp       :: type(),
+               role        = client    :: client | server,
+               port                    :: integer(),
+               opts        = []        :: [{atom(), _}],
+               ipv         = ipv4      :: ipv4 | ipv6,
+               dest                    :: inet:ip_address() | inet:hostname(),
+               dest_port               :: inet:port(),
+               precision   = seconds   :: seconds | milli | micro,
+               timeout                 :: integer(),
+               version     = 'tlsv1.2' :: 'tlsv1.2' | 'tlsv1.3',
+               return_type = iolist    :: iolist | binary}).
 
--record(transport, {type                 :: type() | tcp_listen | tls_listen,
+-record(transport, {type                 :: type() | listen_type(),
                     role                 :: client | server,
                     port                 :: inet:port(),
                     ipv                  :: ipv4 | ipv6,
@@ -132,7 +136,8 @@
 -type opt() :: _.
 -type transport() :: #transport{}.
 -type line() :: map().
--type type() :: udp | tcp | tls.
+-type type() :: udp | dtls | tcp | tls.
+-type listen_type() :: dtls_listen | tcp_listen | tls_listen.
 -type socket_options() :: gen_udp:option() | gen_tcp:option() | ssl:option().
 
 %% Defines
@@ -157,26 +162,28 @@ open() -> open(#opts{}).
 %% Function: open(Options) -> Transport | Error.
 %% @doc
 %%   Opens a Transport returning a connected client connection or a listen
-%%   port for TCP and TLS for the server, UDP the difference is quite moot.
+%%   port for DTLS/TCP/TLS for the server, UDP the difference is quite moot.
 %%
 %%   Options are:
 %%     client -> opens a client transport (default)
 %%     server -> open a server transport
 %%     udp -> uses the UDP protocol (default)
+%%     dtls -> uses the DTLS v1.2 over UDP
 %%     tcp -> uses the TCP protocol
-%%     tls -> uses TLS v1.2 over TCP
+%%     tls -> uses TLS v1.2(default) or TLS v1.3 over TCP
 %%     ipv4 -> IPv4 addresses are used (default)
 %%     ipv6 -> IPv6 addresses are used
 %%     port -> The port used by client or server with the default in the
 %%             client case is 0 (the underlying OS assigns an available
 %%             port number) for the server the default ports are as follows:
-%%             UDP/514, TCP/601, TLS/6514
+%%             UDP/514, UDP/6514, TCP/601, TLS/6514
 %%     destination -> the IP address or hostname of the server to connect
 %%                    to in the case TCP and TLS and the default server for
-%%                    the UDP case
+%%                    the UDP/DTLS case
 %%     destination_port -> the port of the server to connect to in the case
-%%                         TCP and TLS and the default server for the UDP case
-%%     opts -> options to the transport's UDP, TCP, or TLS, see the
+%%                         TCP/TLS and the default server for the UDP/DTLS case
+%%     version -> the version used for TLS, v1.2(default) or v1.3.
+%%     opts -> options to the transport's UDP, DTLS, TCP, or TLS, see the
 %%             documentation of gen_udp, gen_tcp, ssl respectively
 %%     timeout -> the time in milliseconds the request is allowed to complete
 %% @end
@@ -206,6 +213,58 @@ open(Opts = #opts{type = udp}) ->
         Error -> Error
     catch
         Class:Error -> {error, {Class, Error}}
+    end;
+open(Opts = #opts{type = dtls}) ->
+    #opts{role = Role,
+          port = Port,
+          opts = TransportOpts,
+          ipv = IPv,
+          dest = Dest,
+          dest_port = DestPort,
+          timeout = Timeout} = Opts,
+    Port1 = port(dtls, Port, Role),
+    Dest1 = dest(Dest, IPv),
+    DestPort1 = port(dtls, DestPort, inverse(Role)),
+    TransportOpts1 = case IPv of
+                         ipv4 -> [inet,
+                                  binary,
+                                  {protocol, dtls},
+                                  {versions, ['dtlsv1.2']} |
+                                  TransportOpts];
+                         ipv6 -> [inet6,
+                                  binary,
+                                  {protocol, dtls},
+                                  {versions, ['dtlsv1.2']} |
+                                  TransportOpts]
+                     end,
+    case {Role, Timeout} of
+        {client, undefined} ->
+            case ssl:connect(Dest1, DestPort1, TransportOpts1) of
+                {ok, Sock} -> #transport{type = dtls,
+                                         role = client,
+                                         socket = Sock,
+                                         dest = Dest1,
+                                         dest_port = DestPort1};
+                Error -> Error
+            end;
+        {client, Timeout} ->
+            case ssl:connect(Dest1, DestPort1, TransportOpts1, Timeout) of
+                {ok, Sock} -> #transport{type = dtls,
+                                         role = client,
+                                         socket = Sock,
+                                         dest = Dest1,
+                                         dest_port = DestPort1};
+                Error -> Error
+            end;
+        {server, _} ->
+            try ssl:listen(Port1, TransportOpts1) of
+                {ok, Sock} -> #transport{type = dtls_listen,
+                                         role = server,
+                                         listen_socket = Sock};
+                Error -> Error
+            catch
+                Class:Error -> {error, {Class, Error}}
+            end
     end;
 open(Opts = #opts{type = tcp}) ->
     #opts{role = Role,
@@ -262,14 +321,15 @@ open(Opts = #opts{type = tls}) ->
           ipv = IPv,
           dest = Dest,
           dest_port = DestPort,
-          timeout = Timeout} = Opts,
+          timeout = Timeout,
+          version = Version} = Opts,
     Port1 = port(tls, Port, Role),
     Dest1 = dest(Dest, IPv),
     DestPort1 = port(tls, DestPort, inverse(Role)),
     TransportOpts1 = case IPv of
-                         ipv4 -> [inet, binary, {versions, ['tlsv1.2']} |
+                         ipv4 -> [inet, binary, {versions, [Version]} |
                                   TransportOpts];
-                         ipv6 -> [inet6, binary, {versions, ['tlsv1.2']} |
+                         ipv6 -> [inet6, binary, {versions, [Version]} |
                                   TransportOpts]
                      end,
     case {Role, Timeout} of
@@ -327,6 +387,49 @@ accept(Transport) -> accept(Transport, []).
 %%--------------------------------------------------------------------
 -spec accept(transport(), [opt()]) -> transport() | {error, _}.
 %%--------------------------------------------------------------------
+accept(Transport = #transport{type = dtls_listen,listen_socket = LSock},Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try ssl:transport_accept(LSock) of
+                {ok, Sock}  ->
+                    case ssl:handshake(Sock) of
+                        {ok, SSock} ->
+                            Transport#transport{type = dtls,
+                                                socket = SSock,
+                                                listen_socket = undefined};
+                        {ok, SSock, _} ->
+                            Transport#transport{type = dtls,
+                                                socket = SSock,
+                                                listen_socket = undefined};
+                        Error ->
+                            Error
+                    end;
+                Error ->
+                    Error
+            catch
+                error:Error -> {error, Error}
+            end;
+        #opts{timeout = Timeout} ->
+            try ssl:transport_accept(LSock, Timeout) of
+                {ok, Sock}  ->
+                    case ssl:handshake(Sock) of
+                        {ok, SSock} ->
+                            Transport#transport{type = dtls,
+                                                socket = SSock,
+                                                listen_socket = Sock};
+                        {ok, SSock, _} ->
+                            Transport#transport{type = dtls,
+                                                socket = SSock,
+                                                listen_socket = Sock};
+                        Error ->
+                            Error
+                    end;
+                Error ->
+                    Error
+            catch
+                error:Error -> {error, Error}
+            end
+    end;
 accept(Transport = #transport{type = tcp_listen, listen_socket = LSock},Opts) ->
     case parse_opts(Opts) of
         #opts{timeout = undefined} ->
@@ -436,6 +539,10 @@ send(Transport = #transport{type = udp, socket = Sock}, Line, Opts) ->
             catch error:Error -> {error, Error}
             end
     end;
+send(#transport{type = dtls, socket = Sock}, Line, Opts) ->
+    try ssl:send(Sock, frame(tls, encode(Line, Opts)))
+    catch error:Error -> {error, Error}
+    end;
 send(#transport{type = tcp, socket = Sock}, Line, Opts) ->
     try gen_tcp:send(Sock, frame(tcp, encode(Line, Opts)))
     catch error:Error -> {error, Error}
@@ -488,6 +595,62 @@ recv(#transport{type = udp, socket = Sock}, Opts) ->
                 Error -> Error
             catch
                 error:Error -> {error, Error}
+            end
+    end;
+recv(Transport = #transport{type = dtls, socket = Sock, buf = Buf}, Opts) ->
+    case parse_opts(Opts) of
+        #opts{timeout = undefined} ->
+            try ssl:recv(Sock, 0) of
+                {ok, Packet} ->
+                    case unframe(tls, <<Buf/binary, Packet/binary>>) of
+                        {more, Len} ->
+                            try ssl:recv(Sock, Len) of
+                                {ok, {_, _, Packet1}} ->
+                                    {Frame, Buf1} =
+                                        unframe(tls,
+                                                <<Buf/binary,
+                                                  Packet/binary,
+                                                  Packet1/binary>>),
+                                    {ok,
+                                     decode(Frame, Opts),
+                                     Transport#transport{buf = Buf1}};
+                                Error -> Error
+                            catch error:Error -> {error, Error}
+                            end;
+                        {Frame, Buf1} ->
+                            {ok,
+                             decode(Frame, Opts),
+                             Transport#transport{buf = Buf1}}
+                    end;
+                Error ->
+                    Error
+            catch error:Error -> {error, Error}
+            end;
+        #opts{timeout = Timeout} ->
+            try ssl:recv(Sock, 0, Timeout) of
+                {ok, Packet} ->
+                    case unframe(tls, <<Buf/binary, Packet/binary>>) of
+                        {more, Len} ->
+                            try ssl:recv(Sock, Len, Timeout) of
+                                {ok, {_, _, Packet1}} ->
+                                    {Frame, Buf1} =
+                                        unframe(tls, <<Buf/binary,
+                                                       Packet/binary,
+                                                       Packet1/binary>>),
+                                    {ok,
+                                     decode(Frame, Opts),
+                                     Transport#transport{buf = Buf1}};
+                                Error -> Error
+                            catch error:Error -> {error, Error}
+                            end;
+                        {Frame, Buf1} ->
+                            {ok,
+                             decode(Frame, Opts),
+                             Transport#transport{buf = Buf1}}
+                    end;
+                Error ->
+                    Error
+            catch error:Error -> {error, Error}
             end
     end;
 recv(Transport = #transport{type = tcp, socket = Sock, buf = Buf}, Opts) ->
@@ -615,6 +778,10 @@ setopts(#transport{type = udp, socket = Sock}, Options) ->
     try inet:setopts(Sock, Options)
     catch error:Error -> {error, Error}
     end;
+setopts(#transport{type = dtls, socket = Sock}, Options) ->
+    try ssl:setopts(Sock, Options)
+    catch error:Error -> {error, Error}
+    end;
 setopts(#transport{type = tcp, socket = Sock}, Options) ->
     try inet:setopts(Sock, Options)
     catch error:Error -> {error, Error}
@@ -634,6 +801,14 @@ setopts(#transport{type = tls, socket = Sock}, Options) ->
 %%--------------------------------------------------------------------
 controlling_process(#transport{type = udp, socket = Sock}, Pid) ->
     try gen_udp:controlling_process(Sock, Pid)
+    catch error:Error -> {error, Error}
+    end;
+controlling_process(#transport{type = dtls, socket = Sock}, Pid) ->
+    try ssl:controlling_process(Sock, Pid)
+    catch error:Error -> {error, Error}
+    end;
+controlling_process(#transport{type = dtls_listen,listen_socket = Sock}, Pid) ->
+    try ssl:controlling_process(Sock, Pid)
     catch error:Error -> {error, Error}
     end;
 controlling_process(#transport{type = tcp, socket = Sock}, Pid) ->
@@ -663,6 +838,10 @@ controlling_process(#transport{type = tls_listen, listen_socket = Sock}, Pid) ->
 %%--------------------------------------------------------------------
 close(#transport{type = udp, socket = Sock}) ->
     try gen_udp:close(Sock) catch error:Error -> {error, Error} end;
+close(#transport{type = dtls_listen, listen_socket = Sock}) ->
+    try ssl:close(Sock) catch error:Error -> {error, Error} end;
+close(#transport{type = dtls, socket = Sock}) ->
+    try ssl:close(Sock) catch error:Error -> {error, Error} end;
 close(#transport{type = tcp_listen, listen_socket = Sock}) ->
     try gen_tcp:close(Sock) catch error:Error -> {error, Error} end;
 close(#transport{type = tcp, socket = Sock}) ->
@@ -776,6 +955,7 @@ dest(undefined, ipv6) -> {0, 0, 0, 0, 0, 0, 0, 1};
 dest(Address, _) -> Address.
 
 port(udp, undefined, server) -> 514;
+port(dtls, undefined, server) -> 6514;
 port(tcp, undefined, server) -> 601;
 port(tls, undefined, server) -> 6514;
 port(_, undefined, client) -> 0;
@@ -1060,12 +1240,15 @@ parse_opt(seconds, Opts) -> Opts#opts{precision = seconds};
 parse_opt(milli, Opts) -> Opts#opts{precision = milli};
 parse_opt(micro, Opts) -> Opts#opts{precision = micro};
 parse_opt(udp, Opts) -> Opts#opts{type = udp};
+parse_opt(dtls, Opts) -> Opts#opts{type = dtls};
 parse_opt(tcp, Opts) -> Opts#opts{type = tcp};
 parse_opt(tls, Opts) -> Opts#opts{type = tls};
 parse_opt(client, Opts) -> Opts#opts{role = client};
 parse_opt(server, Opts) -> Opts#opts{role = server};
 parse_opt({port, Port}, Opts) -> Opts#opts{port = Port};
 parse_opt({opts, TransportOpts}, Opts) -> Opts#opts{opts = TransportOpts};
+parse_opt({version, 'tlsv1.2'}, Opts) -> Opts#opts{version = 'tlsv1.2'};
+parse_opt({version, 'tlsv1.3'}, Opts) -> Opts#opts{version = 'tlsv1.3'};
 parse_opt(ipv4, Opts) -> Opts#opts{ipv = ipv4};
 parse_opt(ipv6, Opts) -> Opts#opts{ipv = ipv6};
 parse_opt({timeout, Timeout}, Opts) -> Opts#opts{timeout = Timeout};
