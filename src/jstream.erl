@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2021-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
+%%%  Deprecated use jhn_json instead.
+%%%
 %%%  A JSON stream library based on:
 %%%    The JavaScript Object Notation (JSON) Data Interchange Format   (rfc7159)
 %%%
@@ -43,10 +45,12 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2021-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(jstream).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
+
+-deprecated(module).
 
 %% Library functions
 -export([encode/1, encode/2,
@@ -416,7 +420,7 @@ log2floor(Int, N) -> log2floor(Int bsr 1, 1 + N).
 %% Decoding
 %% ===================================================================
 
-do_decode(<<>>, S) -> {more, {decode, args = S}};
+do_decode(<<>>, S) -> {more, {decode, S}};
 do_decode(<<?HT, T/binary>>, S) -> do_decode(T, S);
 do_decode(<<?LF, T/binary>>, S) -> do_decode(T, S);
 do_decode(<<?CR, T/binary>>, S) -> do_decode(T, S);

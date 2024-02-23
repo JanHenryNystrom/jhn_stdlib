@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013-2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
+%%%  Deprecated use jhn_json instead for all functionality except validate.
+%%%
 %%%  A JSON library based on:
 %%%    The application/json Media Type for JavaScript Object Notation (JSON)
 %%%                                                                    (rfc4627)
@@ -79,10 +81,14 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
+
+-deprecated({encode, '_'}).
+-deprecated({decode, '_'}).
+-deprecated({eval, '_'}).
 
 %% Compiler directives
 -compile({no_auto_import, [float_to_binary/1]}).
@@ -1335,7 +1341,7 @@ eval_json([N | _], _, Path, _) when is_integer(N) ->
 eval_json([Key | T], JSON = #{}, Path, State =#state{maps=M}) when M /= false ->
     case maps:find(Key, JSON) of
         {ok, Value} -> eval_json(T, Value, [Key | Path], State);
-        _ -> {error, {non_member, lists:reverse([key | Path])}}
+        _ -> {error, {non_member, lists:reverse([Key | Path])}}
     end;
 eval_json([Key | T], {Members}, Path, State) ->
     case plist:find(Key, Members) of

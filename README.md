@@ -1,10 +1,11 @@
-jhn_stdlib [(γ)][5] [![Build Status](https://secure.travis-ci.org/JanHenryNystrom/jhn_stdlib.png)](http://travis-ci.org/JanHenryNystrom/jhn_stdlib)
+jhn_stdlib [(γ)][5]
 ==========
 
 A few thought experiments solidified as code.
 
   * [Introduction](#introduction)
   * [Features/Modules](#features)
+  * [Deprecated Features/Modules](#deprecated)
   * [Build](#build)
   * [Install](#install)
   * [Contribute](#contribute) - Read if you're planning to submit patches
@@ -30,9 +31,10 @@ Features/Modules
     * bstring -- drop in replacement for the string module in stdlib
     * mustache -- Mustache template rendering
   * Protocols
-    * Encoding/decoding JSON/Erlang  -- json [rfc4627][6], [rfc7159][7]
-    * Encoding/decoding stream JSON/Erlang  -- jstream [rfc7159][7]
-    * Encoding/decoding/evaluation JSON Pointer/Erlang  -- json [rfc6901][8]
+    * Encoding/decoding JSON/Erlang  -- jhn_json [rfc8259][30]
+    * Encoding/decoding/evaluation JSON Pointer/Erlang  -- jhn_json [rfc6901][8]
+    * Patch JSON -- jhn_json [rfc6902][31]
+    * Merge patch JSON -- jhn_json [rfc7396][32]
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
                                      [draft-fge-json-schema-validation-00][11]
     * MessagePack -- msgpack [MessagePack][12]/Erlang
@@ -65,6 +67,15 @@ Features/Modules
     * T-trees -- t_tree
   * Algorithms
     * Levenshtein distance -- levenshtein
+
+<a name='deprecated'>
+
+Deprecated Features/Modules
+--------
+
+  * json -- use jhn_json instead, with the exception of validation
+  * jstream -- use jhn_json instead
+
 
 <a name='build'>
 
@@ -177,3 +188,9 @@ I know I really should.
        "A Fast, Minimal Memory, Consistent Hash Algorithm, John Lamping, Eric Veach"
   [29]: http://www.ietf.org/rfc/rfc6012.txt
         "Datagram Transport Layer Security (DTLS) Transport Mapping for Syslog"
+  [30]: http://www.ietf.org/rfc/rfc8259.txt
+        "The JavaScript Object Notation (JSON) Data Interchange Format"
+  [31]: http://www.ietf.org/rfc/rfc6902.txt
+        "JavaScript Object Notation (JSON) Patch"
+  [32]: http://www.ietf.org/rfc/rfc7396.txt
+        "JSON Merge Patch"
