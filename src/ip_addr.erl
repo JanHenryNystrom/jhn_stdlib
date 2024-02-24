@@ -42,7 +42,8 @@
                continue = false :: boolean(),
                range = false :: boolean(),
                compact = false :: boolean(),
-               return_type = iolist :: iolist | list | binary}).
+               return_type = iolist :: iolist | list | binary |
+                                       tuple | integer}).
 
 %% Types
 -type opt() :: _.

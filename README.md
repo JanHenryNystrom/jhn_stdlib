@@ -82,7 +82,7 @@ Deprecated Features/Modules
 Build
 -----
 
-jhn_stdlib requires [rebar][1] to build, but provides make support to download
+jhn_stdlib requires [rebar3][1] to build, but provides make support to download
 and install rebar. To build jhn_stdlib, go to the jhn_stdlib directory and type:
 
 ```sh
@@ -132,8 +132,8 @@ appreciation I feel or indeed [express.] [3]
 For a much nicer history, please [write good commit messages][4].
 I know I really should.
 
-  [1]: http://github.com/rebar/rebar
-       "Rebar - A build tool for Erlang"
+  [1]: https://github.com/erlang/rebar3
+       "Rebar3 - A build tool for Erlang"
   [2]: http://github.com/JanHenryNystrom/jhn_stdlib/issues
        "jhn_stdlib issues"
   [3]: http://github.com/JanHenryNystrom/jhn_stdlib/blob/master/THANKS

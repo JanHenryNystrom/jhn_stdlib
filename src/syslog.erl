@@ -109,20 +109,20 @@
 %% Records
 -record(opts, {type        = udp       :: type(),
                role        = client    :: client | server,
-               port                    :: integer(),
+               port                    :: integer() | undefined,
                opts        = []        :: [{atom(), _}],
                ipv         = ipv4      :: ipv4 | ipv6,
                dest                    :: inet:ip_address() | inet:hostname(),
                dest_port               :: inet:port(),
                precision   = seconds   :: seconds | milli | micro,
-               timeout                 :: integer(),
+               timeout                 :: integer() | undefined,
                version     = 'tlsv1.2' :: 'tlsv1.2' | 'tlsv1.3',
                return_type = iolist    :: iolist | binary}).
 
 -record(transport, {type                 :: type() | listen_type(),
                     role                 :: client | server,
                     port                 :: inet:port(),
-                    ipv                  :: ipv4 | ipv6,
+                    ipv                  :: ipv4 | ipv6 | undefined,
                     dest                 :: inet:ip_address() | inet:hostname(),
                     dest_port            :: inet:port(),
                     socket               :: gen_udp:socket() |
@@ -932,7 +932,7 @@ frame(_, Data) -> [integer_to_binary(iolist_size(Data)), $\s, Data].
 %%   Extracts the line from an octet counting frame.
 %% @end
 %%--------------------------------------------------------------------
--spec unframe(type(), iodata()) -> iodata().
+-spec unframe(type(), binary()) -> {binary(), iodata()} | {more, integer()}.
 %%--------------------------------------------------------------------
 unframe(_, Data) -> unframe1(Data, <<>>).
 
@@ -1112,8 +1112,8 @@ decode_timestamp(<<$-, $\s, T/binary>>, Header) -> decode_hostname(T, Header);
 decode_timestamp(T, Header) ->
     {#{year := Y, month := M, day := D, hour := H, minute := Mi, second := S,
        fraction := Fraction, offset := Offset},
-     <<_, T1/binary>>}
-        = timestamp:decode(T, [continue]),
+     <<_, T1/binary>>} =
+        timestamp:decode(T, [continue]),
     Header1 = Header#{time_stamp => {{Y, M, D}, {H,Mi,S}},fraction => Fraction},
     case Offset of
         'Z' -> decode_hostname(T1, Header1);
@@ -1264,7 +1264,7 @@ parse_opt({destination, Dest = [C | _]}, Opts) when C >= $0, C =< $: ->
 parse_opt({destination, Dest = <<C,_/binary>>},Opts) when C >= $0,C =< $: ->
     try ip_addr:decode(Dest, [tuple]) of
         Dest1 -> Opts#opts{dest = Dest1}
-    catch _:_ -> Opts#opts{dest = Dest}
+    catch _:_ -> Opts#opts{dest = binary_to_list(Dest)}
     end;
 parse_opt({destination, Dest}, Opts) ->
     Opts#opts{dest = Dest};

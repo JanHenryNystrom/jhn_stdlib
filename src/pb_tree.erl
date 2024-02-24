@@ -39,7 +39,7 @@
 
 %% Records
 -record(bucket, {pivot       :: value(),
-                 rest   = [] :: {value(), value()},
+                 rest   = [] :: [{value(), value()}],
                  values = [] :: [value()]}).
 
 -record(pb_node, {pivot         :: value(),
@@ -51,7 +51,7 @@
 
 %% Types
 -opaque pb_tree()   :: #pb_node{} | pb_nil.
--type   key()    :: [_].
+-type   key()    :: binary().
 -type   value()    :: _.
 -type   default()  :: _.
 -type   flag()     :: check | nocheck.

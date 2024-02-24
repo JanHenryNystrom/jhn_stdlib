@@ -47,7 +47,7 @@
 -type opt()       :: binary | iolist | continue.
 
 %% Records
--record(opts, {return_type = iolist :: binary() | iolist(),
+-record(opts, {return_type = iolist :: binary | iolist,
                continue    = false :: boolean()
               }).
 

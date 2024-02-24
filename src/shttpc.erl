@@ -206,7 +206,7 @@
 
 %% Records
 -record(state, {transport = tcp :: tcp | ssl,
-                host :: inet:ip_address(),
+                host :: inet:ip_address() | inet:hostname(),
                 port :: inet:port_number(),
                 method :: method(),
                 headers :: headers(),
@@ -1009,8 +1009,8 @@ read_trailers(State, Trailers) ->
         {ok, http_eoh} -> Trailers;
         {ok, {http_header, _, Name, _, Value}} ->
             read_trailers(State, normalize_header(Name, Value, Trailers));
-        {error, {http_error, Data}} ->
-            erlang:error({bad_trailer, Data})
+        closed ->
+            erlang:error(bad_trailer)
     end.
 
 should_close({1, 1}, Client, Server) ->

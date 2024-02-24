@@ -39,7 +39,7 @@
 
 %% Records
 -record(bucket, {pivot       :: value(),
-                 rest   = [] :: {value(), value()},
+                 rest   = [] :: [{value(), value()}],
                  values = [] :: [value()]}).
 
 -record(p_node, {pivot         :: value(),

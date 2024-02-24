@@ -16,7 +16,8 @@
 %%==============================================================================
 
 %% Types
--type scheme() :: http | https | file.
+-type scheme() :: http | https | file | sip | sips | mailto | ws | wss |
+                  atom().
 
 %% Records
 -record(uri, {scheme  :: undefined | scheme(),

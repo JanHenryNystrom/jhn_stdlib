@@ -61,11 +61,11 @@
 
 %% Types
 -type posix() :: integer().
--type stamp() :: #{}.
+-type stamp() :: map().
 
 
--type opt() :: [seconds | milli | micro | nano |
-                iolist | binary | list | posix].
+-type opt() :: seconds | milli | micro | nano |
+               iolist | binary | list | posix | continue.
 
 %% Defines
 -define(SECONDS_PER_MINUTE, 60).
@@ -181,7 +181,8 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%     continue -> all remaining indata is returned when decoding a binary
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary() | posix(), [opt()] | #opts{}) -> stamp().
+-spec decode(binary() | posix(), [opt()] | #opts{}) -> stamp() |
+                                                       {stamp(), binary()}.
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
