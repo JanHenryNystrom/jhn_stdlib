@@ -62,9 +62,6 @@
         ]).
 
 
-%% FIXME
--export([chunk/1]).
-
 %% Exported types
 -export_type([json/0, pointer/0, patch/0, merge/0]).
 
@@ -84,7 +81,41 @@
                      {unescape, binary(), stack()} |
                      {number, stage(), phase(), list(), stack()}.
 
--type eval_cont() :: {decode, path(), cont()}.
+-type eval_cont() :: {eval_binary, path(), stream(), path()} |
+                     {eval_dash, expect(), integer(), stream(), path()} |
+                     {eval_array, integer(), expect(), stream(),path(),path()} |
+                     {eval_object, binary(), expect(), stream(),path(),path()} |
+                     {eval_key, binary(), stream(), path(), path()} |
+                     {skip_value, skip_cont()} |
+                     {skip_base, string(), skip_cont()} |
+                     {skip_object, expect(), skip_cont()} |
+                     {skip_string, skip_cont()} |
+                     {skip_colon, boolean(), skip_cont()} |
+                     {skip_number, skip_cont()} |
+                     {unwind, path(), json()} |
+                     {unwind_array, unwind_cont()} |
+                     {unwind_object, unwind_cont()} |
+                     {unwind_name, unwind_cont()} |
+                     {unwind_colon, unwind_cont()} |
+                     {unwind_string, unwind_cont()} |
+                     {unwind_value, unwind_cont()} |
+                     {unwind_number, unwind_cont()} |
+                     {unwind_base, string(), unwind_cont()} |
+                     {decode, path(), cont()}.
+
+-type skip_cont() :: {eval_binary, path(), stream(), path()} |
+                     {eval_dash, expect(), integer(), stream(), path()} |
+                     {eval_array, integer(), expect(), stream(),path(),path()} |
+                     {eval_object, binary(), expect(), stream(),path(),path()} |
+                     {skip_object, expect(), skip_cont()} |
+                     {skip_array, expect(), skip_cont()} |
+                     {skip_value, skip_cont()}.
+
+-type unwind_cont() :: {unwind, path(), json()} |
+                       {unwind_array, unwind_cont()} |
+                       {unwind_object, unwind_cont()}.
+
+-type stream()    :: boolean().
 
 -type complete()  :: boolean().
 -type expect()    :: name | comma | colon.
@@ -95,8 +126,8 @@
 -type acc()       :: [{jstring(), json()}].
 
 -type stack()     :: [{array, array()} |
-                         {name, acc()} |
-                         {value, {name(), acc()}}].
+                      {name, acc()} |
+                      {value, {name(), acc()}}].
 
 -type path()      :: [integer() | binary()].
 
@@ -106,9 +137,9 @@
 %% FIXME
 -type merge() :: object().
 -type patch() :: [object()].
--type opt() :: _.
+-type opt() :: stream | decode | pointer | binary.
 -type next_cont() :: _.
--type opts() :: _.
+-type opts() :: [opt()].
 -type pointer() :: top | ['-' | integer() | jstring() | atom()].
 
 %% Defines
@@ -177,7 +208,7 @@ encode(String) when is_atom(String) ->
 %%     iolist -> an iolist is returned (default)
 %% @end
 %%--------------------------------------------------------------------
--spec encode(json() | pointer(), [opt()]) -> binary().
+-spec encode(json() | pointer(), opts()) -> iolist() | binary().
 %%--------------------------------------------------------------------
 encode(T, [binary, _]) -> iolist_to_binary(encode_pointer(T, []));
 encode(T, [_, binary]) -> iolist_to_binary(encode_pointer(T, []));
@@ -195,7 +226,7 @@ encode(T, _) -> encode(T).
 %%   a binary containing the rest of the JSON value to decode.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary()) -> {json(), binary()} | pointer() | {more, cont()}.
+-spec decode(binary()) -> json() | pointer().
 %%--------------------------------------------------------------------
 decode(B) -> decode(B, []).
 
@@ -208,7 +239,7 @@ decode(B) -> decode(B, []).
 %%   with a binary containing the rest of the JSON value to decode.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), cont() | [opt()]) -> pointer() | {json(), binary()} |
+-spec decode(binary(), cont() | opts()) -> pointer() | {json(), binary()} |
                                             {more, cont()}.
 %%--------------------------------------------------------------------
 decode(B, {decode, S}) -> do_decode(B, true, S);
@@ -266,9 +297,8 @@ next(T, {next_number, Acc, C}) -> next_number(T, Acc, C).
 %%   Selects and decodes a Fragment of a JSON document based on the Pointer.
 %% @end
 %%--------------------------------------------------------------------
--spec eval(binary() | pointer(), json()) -> json() | {error, _};
-          (binary() | pointer(), binary()) ->
-                  {json(), binary()} | {more, cont()} | {error, _};
+-spec eval(binary() | pointer(), binary() | json()) ->
+                  json() | {more, cont()} | {error, _};
           (eval_cont(), binary())  ->
                   {json(), binary()} | {more, cont()} | {error, _}.
 %%--------------------------------------------------------------------
@@ -301,9 +331,8 @@ eval(Pointer, J) ->
     eval(Pointer, J, []).
 
 %%--------------------------------------------------------------------
--spec eval(binary() | pointer(), json(), []) -> json() | {error, _};
-          (binary() | pointer(), binary(), opts()) ->
-                  {json(), binary()} | {more, cont()} | {error, _}.
+-spec eval(binary() | pointer(), binary() | json(), opts()) ->
+                  json() | {json(), binary()} | {more, cont()} | {error, _}.
 %%--------------------------------------------------------------------
 eval(top, B, []) when is_binary(B) -> decode(B);
 eval(top, J, []) -> J;
@@ -1232,16 +1261,3 @@ test(_, _, _) ->
 
 merge_object(Key, null, Object) -> maps:remove(Key, Object);
 merge_object(K, PV, O = #{}) -> O#{K => merge(PV, maps:get(K, O))}.
-
-%% FIXME
-chunk(<<H/utf8, T/binary>>) ->
-    case jhn_json:decode(<<H/utf8>>, [stream]) of
-        {more, More} -> chunk(T, More);
-        X -> X
-    end.
-
-chunk(<<H/utf8, T/binary>>, M) ->
-    case jhn_json:decode(<<H/utf8>>, M) of
-        {more, More} -> chunk(T, More);
-        {JSON, Rest} -> {JSON, Rest}
-    end.
