@@ -287,7 +287,7 @@ escape(<<H/utf8, T/binary>>, Acc) -> escape(T, <<Acc/binary, H>>).
 %%  Conference on Programming Language Design and Implementation.
 %% ===================================================================
 
-encode_float(0.0) -> "0.0";
+encode_float(Float) when Float == 0.0 -> "0.0";
 encode_float(Float) when is_float(Float) ->
     {Sign, Frac, Exp} = mantissa_exponent(Float),
     {Place, Digits} = float_to_digits(Float, Exp, Frac, (Frac band 1) =:= 0),

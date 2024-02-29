@@ -561,7 +561,7 @@ solidus_escape(Code) ->
 %%  Conference on Programming Language Design and Implementation.
 %% ===================================================================
 
-float_to_binary(0.0) -> "0.0";
+float_to_binary(Float) when Float == 0.0 -> "0.0";
 float_to_binary(Float) when is_float(Float) ->
     {Sign, Frac, Exp} = mantissa_exponent(Float),
     {Place, Digits} = float_to_digits(Float, Exp, Frac, (Frac band 1) =:= 0),
@@ -1376,7 +1376,10 @@ validate_json([{K, V}  | T], JSON, State = #state{plain_string = Plain}) ->
 %% Numeric
 validate_prop(multipleOf, _, JSON, _) when not is_number(JSON) -> true;
 validate_prop(multipleOf, N, JSON, _) when is_number(N), N > 0 ->
-    0.0 = (JSON / N - trunc(JSON / N)) * N;
+    Value = ((JSON / N - trunc(JSON / N)) * N),
+    case 0.0 == Value of
+        true -> Value
+    end;
 validate_prop(maximum, _, JSON, _) when not is_number(JSON) ->
     true;
 validate_prop(maximum, N, JSON, State) when is_number(N) ->
