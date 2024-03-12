@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2016-2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2016-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2016-2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2016-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(p_tree).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -39,7 +39,7 @@
 
 %% Records
 -record(bucket, {pivot       :: value(),
-                 rest   = [] :: {value(), value()},
+                 rest   = [] :: [{value(), value()}],
                  values = [] :: [value()]}).
 
 -record(p_node, {pivot         :: value(),

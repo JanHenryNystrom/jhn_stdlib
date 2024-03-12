@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2017-2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2017-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2017-2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2017-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(timestamp).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -61,11 +61,11 @@
 
 %% Types
 -type posix() :: integer().
--type stamp() :: #{}.
+-type stamp() :: map().
 
 
--type opt() :: [seconds | milli | micro | nano |
-                iolist | binary | list | posix].
+-type opt() :: seconds | milli | micro | nano |
+               iolist | binary | list | posix | continue.
 
 %% Defines
 -define(SECONDS_PER_MINUTE, 60).
@@ -181,7 +181,8 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%     continue -> all remaining indata is returned when decoding a binary
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary() | posix(), [opt()] | #opts{}) -> stamp().
+-spec decode(binary() | posix(), [opt()] | #opts{}) -> stamp() |
+                                                       {stamp(), binary()}.
 %%--------------------------------------------------------------------
 decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).

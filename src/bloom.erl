@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2016-2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2016-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2016-2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2016-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(bloom).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -37,13 +37,14 @@
 %% Records
 -record(filter,
         {type         = fixed :: fixed | scalable,
-         size                 :: integer(),
-         capacity             :: integer(),
+         size                 :: integer() | undefined,
+         capacity             :: integer() | undefined,
          error_prob   = 0.001 :: float(),
-         error_ratio          :: float(),
+         error_ratio          :: float()   | undefined,
          growth_ratio = 1     :: integer(),
-         slice_size           :: integer(),
-         slices               :: [array:array(integer())] | [filter()]
+         slice_size           :: integer() | undefined,
+         slices               :: [array:array(integer())] | [filter()] |
+                                 undefined
         }).
 
 %% Types
@@ -92,7 +93,7 @@ filter() -> filter(check_size(#filter{})).
 %%     error_ratio -> error probability ratio, default 0.85
 %% @end
 %%--------------------------------------------------------------------
--spec filter([opt()]) -> filter().
+-spec filter([opt()] | filter()) -> filter().
 %%--------------------------------------------------------------------
 filter(Opts) when is_list(Opts) -> filter(parse_opts(Opts));
 filter(F = #filter{type = fixed, size = N, error_prob = E}) ->

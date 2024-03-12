@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2021-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2021-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(pb_tree).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -39,7 +39,7 @@
 
 %% Records
 -record(bucket, {pivot       :: value(),
-                 rest   = [] :: {value(), value()},
+                 rest   = [] :: [{value(), value()}],
                  values = [] :: [value()]}).
 
 -record(pb_node, {pivot         :: value(),
@@ -51,7 +51,7 @@
 
 %% Types
 -opaque pb_tree()   :: #pb_node{} | pb_nil.
--type   key()    :: [_].
+-type   key()    :: binary().
 -type   value()    :: _.
 -type   default()  :: _.
 -type   flag()     :: check | nocheck.

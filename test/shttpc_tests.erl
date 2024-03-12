@@ -52,8 +52,7 @@ tcp_test_() ->
       fun stop_app/1,
       [{"Open Close", ?_test(open_close())},
        {"Simple GET", ?_test(simple_get())},
-%% Broken IPv6 support ni travis
-%%       {"Simple GET Ipv6", ?_test(simple_get_ipv6())},
+       {"Simple GET Ipv6", ?_test(simple_get_ipv6())},
        {"Empty GET", ?_test(empty_get())},
        {"Basic auth", ?_test(basic_auth())},
        {"Missing Basic auth", ?_test(missing_basic_auth())},
@@ -100,8 +99,7 @@ ssl_test_() ->
       fun start_app/0,
       fun stop_app/1,
       [{"Simple GET", ?_test(ssl_get())},
-%% Broken IPv6 support ni travisx
-%%       {"Simple GET IPv6", ?_test(ssl_get_ipv6())},
+       {"Simple GET IPv6", ?_test(ssl_get_ipv6())},
        {"Simple POST", ?_test(ssl_post())},
        {"Chunked encoding", ?_test(ssl_chunked())}
       ]}

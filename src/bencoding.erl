@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2018-2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2018-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2018-2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2018-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(bencoding).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -47,7 +47,7 @@
 -type opt()       :: binary | iolist | continue.
 
 %% Records
--record(opts, {return_type = iolist :: binary() | iolist(),
+-record(opts, {return_type = iolist :: binary | iolist,
                continue    = false :: boolean()
               }).
 

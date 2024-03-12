@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2013-2021 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
+%%%  Deprecated use jhn_json instead for all functionality except validate.
+%%%
 %%%  A JSON library based on:
 %%%    The application/json Media Type for JavaScript Object Notation (JSON)
 %%%                                                                    (rfc4627)
@@ -79,10 +81,14 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2021, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(json).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
+
+-deprecated({encode, '_'}).
+-deprecated({decode, '_'}).
+-deprecated({eval, '_'}).
 
 %% Compiler directives
 -compile({no_auto_import, [float_to_binary/1]}).
@@ -123,7 +129,7 @@
 
 -type pointer() :: [binary() | atom() | '-' | pos_integer()].
 
--type resolver() :: fun((uri:uri(), plist:plist() | map()) -> json()).
+-type resolver() :: fun((uri:uri(), plist:plist() | map()) -> binary()).
 
 %% Records
 -record(state,
@@ -339,7 +345,7 @@ eval(Pointer, JSON) -> eval(Pointer, JSON, #state{}).
 %%     {existing_atom_keys, Bool}
 %% @end
 %%--------------------------------------------------------------------
--spec eval(pointer() | binary(), json() | binary(), [opt()]) ->
+-spec eval(pointer() | binary(), json() | binary(), [opt()] | #state{}) ->
           json() | binary() | {error, _}.
 %%--------------------------------------------------------------------
 eval(Pointer, JSON, State = #state{}) when is_binary(Pointer) ->
@@ -377,7 +383,7 @@ validate(Schema) -> validate(?JSON_SCHEMA, Schema, [decode]).
 %%   Equivalent of validate(JSONSchema, JSON, [])
 %% @end
 %%--------------------------------------------------------------------
--spec validate(json() | binary(), json()) -> true | false.
+-spec validate(json() | binary(), json()) -> boolean().
 %%--------------------------------------------------------------------
 validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 
@@ -400,7 +406,7 @@ validate(Schema, JSON) -> validate(Schema, JSON, #state{}).
 %%     {existing_atom_keys, Bool}
 %% @end
 %%--------------------------------------------------------------------
--spec validate(json() | binary(), json() | binary(), [opt()]) ->
+-spec validate(_| json() | binary(), json() | binary(), [opt()] | #state{}) ->
           true | {true, json()} | false.
 %%--------------------------------------------------------------------
 validate(Schema, JSON, State = #state{}) when is_binary(Schema) ->
@@ -1079,7 +1085,7 @@ eval_binary_dash(Binary, Expect, Size, State) ->
             {T, _} = skip_value(Binary, State),
             eval_binary_dash(T, {false, true}, Size + 1, State);
         _ ->
-            erlang:error(badarg)
+            {error, badarg}
     end.
 
 eval_binary_object(Key, Binary, Expect, Path, State) ->
@@ -1196,10 +1202,7 @@ eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32L}) ->
     eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4));
 eval_binary_unescape_hex(Binary, Acc, State = #state{encoding = ?UTF32B}) ->
     <<0:24, A, 0:24, B, 0:24, C, 0:24, D, T/binary>> = Binary,
-    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4));
-eval_binary_unescape_hex(_, _, _) ->
-    erlang:error(badarg).
-
+    eval_binary_unescape(T, [encode_hex([A, B, C, D], State)|Acc],inc(State,4)).
 
 skip_value(Binary, State) ->
     case next(Binary, State) of
@@ -1305,10 +1308,10 @@ skip_number(Binary, Stage, Phase, State) ->
             skip_number(T, pre, exp, inc(State));
         {{E, T}, post, float} when ?IS_EXP(E) ->
             skip_number(T, pre, exp, inc(State));
-        {_, State, int} when ?ZERO_OR_POST(State) ->
-            {Binary, State};
-        {_, post, _} ->
-            {Binary, State};
+      %% {_, State, int} when ?ZERO_OR_POST(State) ->
+      %%     {Binary, State};
+      %%   {_, post, _} ->
+      %%       {Binary, State};
         _ ->
             erlang:error(badarg)
     end.
@@ -1335,7 +1338,7 @@ eval_json([N | _], _, Path, _) when is_integer(N) ->
 eval_json([Key | T], JSON = #{}, Path, State =#state{maps=M}) when M /= false ->
     case maps:find(Key, JSON) of
         {ok, Value} -> eval_json(T, Value, [Key | Path], State);
-        _ -> {error, {non_member, lists:reverse([key | Path])}}
+        _ -> {error, {non_member, lists:reverse([Key | Path])}}
     end;
 eval_json([Key | T], {Members}, Path, State) ->
     case plist:find(Key, Members) of
@@ -1661,9 +1664,7 @@ validate_dependencies([{Key, Schema} | T], JSON = {M}, State) ->
         true -> validate_schema(Schema, JSON, State);
         _ -> true
     end,
-    validate_dependencies(T, JSON, State);
-validate_dependencies(Props, JSON, State) when is_map(JSON) ->
-    validate_dependencies(Props, {maps:to_list(JSON)}, State).
+    validate_dependencies(T, JSON, State).
 
 validate_dependency(K, M, #state{atom_keys = true, plain_string = P}) ->
     true = plist:member(binary_to_atom(char_code(K, P, utf8), utf8), M);
