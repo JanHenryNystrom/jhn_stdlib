@@ -282,7 +282,7 @@ decode_2_test_() ->
 %%--------------------------------------------------------------------
 decode_2_string_escape_test_() ->
     [
-     ?_test(?assertEqual({String, <<>>}, jhn_json:chunk(JSON))) ||
+     ?_test(?assertEqual({String, <<>>}, chunk(JSON))) ||
         {JSON, String} <- ?STRING_ESCAPE
     ].
 
@@ -291,7 +291,7 @@ decode_2_string_escape_test_() ->
 %%--------------------------------------------------------------------
 decode_2_non_latin_test_() ->
     [
-     ?_test(?assertEqual({String, <<>>}, jhn_json:chunk(JSON))) ||
+     ?_test(?assertEqual({String, <<>>}, chunk(JSON))) ||
         {JSON, String} <- ?NON_LATIN
     ].
 
@@ -300,7 +300,7 @@ decode_2_non_latin_test_() ->
 %%--------------------------------------------------------------------
 decode_2_ws_test_() ->
     [
-     ?_test(?assertEqual({Term, <<>>}, jhn_json:chunk(JSON))) ||
+     ?_test(?assertEqual({Term, <<>>}, chunk(JSON))) ||
         {JSON, Term} <- ?WS_JSON
     ].
 

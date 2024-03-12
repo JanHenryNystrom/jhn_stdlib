@@ -30,7 +30,7 @@
 %%%  merge         : object
 %%%
 %%%  object        : map
-%%%  array         : [value*]
+%%%  array         : [value]
 %%%  string        : UTF-8 binary
 %%%  number        : integer() | float()
 %%%  true          : atom(true)
@@ -64,6 +64,7 @@
 
 %% Exported types
 -export_type([json/0, pointer/0, patch/0, merge/0]).
+-export_type([jstring/0, object/0, array/0]).
 
 %% Types
 -type json()      :: true | false | null |
@@ -201,7 +202,7 @@ encode(String) when is_atom(String) ->
 %% Function: encode(Term, [Option]) -> JSON.
 %% @doc
 %%   Encodes the structured Erlang term as an iolist or binary.
-%%   Encode will give an exception if the erlang term is not well formed.
+%%   Encode will raise an exception if the erlang term is not well formed.
 %%   Options are:
 %%     pointer -> the term represents a pointer
 %%     binary -> a binary is returned
@@ -220,10 +221,9 @@ encode(T, _) -> encode(T).
 %%--------------------------------------------------------------------
 %% Function: decode(JSON) -> {Term, Binary} | {more, Continuation}.
 %% @doc
-%%   Decodes the binary into a tuple of structured Erlang term and the
-%%   remaining binary or a continuation if the binary did not contain
-%%   a complete JSON value. The continuation can be used by decode/2 with
-%%   a binary containing the rest of the JSON value to decode.
+%%   Decodes the binary if a JSON Pointer into the Erlang respresentation
+%%   and if a JSON value into a structured Erlang term and the remaining binary
+%%   is ignored.
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> json() | pointer().
@@ -233,14 +233,18 @@ decode(B) -> decode(B, []).
 %%--------------------------------------------------------------------
 %% Function: decode(JSON, Continuation) -> {Term, Binary} | {more,Continuation}.
 %% @doc
-%%   Decodes a binary and a continuation into a tuple of structured
-%%   Erlang term and the remaining binary or a continuation if the binary
-%%   did not contain a complete JSON value. The continuation can be used
-%%   with a binary containing the rest of the JSON value to decode.
+%%   Supports the decoding of when supplied with the the option stream as the
+%%   option with no options works as decode/1.
+%%   Decoding a stream of JSON the functions returns either a tuple of a
+%%   complete json value and the remainder of the stream (binary) or 
+%%   {more, Continuation} where subsequent calls to decode/2 is made with
+%%   futher data and the Continuation as the second argument.
+%%   Options are:
+%%     stream -> enables the decoding of a stream of JSON values.
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), cont() | opts()) -> pointer() | {json(), binary()} |
-                                            {more, cont()}.
+-spec decode(binary(), cont() | opts()) -> pointer() | json() |
+                                           {json(), binary()} | {more, cont()}.
 %%--------------------------------------------------------------------
 decode(B, {decode, S}) -> do_decode(B, true, S);
 decode(B, {base, Check, V, S}) -> base(Check, B, V, true, S);
@@ -264,7 +268,9 @@ decode(B, [stream]) ->
 %%--------------------------------------------------------------------
 %% Function: next(Binary) -> {Binary, Binary} | {more, Continuation}.
 %% @doc
-%%   Picks the first json on a stream and returns that and the rest.
+%%   Picks the first json on a stream and returns that and the rest or
+%%   {more, Continuation} where Continuation is used in a call to
+%%   decode(Binary, Continuation).
 %% @end
 %%--------------------------------------------------------------------
 -spec next(binary()) -> {binary(), binary()} | {more, next_cont()}.
@@ -275,7 +281,7 @@ next(B) -> do_next(B).
 %% Function: next(Binary, Cont) -> {Binary, Binary} | {more, Cont}.
 %% @doc
 %%   Picks the first json on a stream given a continuation and returns that
-%%   and the rest.
+%%   and the rest or {moew Continuation} is if it was not a complete value.
 %% @end
 %%--------------------------------------------------------------------
 -spec next(binary(), next_cont()) -> {binary(), binary()} | {more, next_cont()}.
@@ -295,6 +301,10 @@ next(T, {next_number, Acc, C}) -> next_number(T, Acc, C).
 %% Function: eval(JSONPointer | Continuation, Binary | JSON) -> JSON.
 %% @doc
 %%   Selects and decodes a Fragment of a JSON document based on the Pointer.
+%%   Both the pointer and the JSON can be either a binary or the Erlang
+%%   representation. If the JSON is a binary and not the complete JSON fragment
+%%   eval/2 returns {more, Continuation} and eval is called again with
+%%   Continuation and more of the stream as eval(Continuation, Binary).
 %% @end
 %%--------------------------------------------------------------------
 -spec eval(binary() | pointer(), binary() | json()) ->
@@ -350,7 +360,9 @@ eval(Pointer, J, []) ->
 %%--------------------------------------------------------------------
 %% Function: patch(Patch, JSON) -> JSON.
 %% @doc
-%%   
+%%   Patch applies the JSON Patch to a JSON value represented as Erlang
+%%   returning the patched JSON or error if one of the test operations in the
+%%   JSON Patch failed.
 %% @end
 %%--------------------------------------------------------------------
 -spec patch(patch(), json()) -> json() | error.
@@ -367,7 +379,8 @@ patch([Op | Ops], JSON) ->
 %%--------------------------------------------------------------------
 %% Function: merge(Patch, JSON) -> JSON.
 %% @doc
-%%   
+%%   Merge applies a JSON Merge Patch to the JSON represented as Erlang
+%%   returning a new JSON object represented as Erlang.
 %% @end
 %%--------------------------------------------------------------------
 -spec merge(merge(), json()) -> json().
