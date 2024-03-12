@@ -16,7 +16,7 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%   eunit unit tests for the jhn_crc32c library module.
+%%%   eunit unit tests for the jhn_hash library module.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
