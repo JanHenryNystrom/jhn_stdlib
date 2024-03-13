@@ -67,7 +67,7 @@ Features/Modules
     * T-trees -- t_tree
   * Algorithms
     * Levenshtein distance -- levenshtein
-    * CRC32-C checksum -- jhn_hash [rfc9260]
+    * CRC32-C checksum -- jhn_hash [rfc9260][33]
     * xxHash-32 checksum -- jhn_hash [xxHash][34]
 
 <a name='deprecated'>
