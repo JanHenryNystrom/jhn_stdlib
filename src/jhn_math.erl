@@ -16,7 +16,7 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%
+%%%   Misc math functionality.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -35,9 +35,9 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: rotl32(Integer, Steps) -> RotatedInteger
 %% @doc
-%%   
+%%   Performs a Steps many rotation on a 32 bit integer.
 %% @end
 %%--------------------------------------------------------------------
 -spec rotl32(non_neg_integer(), non_neg_integer()) -> non_neg_integer().

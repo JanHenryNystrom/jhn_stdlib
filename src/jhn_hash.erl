@@ -16,7 +16,7 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%
+%%%   A few checksum algorithms, CRC32-C and xxHash-32.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -29,14 +29,7 @@
 -export([crc32c/1,
          xxh32/1, xxh32/2]).
 
-%% [Castagnoli93] G. Castagnoli, S. Braeuer and M. Herrman "Optimization
-%%                   of Cyclic Redundancy-Check Codes with 24 and 32 Parity
-%%                   Bits", IEEE Transact. on Communications, Vol. 41, No.
-%%                   6, June 1993.
-%% https://github.com/Cyan4973/xxHash
-
-
-%% Defines.
+%% Defines
 
 %% CRC32-C
 -define(TABLE,
@@ -106,7 +99,7 @@
          16#BE2DA0A5, 16#4C4623A6, 16#5F16D052, 16#AD7D5351
         }).
 
-%% XXH32
+%% xxH32
 -define(PRIME1, 16#9E3779B1).
 -define(PRIME2, 16#85EBCA77).
 -define(PRIME3, 16#C2B2AE3D).
@@ -120,9 +113,9 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: crc32c(Data) -> Checksum
 %% @doc
-%%   
+%%   Generate a CRC32-C checksum from iodata.
 %% @end
 %%--------------------------------------------------------------------
 -spec crc32c(iodata()) -> non_neg_integer().
@@ -130,9 +123,9 @@
 crc32c(Data) -> crc32c(iolist_to_binary(Data), 16#FFFFFFFF).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: xxh32(Data) -> Checksum
 %% @doc
-%%   
+%%   Generate a xxH32 checksum from iodata with Seed 0.
 %% @end
 %%--------------------------------------------------------------------
 -spec xxh32(iodata()) -> non_neg_integer().
@@ -140,9 +133,9 @@ crc32c(Data) -> crc32c(iolist_to_binary(Data), 16#FFFFFFFF).
 xxh32(Data) -> xxh32(Data, 0).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: xxh32(Data, Seed) -> Checksum
 %% @doc
-%%   
+%%   Generate a xxH32 checksum from iodata using Seed.
 %% @end
 %%--------------------------------------------------------------------
 -spec xxh32(iodata(), non_neg_integer()) -> non_neg_integer().

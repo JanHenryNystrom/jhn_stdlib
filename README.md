@@ -67,6 +67,8 @@ Features/Modules
     * T-trees -- t_tree
   * Algorithms
     * Levenshtein distance -- levenshtein
+    * CRC32-C checksum -- jhn_hash [rfc9260]
+    * xxHash-32 checksum -- jhn_hash [xxHash][34]
 
 <a name='deprecated'>
 
@@ -194,3 +196,10 @@ I know I really should.
         "JavaScript Object Notation (JSON) Patch"
   [32]: http://www.ietf.org/rfc/rfc7396.txt
         "JSON Merge Patch"
+  [33]: http://www.ietf.org/rfc/rfc9260.txt
+       "[Castagnoli93] G. Castagnoli, S. Braeuer and M. Herrman """Optimization
+                       of Cyclic Redundancy-Check Codes with 24 and 32 Parity
+                       Bits""", IEEE Transact. on Communications, Vol. 41, No.
+                       6, June 1993."
+  [34]: https://github.com/Cyan4973/xxHash
+        "xxHash - Extremely fast hash algorithm"
