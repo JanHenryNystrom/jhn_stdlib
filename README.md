@@ -201,5 +201,5 @@ I know I really should.
                        of Cyclic Redundancy-Check Codes with 24 and 32 Parity
                        Bits""", IEEE Transact. on Communications, Vol. 41, No.
                        6, June 1993."
-  [34]: https://github.com/Cyan4973/xxHash
+  [34]: http://github.com/Cyan4973/xxHash
         "xxHash - Extremely fast hash algorithm"
