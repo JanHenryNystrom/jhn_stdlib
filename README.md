@@ -197,9 +197,9 @@ I know I really should.
   [32]: http://www.ietf.org/rfc/rfc7396.txt
         "JSON Merge Patch"
   [33]: http://www.ietf.org/rfc/rfc9260.txt
-       "[Castagnoli93] G. Castagnoli, S. Braeuer and M. Herrman """Optimization
+       "[Castagnoli93] G. Castagnoli, S. Braeuer and M. Herrman \"Optimization
                        of Cyclic Redundancy-Check Codes with 24 and 32 Parity
-                       Bits""", IEEE Transact. on Communications, Vol. 41, No.
+                       Bits\", IEEE Transact. on Communications, Vol. 41, No.
                        6, June 1993."
   [34]: http://github.com/Cyan4973/xxHash
         "xxHash - Extremely fast hash algorithm"
