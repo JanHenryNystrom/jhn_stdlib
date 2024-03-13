@@ -207,8 +207,4 @@ times(A, B) -> mod(A * B).
 
 mod(N) -> N rem 16#100000000.
 
-rotl(I, N) ->
-    N1 = 32 - N,
-    <<H:N, T:N1>> = <<I:32>>,
-    <<I1:32>> = <<T:N1, H:N>>,
-    I1.
+rotl(I, N) -> jhn_math:rotl32(I, N).
