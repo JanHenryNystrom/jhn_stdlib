@@ -140,13 +140,13 @@
 %% Records
 
 %% LZ78 and LZW
--record(state, {buf   = <<>>      :: binary(),
-                code  = undefined :: code() | undefined,
-                dict  = #{}       :: map(),
-                size  = 0         :: integer(),
-                acc   = []        :: [code()],
-                stack = []        :: stack(),
-                cont  = true      :: boolean()
+-record(state, {buf       = <<>>      :: binary(),
+                buf_code  = undefined :: code() | undefined,
+                dict      = #{}       :: map(),
+                max_code  = 0         :: code(),
+                acc       = []        :: [code()],
+                stack     = []        :: stack(),
+                cont      = true      :: boolean()
                }).
 
 -record(lz78w_stream, {state :: #state{}}).
@@ -215,7 +215,7 @@ lzw_compress(Data, Dict) -> lz78w_end(Data, lzw_init(Dict)).
 -spec lzw_init() -> lz78w_stream().
 %%--------------------------------------------------------------------
 lzw_init() ->
-    #lz78w_stream{state = #state{dict = ?W_DICT, size = maps:size(?W_DICT)}}.
+    #lz78w_stream{state = #state{dict = ?W_DICT,max_code = maps:size(?W_DICT)}}.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -226,7 +226,9 @@ lzw_init() ->
 -spec lzw_init(map()) -> lz78w_stream().
 %%--------------------------------------------------------------------
 lzw_init(Dict) ->
-    #lz78w_stream{state = #state{dict = Dict, size = maps:size(Dict)}}.
+    <<Max:8/integer>> =
+        maps:fold(fun(K, _, A) when K > A -> K; (_, _, A) -> A end, 0, Dict),
+    #lz78w_stream{state = #state{dict = Dict, max_code = Max}}.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -292,7 +294,7 @@ lz78w_uncompress({C, Bits, Dict}, [binary]) ->
 %% LZW
 %% --------------------------------------------------------------------
 lz78w_compress([], State = #state{stack = [], cont=false}) -> lz78w_stop(State);
-lz78w_compress(<<>>, State = #state{stack=[],cont=false}) -> lz78w_stop(State);
+lz78w_compress(<<>>, State = #state{stack=[], cont=false}) -> lz78w_stop(State);
 lz78w_compress([], State = #state{stack = []}) -> #lz78w_stream{state = State};
 lz78w_compress(<<>>, State = #state{stack = []}) -> #lz78w_stream{state=State};
 lz78w_compress(<<>>, State = #state{stack = [H | T]}) ->
@@ -305,7 +307,7 @@ lz78w_compress([H  = [_ | _] | T], St = #state{stack = S}) ->
     lz78w_compress(H, St#state{stack = [T | S]});
 lz78w_compress([H  = <<_/binary>> | T], St = #state{stack = S}) ->
     lz78w_compress(H, St#state{stack = [T | S]});
-lz78w_compress(I = [H | T], St) ->
+lz78w_compress(I = [H | T], St) -> 
      lz78w_next(I, H, T, St);
 lz78w_compress(I = <<H:8/integer, T/binary>>, St) ->
      lz78w_next(I, H, T, St).
@@ -314,31 +316,31 @@ lz78w_next(I, H, T, St = #state{buf=Buf,dict=Dict}) ->
     Buf1 = <<Buf/binary, H/integer>>,
     case maps:get(Buf1, Dict, undefined) of
         undefined ->
-            #state{size = Size, code = BufCode, acc = Acc} = St,
-            Code1 = Size + 1,
+            #state{max_code = Max, buf_code = BufCode, acc = Acc} = St,
+            Max1 = Max + 1,
             Acc1 = case Buf of
                        <<>> -> Acc;
                        _ -> [BufCode | Acc]
                    end,
             St1 = St#state{buf = <<>>,
-                           dict = maps:put(Buf1, Code1, Dict),
-                           code = undefined,
-                           size = Code1,
+                           dict = maps:put(Buf1, Max1, Dict),
+                           buf_code = undefined,
+                           max_code = Max1,
                            acc = Acc1},
             lz78w_compress(I, St1);
         Buf1Code ->
-            lz78w_compress(T, St#state{buf = Buf1, code = Buf1Code})
+            lz78w_compress(T, St#state{buf = Buf1, buf_code = Buf1Code})
     end.
 
 lz78w_stop(St) ->
-    #state{buf = Buf, code = BCode, dict = Dict, size = Size, acc = Acc} = St,
+    #state{buf = Buf,buf_code = BCode,dict = Dict,max_code = Max,acc=Acc} = St,
     Acc1 = case Buf of
                <<>> -> Acc;
                _ -> [BCode | Acc]
            end,
-    Bits = code_bits(Size, ?W_POWER_TABLE),
-    C = << <<Code:Bits/integer>> || Code <- lists:reverse(Acc1) >>,
+    Bits = code_bits(Max, ?W_POWER_TABLE),
+    C = << <<Cd:Bits/integer>> || Cd <- lists:reverse(Acc1) >>,
     {C, Bits, Dict}.
 
-code_bits(Size, [{_, Max} | T]) when Size > Max-> code_bits(Size, T);
+code_bits(Code, [{_, Max} | T]) when Code > Max -> code_bits(Code, T);
 code_bits(_, [{Bits, _} | _]) -> Bits.

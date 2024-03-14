@@ -62,6 +62,20 @@ lzw_compress_1_lz78w_uncompress_2_test_() ->
         T <- [rfc(2732), rfc(2818) | ?TEXTS]
     ].
 
+%%--------------------------------------------------------------------
+%% lzw_compress/2 <-> lz78w_uncompress/1
+%%--------------------------------------------------------------------
+lzw_compress_2_lz78w_uncompress_2_test_() ->
+    Dict = lists:foldl(fun(C, Acc) -> maps:put(<<C:8/integer>>, C, Acc) end,
+                       #{},
+                       lists:seq(32, 127)),
+    [?_test(
+        ?assertEqual(T,
+                     jhn_lz:lz78w_uncompress(jhn_lz:lzw_compress(T, Dict),
+                                             [binary]) )) ||
+        T <- [rfc(2732), rfc(2818) | ?TEXTS]
+    ].
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
