@@ -39,6 +39,11 @@
 %%
 %%
 
+%% LZ78
+-export([lz77_compress/1, lz77_compress/2,
+         %% lz77_init/0, lz77_cont/2, lz77_end/1, lz77_end/2,
+         lz77_uncompress/1
+        ]).
 
 %% Library functions.
 
@@ -53,14 +58,17 @@
         ]).
 
 %% LZ78/LZW
--export([ lz78w_cont/2,
-          lz78w_end/1, lz78w_end/2,
-          lz78w_uncompress/1, lz78w_uncompress/2
+-export([lz78w_cont/2,
+         lz78w_end/1, lz78w_end/2,
+         lz78w_uncompress/1, lz78w_uncompress/2
         ]).
 
 %% Defines.
 
-%% W
+%% LZ77
+-define(BYTE, 8/integer).
+
+%% LZW
 -define(W_DICT,
         #{<<155>> => 155, <<"G">> => 71, <<142>> => 142,
           <<"¢">> => 162, <<"ç">> => 231, <<6>> => 6,
@@ -151,6 +159,12 @@
 
 -record(lz78w_stream, {state :: #state{}}).
 
+-record(s77, {buf :: binary() | binary(),
+              search = 16#FFF :: non_neg_integer(),
+              lookahead = 16#F :: non_neg_integer(),
+              acc = []:: [match()]
+             }).
+
 %% Types
 -type opt() :: iolist | binary.
 
@@ -162,9 +176,61 @@
 
 -type lz78w_compressed() :: {binary(), non_neg_integer(), map()}.
 
+-type lz77_compressed() :: {binary(), non_neg_integer()}.
+
+-type match() :: {non_neg_integer(), non_neg_integer(),non_neg_integer()}.
+
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec lz77_compress(iodata()) -> lz77_compressed().
+%%--------------------------------------------------------------------
+lz77_compress(Data) -> lz77_compress(Data, []).
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec lz77_compress(iodata(), [opt()]) -> lz77_compressed().
+%%--------------------------------------------------------------------
+lz77_compress(Data = <<C:?BYTE, T/binary>>, Options) ->
+    State = #s77{buf = Data, acc = [{0, 0, C}]},
+    State1 = #s77{lookahead = L} = parse_opts(Options, State),
+    Acc = lz77_compress1(T, 1, State1),
+    Bits = code_bits(L, ?W_POWER_TABLE),
+    {lists:reverse(Acc),
+%%    {iolist_to_binary([<<Pos:Bits/integer, Len:Bits/integer, Byte:?BYTE>> ||
+%%                          {Pos, Len, Byte} <- lists:reverse(Acc)]),
+     Bits}.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec lz77_uncompress(lz77_compressed()) -> binary().
+%%--------------------------------------------------------------------
+lz77_uncompress({Compressed, Bits}) -> lz77_uncompress(Compressed, Bits, <<>>).
+
+lz77_uncompress(<<>>, _, UnCompressed) -> UnCompressed;
+lz77_uncompress(Compressed, Bits, Un) ->
+    case Compressed of
+        <<0:Bits/integer, 0:Bits/integer, C:?BYTE, T/binary>> ->
+            lz77_uncompress(T, Bits, <<Un/binary, C:?BYTE>>);
+        <<Pos:Bits/integer, Len:Bits/integer, Byte:?BYTE, T/binary>> ->
+            X = erlang:binary_part(Un, {byte_size(Un) - Pos,Len}),
+            lz77_uncompress(T, Bits, <<Un/binary, X:Len/binary, Byte:?BYTE>>)
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -226,7 +292,7 @@ lzw_init() ->
 -spec lzw_init(map()) -> lz78w_stream().
 %%--------------------------------------------------------------------
 lzw_init(Dict) ->
-    <<Max:8/integer>> =
+    <<Max:?BYTE>> =
         maps:fold(fun(K, _, A) when K > A -> K; (_, _, A) -> A end, 0, Dict),
     #lz78w_stream{state = #state{dict = Dict, max_code = Max}}.
 
@@ -291,7 +357,64 @@ lz78w_uncompress({C, Bits, Dict}, [binary]) ->
 %% ===================================================================
 
 %% --------------------------------------------------------------------
-%% LZW
+%% LZ77
+%% --------------------------------------------------------------------
+parse_opts([], Rec) -> Rec;
+parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
+
+parse_opt({search_length, L}, State) -> State#s77{search = L};
+parse_opt({lookahead_length, L}, State) -> State#s77{lookahead = L}.
+
+lz77_compress1(<<>>, _, #s77{acc = Acc}) -> Acc;
+lz77_compress1(<<C:?BYTE>>, _, #s77{acc = Acc}) ->  [{0, 0, C} | Acc];
+lz77_compress1(Data, P, State = #s77{search = P}) -> lz77_compress1(Data,State);
+lz77_compress1(Data = <<C:?BYTE, _/binary>>, Pos, State) ->
+    #s77{buf = Buf, lookahead = L, search = S, acc = Acc} = State,
+    Lookahead = lookahead(Data, L),
+    Match = {_, Len, _} =  match(Buf, Lookahead, min(Pos, S), {0, 0, C}),
+    <<_:(Len + 1)/binary, Data1/binary>> = Data,
+    <<_:(Len + 1)/binary, Buf1/binary>> = Buf,
+    lz77_compress1(Data1,
+                   Pos + Len + 1,
+                   State#s77{buf = Buf1, acc = [Match | Acc]}).
+
+lz77_compress1(<<>>, #s77{acc = Acc}) -> Acc;
+lz77_compress1(<<C:?BYTE>>, #s77{acc = Acc}) ->  [{0, 0, C} | Acc];
+lz77_compress1(Data = <<C:?BYTE, _/binary>>, State) ->
+    #s77{buf = Buf, lookahead = L, search = S, acc = Acc} = State,
+    Lookahead = lookahead(Data, L),
+    Match = {_, Len, _} = match(Buf, Lookahead, S, {0, 0, C}),
+    <<_:Len/binary, Data1/binary>> = Data,
+    <<_:Len/binary, Buf1/binary>> = Buf,
+    lz77_compress1(Data1, State#s77{buf = Buf1, acc = [Match | Acc]}).
+
+lookahead(Data, L) ->
+    case Data of
+        <<Lookahead:L/binary, _/binary>> -> Lookahead;
+        _ -> Data
+    end.
+
+match(_, _, 0, Match) -> Match;
+match(<<>>, _, _, Match) -> Match;
+match(_, <<_:?BYTE>>, _, Match) -> Match;
+match(<<C:?BYTE, B/binary>>, <<C:?BYTE, L/binary>>, Pos, Match = {_, X, _}) ->
+    Match1 = case match_span(B, L, 1) of
+                 {Len, C1} when Len >= X -> {Pos, Len, C1};
+                 _ ->
+                     Match
+             end,
+    match(B, L, Pos + 1, Match1);
+match(B, L, Pos, Match) ->
+    match(B, L, Pos - 1, Match).
+
+match_span(<<C:?BYTE, _/binary>>, <<C:?BYTE>>, Len) -> {Len, C};
+match_span(<<C:?BYTE, B/binary>>, <<C:?BYTE, L/binary>>, Len) ->
+    match_span(B, L, Len + 1);
+match_span(_, <<C:?BYTE, _/binary>>, Len) ->
+    {Len, C}.
+
+%% --------------------------------------------------------------------
+%% LZ78/LZW
 %% --------------------------------------------------------------------
 lz78w_compress([], State = #state{stack = [], cont=false}) -> lz78w_stop(State);
 lz78w_compress(<<>>, State = #state{stack=[], cont=false}) -> lz78w_stop(State);
@@ -309,7 +432,7 @@ lz78w_compress([H  = <<_/binary>> | T], St = #state{stack = S}) ->
     lz78w_compress(H, St#state{stack = [T | S]});
 lz78w_compress(I = [H | T], St) -> 
      lz78w_next(I, H, T, St);
-lz78w_compress(I = <<H:8/integer, T/binary>>, St) ->
+lz78w_compress(I = <<H:?BYTE, T/binary>>, St) ->
      lz78w_next(I, H, T, St).
 
 lz78w_next(I, H, T, St = #state{buf=Buf,dict=Dict}) ->
