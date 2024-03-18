@@ -38,15 +38,12 @@
 %% Tests.
 %% ===================================================================
 
-%% foo_test_() ->
-%%     [?_test(?assertEqual(xx, rfc(2732)))].
-
 %%--------------------------------------------------------------------
 %% lz77_compress/1 <-> lz77_uncompress/1
 %%--------------------------------------------------------------------
 lz77_compress_1_lz77_uncompress_1_test_() ->
     [?_test(?assertEqual(T, jhn_lz:lz77_uncompress(jhn_lz:lz77_compress(T)))) ||
-        T <- ?TEXTS
+        T <- [rfc(2732), rfc(2818) | ?TEXTS]
     ].
 
 
