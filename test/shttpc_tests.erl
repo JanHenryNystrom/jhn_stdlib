@@ -443,14 +443,15 @@ close_connection() ->
 ssl_get() ->
     Port = start(ssl, [fun simple_response/5]),
     URL = ssl_url(Port, "/simple"),
-    Response = shttpc:get(URL),
+    Response =
+        shttpc:get(URL, #{options => [{verify, verify_none}]}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
 ssl_get_ipv6() ->
     Port = start(ssl, [fun simple_response/5], inet6),
     URL = ssl_url(inet6, Port, "/simple"),
-    Response = shttpc:get(URL),
+    Response = shttpc:get(URL, #{options => [{verify, verify_none}]}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
@@ -459,7 +460,7 @@ ssl_post() ->
     URL = ssl_url(Port, "/simple"),
     Body = "SSL Test <o/",
     BinaryBody = list_to_binary(Body),
-    Response = shttpc:post(URL, Body),
+    Response = shttpc:post(URL, Body, #{options => [{verify, verify_none}]}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(BinaryBody, body(Response)).
 
@@ -467,7 +468,8 @@ ssl_chunked() ->
     Port = start(ssl, [fun chunked_response/5,
                        fun chunked_response_t/5]),
     URL = ssl_url(Port, "/ssl_chunked"),
-    FirstResponse = #{connection := Con} = shttpc:get(URL),
+    FirstResponse = #{connection := Con} =
+        shttpc:get(URL, #{options => [{verify, verify_none}]}),
     ?assertEqual({200, <<"OK">>}, status(FirstResponse)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(FirstResponse)),
     ?assertEqual(<<"chunked">>,
@@ -721,13 +723,13 @@ redirect_response(Module, Socket, _, _, Body) ->
 
 dir() -> code:lib_dir(jhn_stdlib, test).
 
-file(File) -> filename:join([dir(), File]).
-
+cert(File) -> filename:join([dir(), "certs", File]).
 
 -define(TCP, [{packet, http}, binary, {active, false}]).
 -define(SSL, [{verify, verify_none},
-              {keyfile, file("key.pem")},
-              {certfile, file("crt.pem")} | ?TCP]).
+              {cacertfile, cert("ca_certificate.pem")},
+              {keyfile, cert("server_rsa_key.pem")},
+              {certfile, cert("server_certificate.pem")} | ?TCP]).
 
 start(Mod, Responders) -> start(Mod, Responders, inet).
 

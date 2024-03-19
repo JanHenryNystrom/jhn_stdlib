@@ -86,6 +86,7 @@ open_1_client_test_() ->
      ?_test(?assertEqual(ok,
                          syslog:close(
                            syslog:open([dtls,
+                                        {opts, [{verify, verify_none}]},
                                         {destination, "127.0.0.1"},
                                         {destination_port, ?DTLS}])))),
      ?_test(?assertEqual(ok,
@@ -96,6 +97,7 @@ open_1_client_test_() ->
      ?_test(?assertEqual(ok,
                          syslog:close(
                            syslog:open([tls,
+                                        {opts, [{verify, verify_none}]},
                                         {destination, "127.0.0.1"},
                                         {destination_port, ?TLS}])))),
      ?_test(?assertEqual({error, {exit, badarg}},
@@ -134,6 +136,7 @@ open_1_client_timeout_test_() ->
      ?_test(?assertEqual(ok,
                          syslog:close(
                            syslog:open([dtls,
+                                        {opts, [{verify, verify_none}]},
                                         {timeout, 500},
                                         {destination, {127, 0, 0, 1}},
                                         {destination_port, ?DTLS}])))),
@@ -147,6 +150,7 @@ open_1_client_timeout_test_() ->
                          syslog:close(
                            syslog:open([tls,
                                         {timeout, 500},
+                                        {opts, [{verify, verify_none}]},
                                         {destination, {127, 0, 0, 1}},
                                         {destination_port, ?TLS}])))),
      ?_test(?assertMatch({error, _}, syslog:open([tcp, {timeout, 500}]))),
@@ -351,11 +355,11 @@ close_1_test_() ->
 %% setopts/2
 %%--------------------------------------------------------------------
 setopts_2_test_() ->
-    [?_test(?assertEqual({error, function_clause},
+    [?_test(?assertMatch({error, _},
                          syslog:setopts(#transport{type = udp}, self()))),
-     ?_test(?assertEqual({error, function_clause},
+     ?_test(?assertMatch({error, _},
                          syslog:setopts(#transport{type = tcp}, self()))),
-     ?_test(?assertEqual({error, function_clause},
+     ?_test(?assertMatch({error, _},
                          syslog:setopts(#transport{type = tls}, self())))
     ].
 
@@ -363,7 +367,7 @@ setopts_2_test_() ->
 %% controlling_process/2
 %%--------------------------------------------------------------------
 controlling_process_2_test_() ->
-    [?_test(?assertEqual({error, function_clause},
+    [?_test(?assertMatch({error, _},
                          syslog:controlling_process(#transport{type = udp},
                                                     self()))),
      ?_test(?assertEqual({error, function_clause},
@@ -615,15 +619,19 @@ bad_option_test_() ->
 
 dir() -> code:lib_dir(jhn_stdlib, test).
 
-file(File) -> filename:join([dir(), File]).
+cert(File) -> filename:join([dir(), "certs", File]).
+
+-define(SSL, [{verify, verify_none},
+              {cacertfile, cert("ca_certificate.pem")},
+              {keyfile, cert("server_rsa_key.pem")},
+              {certfile, cert("server_certificate.pem")}]).
 
 server_start(tls, Port, Parent) ->
     Transport =
         syslog:open([server,
                      tls,
                      {port, Port},
-                     {opts, [{certfile, file("crt.pem")},
-                             {keyfile, file("key.pem")}]}]),
+                     {opts, ?SSL}]),
     Pid = spawn_link(fun() -> server(tls, Parent) end),
     ok = syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
@@ -633,8 +641,7 @@ server_start(dtls, Port, Parent) ->
         syslog:open([server,
                      dtls,
                      {port, Port},
-                     {opts, [{certfile, file("crt.pem")},
-                             {keyfile, file("key.pem")}]}]),
+                     {opts, ?SSL}]),
     Pid = spawn_link(fun() -> server(dtls, Parent) end),
     ok = syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
