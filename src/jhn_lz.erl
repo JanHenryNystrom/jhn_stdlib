@@ -149,7 +149,7 @@
 
 %% LZ77
 -record(s77, {buf :: binary() | binary(),
-              search = 16#FF :: non_neg_integer(),
+              search = 16#FFF :: non_neg_integer(),
               lookahead = 16#F :: non_neg_integer(),
               acc = []:: [match()]
              }).
@@ -177,9 +177,9 @@
 
 -type lz78w_compressed() :: {binary(), non_neg_integer(), map()}.
 
--type lz77_compressed() :: {binary(), non_neg_integer(), non_neg_integer()}.
+-type lz77_compressed() :: {[match()], non_neg_integer(), non_neg_integer()}.
 
--type match() :: {non_neg_integer(), non_neg_integer(),non_neg_integer()}.
+-type match() :: {non_neg_integer(), non_neg_integer(), integer()}.
 
 %% ===================================================================
 %% Library functions.
@@ -191,7 +191,7 @@
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lz77_compress(iodata()) -> lz77_compressed().
+-spec lz77_compress(binary()) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77_compress(Data) -> lz77_compress(Data, []).
 
@@ -214,10 +214,7 @@ lz77_compress(Data, Options) ->
                     Acc),
     PBits = code_bits(PMax, ?W_POWER_TABLE),
     LBits = code_bits(L, ?W_POWER_TABLE),
-   {<< <<Pos:PBits/integer, Len:LBits/integer, Byte:?BYTE>> ||
-                         {Pos, Len, Byte} <- RevAcc>>,
-    PBits,
-    LBits}.
+   {RevAcc, PBits, LBits}.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -227,8 +224,8 @@ lz77_compress(Data, Options) ->
 %%--------------------------------------------------------------------
 -spec lz77_uncompress(lz77_compressed()) -> binary().
 %%--------------------------------------------------------------------
-lz77_uncompress({Compressed, PBits, LBits}) ->
-    lz77_uncompress(Compressed, PBits, LBits, <<>>).
+lz77_uncompress({Compressed, _PBits, _LBits}) ->
+    lz77_uncompress(Compressed, <<>>).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -357,17 +354,16 @@ lz78w_uncompress({C, Bits, Dict}, [binary]) ->
 %% --------------------------------------------------------------------
 %% LZ77
 %% --------------------------------------------------------------------
-
 parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
 parse_opt({search_length, L}, State) -> State#s77{search = L};
 parse_opt({lookahead_length, L}, State) -> State#s77{lookahead = L}.
 
+lz77_compress(_, DLen, DLen, #s77{acc = Acc}) -> Acc;
 lz77_compress(Data, Pos, DLen, State) ->
     #s77{lookahead = L, search = S, acc = Acc} = State,
     case DLen - Pos of
-        0 -> Acc;
         1 -> [{0, 0, binary:last(Data)} | Acc];
         Left ->
             Start = case Pos < S of
@@ -380,44 +376,60 @@ lz77_compress(Data, Pos, DLen, State) ->
                     false -> binary:bin_to_list(binary:part(Data, Pos, L))
                 end,
             C = binary:at(Data, Pos),
-            Match = {_, MLen, _} =
+            Match = {_, MLen, C1} =
                 match(Data, Lookahead, Start, Pos, Pos - Start, {0, 0, C}),
-            lz77_compress(Data,
-                           Pos + MLen + 1,
-                           DLen,
-                           State#s77{acc = [Match | Acc]})
+            Pos1 = case C1 of
+                       -1  -> Pos + MLen;
+                       _ -> Pos + MLen + 1
+                   end,
+            lz77_compress(Data, Pos1, DLen, State#s77{acc = [Match | Acc]})
     end.
 
 match(_, _, End, End, _, Match) -> Match;
-match(Data, L = [C | T], Curr, End, Pos, Match = {_, X, _}) ->
+match(Data, L = [C | T], Curr, End, Pos, Match = {_, MLen, _}) ->
+    Curr1 = Curr + 1,
     case binary:at(Data, Curr) of
         C ->
-            Match1 = case match_span(Data, T, Curr + 1, End, 1) of
-                         {Len, C1} when Len >= X -> {Pos, Len, C1};
-                         _ ->
-                             Match
+            Match1 = case match_span(Data, T, Curr1, End, 1, [C]) of
+                         {Len, C1} when Len >= MLen -> {Pos, Len, C1};
+                         _ -> Match
                      end,
-            match(Data, L, Curr + 1, End, Pos - 1, Match1);
+            match(Data, L, Curr1, End, Pos - 1, Match1);
         _ ->
-            match(Data, L, Curr + 1, End, Pos - 1, Match)
+            match(Data, L, Curr1, End, Pos - 1, Match)
     end.
 
-match_span(_, [C], _, _, Len) -> {Len, C};
-match_span(_, [C | _], End, End, Len) -> {Len, C};
-match_span(Data, [C | T], Curr, End, Len) ->
+match_span(_, [C], _, _, Len, _) -> {Len, C};
+match_span(_, [C | _], End, End, Len, []) -> {Len, C};
+match_span(_, L, End, End, Len, M) ->
+    Match = lists:reverse(M),
+    match_run(Match, Match, L, Len);
+match_span(Data, [C | T], Curr, End, Len, Match) ->
     case binary:at(Data, Curr) of
-        C -> match_span(Data, T, Curr + 1, End, Len + 1);
+        C -> match_span(Data, T, Curr + 1, End, Len + 1, [C | Match]);
         _ -> {Len, C}
     end.
 
-lz77_uncompress(<<>>, _, _, UnCompressed) -> UnCompressed;
-lz77_uncompress(Compressed, PBits, LBits, Un) ->
-    case Compressed of
-        <<0:PBits/integer, 0:LBits/integer, C:?BYTE, T/bits>> ->
-            lz77_uncompress(T, PBits, LBits, <<Un/binary, C:?BYTE>>);
-        <<Pos:PBits/integer, Len:LBits/integer, Byte:?BYTE, T/bits>> ->
-            X = erlang:binary_part(Un, {byte_size(Un) - Pos, Len}),
-            lz77_uncompress(T,PBits,LBits,<<Un/binary,X:Len/binary,Byte:?BYTE>>)
+match_run([], Match, L, Len) -> match_run(Match, Match, L, Len);
+match_run(_, _, [], Len) -> {Len, -1};
+match_run([C | M], Match, [C | L], Len) -> match_run(M, Match, L, Len + 1);
+match_run(_, _, [C | _], Len) -> {Len, C}.
+
+lz77_uncompress([], UnCompressed) -> UnCompressed;
+lz77_uncompress([{0, 0, -1} | T], U) -> lz77_uncompress(T, U);
+lz77_uncompress([{0, 0, C} | T], U) -> lz77_uncompress(T, <<U/binary,C:?BYTE>>);
+lz77_uncompress([{Pos, Len, C} | T], U) ->
+    X = case Pos > Len of
+            true -> binary_part(U, byte_size(U) - Pos, Pos);
+            false ->
+                Start = byte_size(U) - Pos,
+                C1 = binary:copy(binary_part(U, Start, Pos), Len div Pos),
+                C2 = binary:part(U, Start, Len rem Pos),
+                <<C1/binary, C2/binary>>
+        end,
+    case C of
+        -1 -> lz77_uncompress(T, <<U/binary, X:Len/binary>>);
+        _ -> lz77_uncompress(T, <<U/binary, X:Len/binary, C:?BYTE>>)
     end.
 
 %% --------------------------------------------------------------------
