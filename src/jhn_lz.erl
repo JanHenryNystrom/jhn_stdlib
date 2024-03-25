@@ -31,13 +31,14 @@
 %% rfc1951 DEFLATE Compressed Data Format Specification version 1.3
 %% rfc1952 GZIP file format specification version 4.3
 %%
+%% Snappy https://github.com/google/snappy
+%% LZ4 https://github.com/lz4/lz4
 %%
+%% LZO http://www.infradead.org/~mchehab/kernel_docs/staging/lzo.html
+%% LZO-RLE
 %%
-%%
-%%
-%%
-%%
-%%
+%% LZMA https://www.7-zip.org/sdk.html,
+%%      https://en.wikipedia.org/wiki/Lempel-Ziv-Markov_chain_algorithm
 
 %% LZ77
 -export([lz77_compress/1, lz77_compress/2,

@@ -66,9 +66,12 @@ Features/Modules
     * Range trees -- r_tree
     * T-trees -- t_tree
   * Algorithms
-    * Levenshtein distance -- levenshtein
+    * Levenshtein distance -- Levenshtein
     * CRC32-C checksum -- jhn_hash [rfc9260][33]
     * xxHash-32 checksum -- jhn_hash [xxHash][34]
+    * LZ77 compression -- jhn_lz [Lempel–Ziv 77][35]
+    * LZ78 compression -- jhn_lz [Lempel–Ziv 78][36]
+    * LZW compression -- jhn_lz [Lempel–Ziv-Welch][37]
 
 <a name='deprecated'>
 
@@ -187,7 +190,8 @@ I know I really should.
   [27]: http://www.ietf.org/rfc/rfc6587.txt
        "Transmission of Syslog Messages over TCP"
   [28]: https://arxiv.org/ftp/arxiv/papers/1406/1406.2294.pdf
-       "A Fast, Minimal Memory, Consistent Hash Algorithm, John Lamping, Eric Veach"
+       "A Fast, Minimal Memory, Consistent Hash Algorithm, John Lamping,
+        Eric Veach"
   [29]: http://www.ietf.org/rfc/rfc6012.txt
         "Datagram Transport Layer Security (DTLS) Transport Mapping for Syslog"
   [30]: http://www.ietf.org/rfc/rfc8259.txt
@@ -197,9 +201,19 @@ I know I really should.
   [32]: http://www.ietf.org/rfc/rfc7396.txt
         "JSON Merge Patch"
   [33]: http://www.ietf.org/rfc/rfc9260.txt
-       "[Castagnoli93] G. Castagnoli, S. Braeuer and M. Herrman \"Optimization
-                       of Cyclic Redundancy-Check Codes with 24 and 32 Parity
-                       Bits\", IEEE Transact. on Communications, Vol. 41, No.
-                       6, June 1993."
+        "G. Castagnoli, S. Braeuer and M. Herrman \"Optimization of Cyclic
+         Redundancy-Check Codes with 24 and 32 Parity Bits\", IEEE Transact.
+         on Communications, Vol. 41, No. 6, June 1993."
   [34]: http://github.com/Cyan4973/xxHash
         "xxHash - Extremely fast hash algorithm"
+  [35]: https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.118.8921
+        "Ziv, Jacob; Lempel, Abraham (May 1977). \"A Universal Algorithm for
+         Sequential Data Compression\" IEEE Transactions on Information
+         Theory. 23 (3): 337–343"
+  [36]: https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.14.2892
+        "Ziv, Jacob; Lempel, Abraham (September 1978). \"Compression of
+         Individual Sequences via Variable-Rate Coding\" IEEE Transactions
+         on Information Theory 24 (5): 530–536"
+  [37]: https://www.csd.uoc.gr/~hy474/bibliography/DataCompression-Welch.pdf
+        "Welch, Terry (1984). \"A Technique for High-Performance Data
+         Compression\" Computer. 17 (6): 8–19"
