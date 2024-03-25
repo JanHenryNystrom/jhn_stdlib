@@ -29,7 +29,7 @@
 %%
 %% rfc7932 Brotli Compressed Data Format
 %% rfc1951 DEFLATE Compressed Data Format Specification version 1.3
-%%
+%% rfc1952 GZIP file format specification version 4.3
 %%
 %%
 %%
@@ -155,31 +155,39 @@
              }).
 
 %% LZ78 and LZW
--record(state, {buf       = <<>>      :: binary(),
-                buf_code  = undefined :: code() | undefined,
-                dict      = #{}       :: map(),
-                max_code  = 0         :: code(),
-                acc       = []        :: [code()],
-                stack     = []        :: stack(),
-                cont      = true      :: boolean()
-               }).
+-record(s78w, {buf       = <<>>      :: binary(),
+               buf_code  = undefined :: code() | undefined,
+               dict      = #{}       :: map(),
+               max_code  = 0         :: code(),
+               acc       = []        :: [code()],
+               stack     = []        :: stack(),
+               cont      = true      :: boolean()
+              }).
 
--record(lz78w_stream, {state :: #state{}}).
+-record(lz78w_stream, {state :: #s78w{}}).
 
 %% Types
--type opt() :: iolist | binary.
+
+%% LZ77
+
+-type lz77_compressed() :: {[match()], non_neg_integer(), non_neg_integer()}.
+
+-type match() :: {non_neg_integer(), non_neg_integer(), integer()}.
+
+
+%% LZ78/LZW
 
 -type code() :: non_neg_integer().
 
--type stack() :: list(iodata() | '$end').
+-type stack() :: list(iodata()).
 
 -type lz78w_stream() :: #lz78w_stream{}.
 
 -type lz78w_compressed() :: {binary(), non_neg_integer(), map()}.
 
--type lz77_compressed() :: {[match()], non_neg_integer(), non_neg_integer()}.
+%% LZ77/LZ78/LZW
 
--type match() :: {non_neg_integer(), non_neg_integer(), integer()}.
+-type opt() :: iolist | binary.
 
 %% ===================================================================
 %% Library functions.
@@ -201,7 +209,7 @@ lz77_compress(Data) -> lz77_compress(Data, []).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lz77_compress(iodata(), [opt()]) -> lz77_compressed().
+-spec lz77_compress(binary(), [opt()]) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77_compress(Data, Options) ->
     State1 = #s77{lookahead = L} = parse_opts(Options, #s77{}),
@@ -245,7 +253,7 @@ lz78_compress(Data) -> lz78w_end(Data, lz78_init()).
 %%--------------------------------------------------------------------
 -spec lz78_init() -> lz78w_stream().
 %%--------------------------------------------------------------------
-lz78_init() -> #lz78w_stream{state = #state{}}.
+lz78_init() -> #lz78w_stream{state = #s78w{}}.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -276,7 +284,7 @@ lzw_compress(Data, Dict) -> lz78w_end(Data, lzw_init(Dict)).
 -spec lzw_init() -> lz78w_stream().
 %%--------------------------------------------------------------------
 lzw_init() ->
-    #lz78w_stream{state = #state{dict = ?W_DICT,max_code = maps:size(?W_DICT)}}.
+    #lz78w_stream{state = #s78w{dict = ?W_DICT,max_code = maps:size(?W_DICT)}}.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -289,7 +297,7 @@ lzw_init() ->
 lzw_init(Dict) ->
     <<Max:?BYTE>> =
         maps:fold(fun(K, _, A) when K > A -> K; (_, _, A) -> A end, 0, Dict),
-    #lz78w_stream{state = #state{dict = Dict, max_code = Max}}.
+    #lz78w_stream{state = #s78w{dict = Dict, max_code = Max}}.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -320,7 +328,7 @@ lz78w_end(Stream) -> lz78w_end(<<>>, Stream).
 -spec lz78w_end(iodata(), lz78w_stream()) -> lz78w_compressed().
 %%--------------------------------------------------------------------
 lz78w_end(Data, #lz78w_stream{state = State}) ->
-    lz78w_compress(Data, State#state{cont = false}).
+    lz78w_compress(Data, State#s78w{cont = false}).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -435,47 +443,47 @@ lz77_uncompress([{Pos, Len, C} | T], U) ->
 %% --------------------------------------------------------------------
 %% LZ78/LZW
 %% --------------------------------------------------------------------
-lz78w_compress([], State = #state{stack = [], cont=false}) -> lz78w_stop(State);
-lz78w_compress(<<>>, State = #state{stack=[], cont=false}) -> lz78w_stop(State);
-lz78w_compress([], State = #state{stack = []}) -> #lz78w_stream{state = State};
-lz78w_compress(<<>>, State = #state{stack = []}) -> #lz78w_stream{state=State};
-lz78w_compress(<<>>, State = #state{stack = [H | T]}) ->
-    lz78w_compress(H, State#state{stack = T});
-lz78w_compress([], State = #state{stack = [H | T]}) ->
-    lz78w_compress(H, State#state{stack = T});
+lz78w_compress([], State = #s78w{stack = [], cont=false}) -> lz78w_stop(State);
+lz78w_compress(<<>>, State = #s78w{stack=[], cont=false}) -> lz78w_stop(State);
+lz78w_compress([], State = #s78w{stack = []}) -> #lz78w_stream{state = State};
+lz78w_compress(<<>>, State = #s78w{stack = []}) -> #lz78w_stream{state=State};
+lz78w_compress(<<>>, State = #s78w{stack = [H | T]}) ->
+    lz78w_compress(H, State#s78w{stack = T});
+lz78w_compress([], State = #s78w{stack = [H | T]}) ->
+    lz78w_compress(H, State#s78w{stack = T});
 lz78w_compress([[] | T], St) -> lz78w_compress(T, St);
 lz78w_compress([<<>> | T], St) -> lz78w_compress(T, St);
-lz78w_compress([H  = [_ | _] | T], St = #state{stack = S}) ->
-    lz78w_compress(H, St#state{stack = [T | S]});
-lz78w_compress([H  = <<_/binary>> | T], St = #state{stack = S}) ->
-    lz78w_compress(H, St#state{stack = [T | S]});
+lz78w_compress([H  = [_ | _] | T], St = #s78w{stack = S}) ->
+    lz78w_compress(H, St#s78w{stack = [T | S]});
+lz78w_compress([H  = <<_/binary>> | T], St = #s78w{stack = S}) ->
+    lz78w_compress(H, St#s78w{stack = [T | S]});
 lz78w_compress(I = [H | T], St) -> 
      lz78w_next(I, H, T, St);
 lz78w_compress(I = <<H:?BYTE, T/binary>>, St) ->
      lz78w_next(I, H, T, St).
 
-lz78w_next(I, H, T, St = #state{buf=Buf,dict=Dict}) ->
+lz78w_next(I, H, T, St = #s78w{buf=Buf,dict=Dict}) ->
     Buf1 = <<Buf/binary, H/integer>>,
     case maps:get(Buf1, Dict, undefined) of
         undefined ->
-            #state{max_code = Max, buf_code = BufCode, acc = Acc} = St,
+            #s78w{max_code = Max, buf_code = BufCode, acc = Acc} = St,
             Max1 = Max + 1,
             Acc1 = case Buf of
                        <<>> -> Acc;
                        _ -> [BufCode | Acc]
                    end,
-            St1 = St#state{buf = <<>>,
+            St1 = St#s78w{buf = <<>>,
                            dict = maps:put(Buf1, Max1, Dict),
                            buf_code = undefined,
                            max_code = Max1,
                            acc = Acc1},
             lz78w_compress(I, St1);
         Buf1Code ->
-            lz78w_compress(T, St#state{buf = Buf1, buf_code = Buf1Code})
+            lz78w_compress(T, St#s78w{buf = Buf1, buf_code = Buf1Code})
     end.
 
 lz78w_stop(St) ->
-    #state{buf = Buf,buf_code = BCode,dict = Dict,max_code = Max,acc=Acc} = St,
+    #s78w{buf = Buf,buf_code = BCode,dict = Dict,max_code = Max, acc=Acc} = St,
     Acc1 = case Buf of
                <<>> -> Acc;
                _ -> [BCode | Acc]
@@ -484,5 +492,8 @@ lz78w_stop(St) ->
     C = << <<Cd:Bits/integer>> || Cd <- lists:reverse(Acc1) >>,
     {C, Bits, Dict}.
 
+%% --------------------------------------------------------------------
+%% LZ77/LZ78/LZW
+%% --------------------------------------------------------------------
 code_bits(Code, [{_, Max} | T]) when Code > Max -> code_bits(Code, T);
 code_bits(_, [{Bits, _} | _]) -> Bits.
