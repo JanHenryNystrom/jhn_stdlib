@@ -40,6 +40,12 @@
 %% LZMA https://www.7-zip.org/sdk.html,
 %%      https://en.wikipedia.org/wiki/Lempel-Ziv-Markov_chain_algorithm
 
+%% sNaPpY
+-export([snappy_compress/1, snappy_compress/2,
+         %% lz77_init/0, lz77_cont/2, lz77_end/1, lz77_end/2,
+         snappy_uncompress/1, snappy_uncompress/2
+        ]).
+
 %% LZ77
 -export([lz77_compress/1, lz77_compress/2,
          %% lz77_init/0, lz77_cont/2, lz77_end/1, lz77_end/2,
@@ -149,11 +155,15 @@
 %% Records
 
 %% LZ77
--record(s77, {buf :: binary() | binary(),
-              search = 16#FFF :: non_neg_integer(),
+-record(s77, {search = 16#FFF :: non_neg_integer(),
               lookahead = 16#F :: non_neg_integer(),
               acc = []:: [match()]
              }).
+
+-record(lz77c, {matches  :: [match()],
+                pos_bits :: non_neg_integer(),
+                len_bits :: non_neg_integer()
+               }).
 
 %% LZ78 and LZW
 -record(s78w, {buf       = <<>>      :: binary(),
@@ -167,32 +177,81 @@
 
 -record(lz78w_stream, {state :: #s78w{}}).
 
+%% sNaPpY
+-type snappy_block() :: binary().
+-type snappy_frame() :: binary().
+
 %% Types
 
 %% LZ77
 
--type lz77_compressed() :: {[match()], non_neg_integer(), non_neg_integer()}.
+-type lz77_compressed() :: #lz77c{}.
 
--type match() :: {non_neg_integer(), non_neg_integer(), integer()}.
+-type match() :: {non_neg_integer(), non_neg_integer(), byte() | -1}.
 
 
 %% LZ78/LZW
 
--type code() :: non_neg_integer().
+-type code() :: byte().
 
 -type stack() :: list(iodata()).
 
 -type lz78w_stream() :: #lz78w_stream{}.
 
--type lz78w_compressed() :: {binary(), non_neg_integer(), map()}.
+-type lz78w_compressed() :: {bitstring(), non_neg_integer(), map()}.
 
 %% LZ77/LZ78/LZW
 
--type opt() :: iolist | binary.
+-type opt() :: iolist | binary | raw.
 
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec snappy_compress(binary()) -> snappy_block() | snappy_frame().
+%%--------------------------------------------------------------------
+snappy_compress(Data) -> snappy_compress(Data, []).
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec snappy_compress(binary(), [opt()]) -> snappy_block() | snappy_frame().
+%%--------------------------------------------------------------------
+snappy_compress(Data, Opts) ->
+    Size = byte_size(Data),
+    #lz77c{matches = Matches} = lz77_compress(Data, Opts),
+    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
+    gather(Matches1, [Literal, varint(Size)]).
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec snappy_uncompress(snappy_block() | snappy_frame()) -> binary().
+%%--------------------------------------------------------------------
+snappy_uncompress(Frame) -> snappy_uncompress(Frame, []).
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec snappy_uncompress(snappy_block() | snappy_frame(), [opt()]) -> binary().
+%%--------------------------------------------------------------------
+snappy_uncompress(Block, _Opts) ->
+    snappy_uncompress_block(snappy_drop_varint(Block), <<>>).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -213,17 +272,23 @@ lz77_compress(Data) -> lz77_compress(Data, []).
 -spec lz77_compress(binary(), [opt()]) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77_compress(Data, Options) ->
-    State1 = #s77{lookahead = L} = parse_opts(Options, #s77{}),
-    Acc = lz77_compress(Data, 0, byte_size(Data), State1),
-    {RevAcc, PMax} =
-        lists:foldl(fun(H = {Pos,_,_},{A1,Max}) when Pos>Max -> {[H|A1],Pos};
-                       (H, {A1, Max}) -> {[H | A1], Max}
+    Acc = lz77_compress(Data, 0, byte_size(Data), parse_opts(Options, #s77{})),
+    {RevAcc, PMax, LMax} =
+        lists:foldl(fun(H = {Pos, Len, _}, {A1, PMax, LMax}) when Pos > PMax,
+                                                                  Len > LMax ->
+                            {[H | A1], Pos, Len};
+                       (H = {Pos, _, _}, {A1, PMax, LMax}) when Pos > PMax ->
+                            {[H | A1], Pos, LMax};
+                       (H = {_, Len, _}, {A1, PMax, LMax}) when Len > LMax ->
+                            {[H | A1], PMax, Len};
+                       (H, {A1, PMax, LMax}) ->
+                            {[H | A1], PMax, LMax}
                     end,
-                    {[], 0},
+                    {[], 0, 0},
                     Acc),
     PBits = code_bits(PMax, ?W_POWER_TABLE),
-    LBits = code_bits(L, ?W_POWER_TABLE),
-   {RevAcc, PBits, LBits}.
+    LBits = code_bits(LMax, ?W_POWER_TABLE),
+   #lz77c{matches = RevAcc, pos_bits = PBits, len_bits = LBits}.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -233,8 +298,7 @@ lz77_compress(Data, Options) ->
 %%--------------------------------------------------------------------
 -spec lz77_uncompress(lz77_compressed()) -> binary().
 %%--------------------------------------------------------------------
-lz77_uncompress({Compressed, _PBits, _LBits}) ->
-    lz77_uncompress(Compressed, <<>>).
+lz77_uncompress(#lz77c{matches = Matches}) -> lz77_uncompress(Matches, <<>>).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -361,8 +425,91 @@ lz78w_uncompress({C, Bits, Dict}, [binary]) ->
 %% ===================================================================
 
 %% --------------------------------------------------------------------
+%% sNaPpY
+%% --------------------------------------------------------------------
+
+varint(I) when I =< 127 -> <<I>>;
+varint(I) -> <<1:1, (I band 127):7, (varint(I bsr 7))/binary>>.
+
+gather([], Acc) -> lists:reverse(Acc);
+gather(Matches = [{0, 0, _} | _], Acc) ->
+    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
+    gather(Matches1, [Literal | Acc]);
+gather(Matches, Acc) ->
+    case gather_copy(Matches) of
+        {Copy, -1, Matches1} -> gather(Matches1, [Copy | Acc]);
+        {Copy, C, Matches1} ->
+            {Literal, Matches2} = gather_literal(Matches1, 1, <<C:?BYTE>>),
+            gather(Matches2, [Literal, Copy | Acc])
+    end.
+
+gather_literal([{0, 0, -1} | Matches], Len, Acc) ->
+    gather_literal(Matches, Len, Acc);
+gather_literal([{0, 0, C} | Matches], Len, Acc) ->
+    gather_literal(Matches, Len + 1, <<Acc/binary, C:?BYTE>>);
+gather_literal(Matches, Len, Acc) ->
+    {Tag, L} =
+        case Len - 1 of
+            Len1 when Len1 < 60 -> {Len1, <<>>};
+            Len1 when Len1 < 256 -> {60, <<Len1:8/integer>>};
+            Len1 when Len1 < 65536 -> {61, <<Len1:16/integer-little>>};
+            Len1 when Len1 < 16777216 -> {62, <<Len1:24/integer-little>>};
+            Len1 when Len1 < 4294967296 -> {63, <<Len1:32/integer-little>>}
+        end,
+    {<<Tag:6/integer, 0:2/integer, L/binary, Acc/binary>>, Matches}.
+
+gather_copy([{Pos, Len, C} | Matches]) when Len > 3, Len < 12, Pos < 2048 ->
+    Len4 = Len - 4,
+    <<PosU:3/integer, PosL:8/integer>> = <<Pos:11/integer>>,
+    {<<PosU:3/integer, Len4:3, 1:2, PosL:8/integer>>, C, Matches};
+gather_copy([{Pos, Len, C} | Matches]) when Len < 65, Pos < 65536 ->
+    Len1 = Len - 1,
+    {<<Len1:6, 2:2, Pos:16/integer-little>>, C, Matches};
+%% Have to chop up the copies when we have longer than 64 byte copy
+gather_copy([{Pos, Len, C} | Matches]) when Len < 65 ->
+    Len1 = Len - 1,
+    {<<Len1:6, 3:2, Pos:32/integer-little>>, C, Matches}.
+
+snappy_drop_varint(<<1:1, _:7, T/binary>>) -> snappy_drop_varint(T);
+snappy_drop_varint(<<0:1, _:7, T/binary>>) -> T.
+
+snappy_uncompress_block(<<>>, Acc) -> Acc;
+snappy_uncompress_block(<<S:6/integer, 0:2/integer, T/binary>>, Acc) ->
+    {Len1, T2} = case {S, T} of
+                    {60, <<Len:8/integer, T1/binary>>} -> {Len, T1};
+                    {61, <<Len:16/integer-little, T1/binary>>} -> {Len, T1};
+                    {62, <<Len:24/integer-little, T1/binary>>} -> {Len, T1};
+                    {63, <<Len:32/integer-little, T1/binary>>} -> {Len, T1};
+                    {Len, T1} -> {Len, T1}
+                end,
+    <<Lit:(Len1 + 1)/binary, T3/binary>> = T2,
+    snappy_uncompress_block(T3, <<Acc/binary, Lit/binary>>);
+snappy_uncompress_block(<<PosU:3/integer,Len4:3,1:2,PosL:8/integer,T/binary>>,
+                        Acc) ->
+    <<Pos:11/integer>> = <<PosU:3/integer, PosL:8/integer>>,
+    snappy_uncompress_copy(Pos, Len4 + 4, T, Acc);
+snappy_uncompress_block(<<Len1:6, 2:2, Pos:16/integer-little,T/binary>>, Acc) ->
+    snappy_uncompress_copy(Pos, Len1 + 1, T, Acc);
+snappy_uncompress_block(<<Len1:6, 3:2, Pos:32/integer-little,T/binary>>, Acc) ->
+    snappy_uncompress_copy(Pos, Len1 + 1, T, Acc).
+
+snappy_uncompress_copy(Pos, Len, T, Acc) when Pos > Len ->
+    C1 = binary_part(Acc, byte_size(Acc) - Pos, Len),
+    snappy_uncompress_block(T, <<Acc/binary, C1/binary>>);
+snappy_uncompress_copy(Pos, Len, T, Acc) ->
+    Start = byte_size(Acc) - Pos,
+    C1 = binary:copy(binary_part(Acc, Start, Pos), Len div Pos),
+    C2 = binary:part(Acc, Start, Len rem Pos),
+    snappy_uncompress_block(T, <<Acc/binary, C1/binary, C2/binary>>).
+
+%% --------------------------------------------------------------------
 %% LZ77
 %% --------------------------------------------------------------------
+
+%%
+%% TODO: Add min, max length for matches.
+%%
+
 parse_opts([], Rec) -> Rec;
 parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
 
@@ -429,7 +576,7 @@ lz77_uncompress([{0, 0, -1} | T], U) -> lz77_uncompress(T, U);
 lz77_uncompress([{0, 0, C} | T], U) -> lz77_uncompress(T, <<U/binary,C:?BYTE>>);
 lz77_uncompress([{Pos, Len, C} | T], U) ->
     X = case Pos > Len of
-            true -> binary_part(U, byte_size(U) - Pos, Pos);
+            true -> binary_part(U, byte_size(U) - Pos, Len);
             false ->
                 Start = byte_size(U) - Pos,
                 C1 = binary:copy(binary_part(U, Start, Pos), Len div Pos),
@@ -448,22 +595,24 @@ lz78w_compress([], State = #s78w{stack = [], cont=false}) -> lz78w_stop(State);
 lz78w_compress(<<>>, State = #s78w{stack=[], cont=false}) -> lz78w_stop(State);
 lz78w_compress([], State = #s78w{stack = []}) -> #lz78w_stream{state = State};
 lz78w_compress(<<>>, State = #s78w{stack = []}) -> #lz78w_stream{state=State};
-lz78w_compress(<<>>, State = #s78w{stack = [H | T]}) ->
-    lz78w_compress(H, State#s78w{stack = T});
 lz78w_compress([], State = #s78w{stack = [H | T]}) ->
     lz78w_compress(H, State#s78w{stack = T});
-lz78w_compress([[] | T], St) -> lz78w_compress(T, St);
-lz78w_compress([<<>> | T], St) -> lz78w_compress(T, St);
+lz78w_compress(<<>>, State = #s78w{stack = [H | T]}) ->
+    lz78w_compress(H, State#s78w{stack = T});
+lz78w_compress([[] | T], St) ->
+    lz78w_compress(T, St);
+lz78w_compress([<<>> | T], St) ->
+    lz78w_compress(T, St);
 lz78w_compress([H  = [_ | _] | T], St = #s78w{stack = S}) ->
     lz78w_compress(H, St#s78w{stack = [T | S]});
 lz78w_compress([H  = <<_/binary>> | T], St = #s78w{stack = S}) ->
     lz78w_compress(H, St#s78w{stack = [T | S]});
-lz78w_compress(I = [H | T], St) -> 
+lz78w_compress(I = [H | T], St) ->
      lz78w_next(I, H, T, St);
 lz78w_compress(I = <<H:?BYTE, T/binary>>, St) ->
      lz78w_next(I, H, T, St).
 
-lz78w_next(I, H, T, St = #s78w{buf=Buf,dict=Dict}) ->
+lz78w_next(I, H, T, St = #s78w{buf = Buf, dict = Dict}) ->
     Buf1 = <<Buf/binary, H/integer>>,
     case maps:get(Buf1, Dict, undefined) of
         undefined ->
@@ -484,7 +633,7 @@ lz78w_next(I, H, T, St = #s78w{buf=Buf,dict=Dict}) ->
     end.
 
 lz78w_stop(St) ->
-    #s78w{buf = Buf,buf_code = BCode,dict = Dict,max_code = Max, acc=Acc} = St,
+    #s78w{buf = Buf, buf_code = BCode,dict = Dict,max_code = Max, acc=Acc} = St,
     Acc1 = case Buf of
                <<>> -> Acc;
                _ -> [BCode | Acc]

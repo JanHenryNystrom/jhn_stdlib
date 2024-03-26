@@ -39,13 +39,22 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
+%% snappy_compress/1 <-> snappy_uncompress/1
+%%--------------------------------------------------------------------
+snappy_compress_1_snappy_uncompress_1_test_() ->
+    [?_test(?assertEqual(T,
+                         jhn_lz:snappy_uncompress(
+                           iolist_to_binary(jhn_lz:snappy_compress(T))))) ||
+        T <- [rfc(2732), rfc(2818) | ?TEXTS]
+    ].
+
+%%--------------------------------------------------------------------
 %% lz77_compress/1 <-> lz77_uncompress/1
 %%--------------------------------------------------------------------
 lz77_compress_1_lz77_uncompress_1_test_() ->
     [?_test(?assertEqual(T, jhn_lz:lz77_uncompress(jhn_lz:lz77_compress(T)))) ||
         T <- [rfc(2732), rfc(2818) | ?TEXTS]
     ].
-
 
 %%--------------------------------------------------------------------
 %% lz78_compress/1 <-> lz78w_uncompress/1
