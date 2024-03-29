@@ -39,7 +39,7 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% snappy_compress/1 <-> snappy_uncompress/1
+%% snappy_compress/1 <-> snappy_uncompress/1 Block
 %%--------------------------------------------------------------------
 snappy_compress_1_snappy_uncompress_1_test_() ->
     [?_test(?assertEqual(T,
@@ -53,8 +53,7 @@ snappy_compress_1_snappy_uncompress_1_test_() ->
 %%--------------------------------------------------------------------
 lz77_compress_1_lz77_uncompress_1_test_() ->
     [?_test(?assertEqual(T, jhn_lz:lz77_uncompress(jhn_lz:lz77_compress(T)))) ||
-        T <- [rfc(2732), rfc(2818) | ?TEXTS]
-    ].
+        T <- [rfc(2732), rfc(2818) | ?TEXTS]].
 
 %%--------------------------------------------------------------------
 %% lz78_compress/1 <-> lz78w_uncompress/1
@@ -139,6 +138,65 @@ lzw_compress_2_lz78w_uncompress_2_test_() ->
         T <- [rfc(2732), rfc(2818) | ?TEXTS]
     ].
 
+%%--------------------------------------------------------------------
+%% Performance
+%%--------------------------------------------------------------------
+performance_test_() ->
+    [?_test(
+        ?assertEqual(
+           ok,
+           begin
+               {Timec, D} = timer:tc(jhn_lz, snappy_compress, [T]),
+               D1 = iolist_to_binary(D),
+               {Timeu, _} = timer:tc(jhn_lz, snappy_uncompress, [D1]),
+               Size = byte_size(T),
+               Percent = trunc(100* (byte_size(D1) / Size)),
+               Speedc = (1000000 / Timec) * (Size / math:pow(2, 20)),
+               Speedu = (1000000 / Timeu) * (Size / math:pow(2, 20)),
+               ?debugFmt("~nsnappy ~p:~p ~p% ~.2..f:~.2..f MB/s ~pBytes~n",
+                         [Timec, Timeu, Percent, Speedc, Speedu, Size]),
+               ok
+           end)) ||
+        T <- [file(alice29), rfc(2732), rfc(2818)]
+    ] ++
+    [?_test(
+        ?assertEqual(ok,
+                     begin
+                         {Timec, D} = timer:tc(jhn_lz, lz77_compress, [T]),
+                         {Timeu, _} = timer:tc(jhn_lz, lz77_uncompress, [D]),
+                         ?debugFmt("~nlz77 ~p:~p~n", [Timec, Timeu]),
+                         ok
+                     end)) ||
+        T <- [rfc(2732), rfc(2818)]
+    ] ++
+    [?_test(
+        ?assertEqual(
+           ok,
+           begin
+               {Timec, D} = timer:tc(jhn_lz, lz78_compress, [T]),
+               {Timeu, _} = timer:tc(jhn_lz, lz78w_uncompress, [D]),
+               Size = byte_size(T),
+               {Bs, _, Map} = D,
+               Percent = trunc(100 * (byte_size(Bs) / Size)),
+               Speedc = (1000000 / Timec) * (Size / math:pow(2, 20)),
+               Speedu = (1000000 / Timeu) * (Size / math:pow(2, 20)),
+               MaxSize =
+                   maps:fold(fun(_, V, Acc) when V > Acc -> V;
+                                (_, _, Acc) -> Acc
+                             end,
+                             0,
+                             maps:map(fun(K, _) -> byte_size(K) end, Map)),
+               ?debugFmt(
+                  "~nlz78 ~p:~p ~p% ~.2..f:~.2..f MB/s ~pBytes Dict:~p:~p~n",
+                  [Timec, Timeu, Percent, Speedc, Speedu, Size,
+                   maps:size(Map), MaxSize]),
+               ok
+
+                     end)) ||
+        T <- [file(alice29), rfc(2732), rfc(2818)]
+    ].
+
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
@@ -148,3 +206,19 @@ rfc(Int) ->
     FileName = "rfc" ++ integer_to_list(Int) ++ ".txt",
     {ok, File} = file:read_file(filename:join([Dir, "jhn_lz", FileName])),
     File.
+
+file(Name) when is_atom(Name) ->
+    Dir = code:lib_dir(jhn_stdlib, test),
+    FileName = atom_to_list(Name) ++ ".txt",
+    {ok, File} = file:read_file(filename:join([Dir, "jhn_lz", FileName])),
+    File.
+
+-define(FIB, [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]).
+
+chunk(Data) -> chunk(Data, ?FIB, []).
+
+chunk(Data, [], Acc) -> chunk(Data, ?FIB, Acc);
+chunk(Data, [H | _], Acc) when H > byte_size(Data)-> lists:reverse([Data|Acc]);
+chunk(Data, [H | T], Acc) ->
+    <<Chunk:H/binary, Data1/binary>> = Data,
+    chunk(Data1, T, [Chunk | Acc]).

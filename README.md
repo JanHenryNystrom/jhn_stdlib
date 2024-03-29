@@ -72,6 +72,7 @@ Features/Modules
     * LZ77 compression -- jhn_lz [Lempel–Ziv 77][35]
     * LZ78 compression -- jhn_lz [Lempel–Ziv 78][36]
     * LZW compression -- jhn_lz [Lempel–Ziv-Welch][37]
+    * Snappy compression -- jhn_lz [sNaPpY][38]
 
 <a name='deprecated'>
 
@@ -170,7 +171,8 @@ I know I really should.
   [17]: http://www.ietf.org/rfc/rfc5952.txt
        "A Recommendation for IPv6 Address Text Representation"
   [18]: http://www.ietf.org/rfc/rfc4632.txt
-       "Classless Inter-domain Routing (CIDR): The Internet Address Assignment and Aggregation Plan"
+       "Classless Inter-domain Routing (CIDR): The Internet Address
+        Assignment and Aggregation Plan"
   [19]: http://www.ietf.org/rfc/rfc3339.txt
        "Date and Time on the Internet: Timestamps"
   [20]: http://www.ietf.org/rfc/rfc7230.txt
@@ -217,3 +219,5 @@ I know I really should.
   [37]: https://www.csd.uoc.gr/~hy474/bibliography/DataCompression-Welch.pdf
         "Welch, Terry (1984). \"A Technique for High-Performance Data
          Compression\" Computer. 17 (6): 8–19"
+  [38]: https://github.com/google/snappy
+        "Snappy, a fast compressor/decompressor."

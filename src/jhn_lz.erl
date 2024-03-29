@@ -28,10 +28,13 @@
 
 %%
 %% rfc7932 Brotli Compressed Data Format
+%% rfc1950 ZLIB Compressed Data Format Specification version 3.3
 %% rfc1951 DEFLATE Compressed Data Format Specification version 1.3
 %% rfc1952 GZIP file format specification version 4.3
 %%
-%% Snappy https://github.com/google/snappy
+%% Zstd rfc8878.txt Zstandard Compression and the 'application/zstd' Media Type
+%%
+%%
 %% LZ4 https://github.com/lz4/lz4
 %%
 %% LZO http://www.infradead.org/~mchehab/kernel_docs/staging/lzo.html
@@ -154,10 +157,17 @@
 
 %% Records
 
+%% Snappy
+-record(snappy, {type      = block  :: snappy_type(),
+                 return    = iolist :: return_type()
+                }).
+
 %% LZ77
--record(s77, {search = 16#FFF :: non_neg_integer(),
-              lookahead = 16#F :: non_neg_integer(),
-              acc = []:: [match()]
+-record(s77, {search    = 16#FFF :: non_neg_integer(),
+              lookahead = 16#F   :: non_neg_integer(),
+              min_match = 1      :: 1..4,
+              acc       = []     :: [match()],
+              return    = raw    :: return_type()
              }).
 
 -record(lz77c, {matches  :: [match()],
@@ -172,7 +182,8 @@
                max_code  = 0         :: code(),
                acc       = []        :: [code()],
                stack     = []        :: stack(),
-               cont      = true      :: boolean()
+               cont      = true      :: boolean(),
+               return    = raw       :: return_type()
               }).
 
 -record(lz78w_stream, {state :: #s78w{}}).
@@ -180,6 +191,8 @@
 %% sNaPpY
 -type snappy_block() :: binary().
 -type snappy_frame() :: binary().
+
+-type snappy_type() :: block | frame.
 
 %% Types
 
@@ -194,7 +207,7 @@
 
 -type code() :: byte().
 
--type stack() :: list(iodata()).
+-type stack() :: list(data()).
 
 -type lz78w_stream() :: #lz78w_stream{}.
 
@@ -202,7 +215,15 @@
 
 %% LZ77/LZ78/LZW
 
--type opt() :: iolist | binary | raw.
+-type opt() :: return_type() |
+               {search_length, non_neg_integer()} |
+               {lookahead_length, non_neg_integer()} |
+               {min_match, 1..4} |
+               {type, snappy_type()}.
+
+-type data() :: binary() | [data()].
+
+-type return_type() :: raw | iolist | binary.
 
 %% ===================================================================
 %% Library functions.
@@ -214,7 +235,7 @@
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec snappy_compress(binary()) -> snappy_block() | snappy_frame().
+-spec snappy_compress(data()) -> snappy_block().
 %%--------------------------------------------------------------------
 snappy_compress(Data) -> snappy_compress(Data, []).
 
@@ -224,13 +245,19 @@ snappy_compress(Data) -> snappy_compress(Data, []).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec snappy_compress(binary(), [opt()]) -> snappy_block() | snappy_frame().
+-spec snappy_compress(data(), [opt()]) ->
+          iolist() | snappy_block() | snappy_frame().
 %%--------------------------------------------------------------------
 snappy_compress(Data, Opts) ->
-    Size = byte_size(Data),
-    #lz77c{matches = Matches} = lz77_compress(Data, Opts),
+    #snappy{type = block, return = Return} = parse_opts(Opts, #snappy{}),
+    LZ77Opts = [{return_type, raw} | delete_opt(return_type, Opts)],
+    #lz77c{matches = Matches} = lz77_compress(Data, LZ77Opts),
     {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
-    gather(Matches1, [Literal, varint(Size)]).
+    Block = gather(Matches1, [Literal, varint(byte_size(Data))]),
+    case Return of
+        iolist -> Block;
+        binary -> iolist_to_binary(Block)
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -259,7 +286,7 @@ snappy_uncompress(Block, _Opts) ->
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lz77_compress(binary()) -> lz77_compressed().
+-spec lz77_compress(data()) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77_compress(Data) -> lz77_compress(Data, []).
 
@@ -269,7 +296,7 @@ lz77_compress(Data) -> lz77_compress(Data, []).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lz77_compress(binary(), [opt()]) -> lz77_compressed().
+-spec lz77_compress(data(), [opt()]) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77_compress(Data, Options) ->
     Acc = lz77_compress(Data, 0, byte_size(Data), parse_opts(Options, #s77{})),
@@ -306,7 +333,7 @@ lz77_uncompress(#lz77c{matches = Matches}) -> lz77_uncompress(Matches, <<>>).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lz78_compress(iodata()) -> lz78w_compressed().
+-spec lz78_compress(data()) -> lz78w_compressed().
 %%--------------------------------------------------------------------
 lz78_compress(Data) -> lz78w_end(Data, lz78_init()).
 
@@ -326,7 +353,7 @@ lz78_init() -> #lz78w_stream{state = #s78w{}}.
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lzw_compress(iodata()) -> lz78w_compressed().
+-spec lzw_compress(data()) -> lz78w_compressed().
 %%--------------------------------------------------------------------
 lzw_compress(Data) -> lz78w_end(Data, lzw_init()).
 
@@ -336,7 +363,7 @@ lzw_compress(Data) -> lz78w_end(Data, lzw_init()).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lzw_compress(iodata(), map()) -> lz78w_compressed().
+-spec lzw_compress(data(), map()) -> lz78w_compressed().
 %%--------------------------------------------------------------------
 lzw_compress(Data, Dict) -> lz78w_end(Data, lzw_init(Dict)).
 
@@ -370,7 +397,7 @@ lzw_init(Dict) ->
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lz78w_cont(iodata(), lz78w_stream()) -> lz78w_stream().
+-spec lz78w_cont(data(), lz78w_stream()) -> lz78w_stream().
 %%--------------------------------------------------------------------
 lz78w_cont(Data, #lz78w_stream{state = State}) -> lz78w_compress(Data, State).
 
@@ -390,7 +417,7 @@ lz78w_end(Stream) -> lz78w_end(<<>>, Stream).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec lz78w_end(iodata(), lz78w_stream()) -> lz78w_compressed().
+-spec lz78w_end(data(), lz78w_stream()) -> lz78w_compressed().
 %%--------------------------------------------------------------------
 lz78w_end(Data, #lz78w_stream{state = State}) ->
     lz78w_compress(Data, State#s78w{cont = false}).
@@ -428,6 +455,12 @@ lz78w_uncompress({C, Bits, Dict}, [binary]) ->
 %% sNaPpY
 %% --------------------------------------------------------------------
 
+parse_snappy_opt({type, T}, State) -> State#snappy{type = T};
+parse_snappy_opt({search_length, _}, State) -> State;
+parse_snappy_opt({lookahead_length, L}, State) when L =< 64 -> State;
+parse_snappy_opt({min_match, L}, State) when L > 0, L < 5 -> State;
+parse_snappy_opt({return_type, R}, State) -> State#snappy{return = R}.
+
 varint(I) when I =< 127 -> <<I>>;
 varint(I) -> <<1:1, (I band 127):7, (varint(I bsr 7))/binary>>.
 
@@ -462,11 +495,10 @@ gather_copy([{Pos, Len, C} | Matches]) when Len > 3, Len < 12, Pos < 2048 ->
     Len4 = Len - 4,
     <<PosU:3/integer, PosL:8/integer>> = <<Pos:11/integer>>,
     {<<PosU:3/integer, Len4:3, 1:2, PosL:8/integer>>, C, Matches};
-gather_copy([{Pos, Len, C} | Matches]) when Len < 65, Pos < 65536 ->
+gather_copy([{Pos, Len, C} | Matches]) when Pos < 65536 ->
     Len1 = Len - 1,
     {<<Len1:6, 2:2, Pos:16/integer-little>>, C, Matches};
-%% Have to chop up the copies when we have longer than 64 byte copy
-gather_copy([{Pos, Len, C} | Matches]) when Len < 65 ->
+gather_copy([{Pos, Len, C} | Matches]) ->
     Len1 = Len - 1,
     {<<Len1:6, 3:2, Pos:32/integer-little>>, C, Matches}.
 
@@ -507,14 +539,11 @@ snappy_uncompress_copy(Pos, Len, T, Acc) ->
 %% --------------------------------------------------------------------
 
 %%
-%% TODO: Add min, max length for matches.
-%%
-
-parse_opts([], Rec) -> Rec;
-parse_opts(Opts, Rec) -> lists:foldl(fun parse_opt/2, Rec, Opts).
-
-parse_opt({search_length, L}, State) -> State#s77{search = L};
-parse_opt({lookahead_length, L}, State) -> State#s77{lookahead = L}.
+%% TODO: Add min length for matches.
+parse_s77_opt({search_length, L}, State) -> State#s77{search = L};
+parse_s77_opt({lookahead_length, L}, State) -> State#s77{lookahead = L};
+parse_s77_opt({min_match, L}, State) -> State#s77{min_match = L};
+parse_s77_opt({return_type, R}, State) -> State#s77{return = R}.
 
 lz77_compress(_, DLen, DLen, #s77{acc = Acc}) -> Acc;
 lz77_compress(Data, Pos, DLen, State) ->
@@ -599,16 +628,8 @@ lz78w_compress([], State = #s78w{stack = [H | T]}) ->
     lz78w_compress(H, State#s78w{stack = T});
 lz78w_compress(<<>>, State = #s78w{stack = [H | T]}) ->
     lz78w_compress(H, State#s78w{stack = T});
-lz78w_compress([[] | T], St) ->
-    lz78w_compress(T, St);
-lz78w_compress([<<>> | T], St) ->
-    lz78w_compress(T, St);
-lz78w_compress([H  = [_ | _] | T], St = #s78w{stack = S}) ->
+lz78w_compress([H | T], St = #s78w{stack = S}) ->
     lz78w_compress(H, St#s78w{stack = [T | S]});
-lz78w_compress([H  = <<_/binary>> | T], St = #s78w{stack = S}) ->
-    lz78w_compress(H, St#s78w{stack = [T | S]});
-lz78w_compress(I = [H | T], St) ->
-     lz78w_next(I, H, T, St);
 lz78w_compress(I = <<H:?BYTE, T/binary>>, St) ->
      lz78w_next(I, H, T, St).
 
@@ -647,3 +668,13 @@ lz78w_stop(St) ->
 %% --------------------------------------------------------------------
 code_bits(Code, [{_, Max} | T]) when Code > Max -> code_bits(Code, T);
 code_bits(_, [{Bits, _} | _]) -> Bits.
+
+%%
+parse_opts(Opts, Rec = #s77{}) -> lists:foldl(fun parse_s77_opt/2, Rec, Opts);
+parse_opts(Opts, Rec = #snappy{}) ->
+    lists:foldl(fun parse_snappy_opt/2, Rec, Opts).
+
+delete_opt(_, []) -> [];
+delete_opt(Opt, [{Opt, _} | T]) -> T;
+delete_opt(Opt, [_ | T]) -> delete_opt(Opt, T).
+
