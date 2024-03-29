@@ -46,7 +46,7 @@
                  left  = pb_nil :: pb_tree(),
                  next  = pb_nil :: pb_tree(),
                  right = pb_nil :: pb_tree(),
-                 value         :: value()}).
+                 value          :: value()}).
 
 
 %% Types
