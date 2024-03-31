@@ -57,7 +57,9 @@
          lz77_uncompress/1
         ]).
 
--export([lz77d_compress/1, lz77d_compress/2]).
+-export([lz77d_compress/1, lz77d_compress/2
+         %% lz77d_init/0, lz77d_cont/2, lz77d_end/1, lz77d_end/2,
+        ]).
 
 %% LZ78
 -export([lz78_compress/1,
@@ -352,7 +354,7 @@ lz77d_compress(Data, Options) ->
                          0,
                          byte_size(Data),
                          #{},
-                         parse_opts(Options, #s77{})),
+                         parse_opts(Options, #s77{min_match = 4})),
     {RevAcc, PMax, LMax} =
         lists:foldl(fun(H = {Pos, Len, _}, {A1, PMax, LMax}) when Pos > PMax,
                                                                   Len > LMax ->
@@ -581,8 +583,6 @@ snappy_uncompress_copy(Pos, Len, T, Acc) ->
 %% LZ77
 %% --------------------------------------------------------------------
 
-%%
-%% TODO: Add min length for matches.
 parse_s77_opt({search_length, L}, State) -> State#s77{search = L};
 parse_s77_opt({lookahead_length, L}, State) -> State#s77{lookahead = L};
 parse_s77_opt({min_match, L}, State) -> State#s77{min_match = L};
@@ -590,20 +590,18 @@ parse_s77_opt({return_type, R}, State) -> State#s77{return = R}.
 
 lz77_compress(_, DLen, DLen, #s77{acc = Acc}) -> Acc;
 lz77_compress(Data, Pos, DLen, State) ->
-    #s77{lookahead = L, search = S, acc = Acc} = State,
-    case DLen - Pos of
+    #s77{lookahead = L, search = S, acc = Acc, min_match = M} = State,
+    LL = min(DLen - Pos, L),
+    Lookahead = [C | _] = binary_to_list(binary:part(Data, Pos, LL)),
+    case LL of
         1 -> [{0, 0, binary:last(Data)} | Acc];
-        Left ->
+        LL when LL < M ->
+            lists:reverse([{0, 0, X} || <<X:?BYTE>> <= Lookahead]) ++ Acc;
+        _ ->
             Start = case Pos < S of
                         true -> 0;
                         false -> Pos - S
                     end,
-            Lookahead =
-                case Left =< L of
-                    true -> binary:bin_to_list(binary:part(Data, Pos, Left));
-                    false -> binary:bin_to_list(binary:part(Data, Pos, L))
-                end,
-            C = binary:at(Data, Pos),
             Match = {_, MLen, C1} =
                 match(Data, Lookahead, Start, Pos, Pos - Start, {0, 0, C}),
             Pos1 = case C1 of
