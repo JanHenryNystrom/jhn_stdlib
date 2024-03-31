@@ -56,6 +56,14 @@ lz77_compress_1_lz77_uncompress_1_test_() ->
         T <- [rfc(2732), rfc(2818) | ?TEXTS]].
 
 %%--------------------------------------------------------------------
+%% lz77d_compress/1 <-> lz77_uncompress/1
+%%--------------------------------------------------------------------
+lz77d_compress_1_lz77_uncompress_1_test_() ->
+    [?_test(?assertEqual(T,
+                         jhn_lz:lz77_uncompress(jhn_lz:lz77d_compress(T)))) ||
+        T <- [file(alice29), rfc(2732), rfc(2818) | ?TEXTS]].
+
+%%--------------------------------------------------------------------
 %% lz78_compress/1 <-> lz78w_uncompress/1
 %%--------------------------------------------------------------------
 lz78_compress_1_lz78w_uncompress_1_test_() ->
@@ -146,7 +154,8 @@ performance_test_() ->
         ?assertEqual(
            ok,
            begin
-               {Timec, D} = timer:tc(jhn_lz, snappy_compress, [T]),
+               {Timec, D} =
+                   timer:tc(jhn_lz, snappy_compress, [T, [{min_match, 4}]]),
                D1 = iolist_to_binary(D),
                {Timeu, _} = timer:tc(jhn_lz, snappy_uncompress, [D1]),
                Size = byte_size(T),
@@ -157,7 +166,7 @@ performance_test_() ->
                          [Timec, Timeu, Percent, Speedc, Speedu, Size]),
                ok
            end)) ||
-        T <- [file(alice29), rfc(2732), rfc(2818)]
+        T <- [jpeg(fireworks), file(alice29), file(html), rfc(2732), rfc(2818)]
     ] ++
     [?_test(
         ?assertEqual(ok,
@@ -167,7 +176,7 @@ performance_test_() ->
                          ?debugFmt("~nlz77 ~p:~p~n", [Timec, Timeu]),
                          ok
                      end)) ||
-        T <- [rfc(2732), rfc(2818)]
+        T <- [file(alice29), file(html), rfc(2732), rfc(2818)]
     ] ++
     [?_test(
         ?assertEqual(
@@ -193,8 +202,20 @@ performance_test_() ->
                ok
 
                      end)) ||
-        T <- [file(alice29), rfc(2732), rfc(2818)]
-    ].
+        T <- [file(alice29), file(html), rfc(2732), rfc(2818)]
+    ] ++
+        [?_test(
+            ?assertEqual(
+               ok,
+               begin
+                   {Timec, D} = timer:tc(jhn_lz, lz77d_compress, [T]),
+                   {Timeu, _} = timer:tc(jhn_lz, lz77_uncompress, [D]),
+                   ?debugFmt("~nlz77d ~p:~p~n",
+                             [Timec, Timeu]),
+                   ok
+               end)) ||
+            T <- [file(alice29), file(html), rfc(2732), rfc(2818)]
+        ].
 
 
 %% ===================================================================
@@ -210,6 +231,12 @@ rfc(Int) ->
 file(Name) when is_atom(Name) ->
     Dir = code:lib_dir(jhn_stdlib, test),
     FileName = atom_to_list(Name) ++ ".txt",
+    {ok, File} = file:read_file(filename:join([Dir, "jhn_lz", FileName])),
+    File.
+
+jpeg(Name) when is_atom(Name) ->
+    Dir = code:lib_dir(jhn_stdlib, test),
+    FileName = atom_to_list(Name) ++ ".jpeg",
     {ok, File} = file:read_file(filename:join([Dir, "jhn_lz", FileName])),
     File.
 
