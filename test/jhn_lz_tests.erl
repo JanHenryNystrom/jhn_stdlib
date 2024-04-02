@@ -155,7 +155,7 @@ performance_test_() ->
            ok,
            begin
                {Timec, D} =
-                   timer:tc(jhn_lz, snappy_compress, [T, [{min_match, 4}]]),
+                   timer:tc(jhn_lz, snappy_compress, [T, [{min_match, 8}]]),
                D1 = iolist_to_binary(D),
                {Timeu, _} = timer:tc(jhn_lz, snappy_uncompress, [D1]),
                Size = byte_size(T),

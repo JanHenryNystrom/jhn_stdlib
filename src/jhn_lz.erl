@@ -698,18 +698,21 @@ matchd1(F, <<>>, Pos, Len, MPos, H, Dict) ->
         undefined -> {maps:put(F, Pos, Dict), {Pos - MPos, Len, H}};
         MPos1 -> {Dict, {Pos - MPos1, Len + 1, -1}}
     end;
-matchd1(F, <<H1:?BYTE, T/binary>>, Pos, Len, MPos, H, Dict) ->
+matchd1(F, L = <<H1:?BYTE, T/binary>>, Pos, Len, MPos, H, Dict) ->
     case maps:get(F, Dict, undefined) of
         undefined -> {maps:put(F, Pos, Dict), {Pos - MPos, Len, H}};
-        %% %% MPos1 when MPos1 + Len = Pos
+        MPos1 when MPos1 + Len == Pos ->
+            matchd_run(F, F, L, Len);
         MPos1 ->
             matchd1(<<F/binary, H1:?BYTE>>, T, Pos, Len + 1, MPos1, H1, Dict)
     end.
 
-%% matchd_run([], Match, L, Len) -> matchd_run(Match, Match, L, Len);
-%% matchd_run(_, _, [], Len) -> {Len, -1};
-%% matchd_run([C | M], Match, [C | L], Len) -> matchd_run(M, Match, L, Len + 1);
-%% matchd_run(_, _, [C | _], Len) -> {Len, C}.
+matchd_run(<<>>, Match, L, Len) -> matchd_run(Match, Match, L, Len);
+matchd_run(_, _, <<>>, Len) -> {Len, -1};
+matchd_run(<<C:?BYTE,  M/binary>>, Match, <<C:?BYTE,  L/binary>>, Len) ->
+ matchd_run(M, Match, L, Len + 1);
+matchd_run(_, _, <<C:?BYTE, _/binary>>, Len) ->
+    {Len, C}.
 
 %% --------------------------------------------------------------------
 %% LZ78/LZW
