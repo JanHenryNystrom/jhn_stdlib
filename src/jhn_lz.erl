@@ -303,23 +303,8 @@ lz77_compress(Data) -> lz77_compress(Data, []).
 -spec lz77_compress(data(), [opt()]) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77_compress(Data, Options) ->
-    Acc = lz77_compress(Data, 0, byte_size(Data), parse_opts(Options, #s77{})),
-    {RevAcc, PMax, LMax} =
-        lists:foldl(fun(H = {Pos, Len, _}, {A1, PMax, LMax}) when Pos > PMax,
-                                                                  Len > LMax ->
-                            {[H | A1], Pos, Len};
-                       (H = {Pos, _, _}, {A1, PMax, LMax}) when Pos > PMax ->
-                            {[H | A1], Pos, LMax};
-                       (H = {_, Len, _}, {A1, PMax, LMax}) when Len > LMax ->
-                            {[H | A1], PMax, Len};
-                       (H, {A1, PMax, LMax}) ->
-                            {[H | A1], PMax, LMax}
-                    end,
-                    {[], 0, 0},
-                    Acc),
-    PBits = code_bits(PMax, ?W_POWER_TABLE),
-    LBits = code_bits(LMax, ?W_POWER_TABLE),
-   #lz77c{matches = RevAcc, pos_bits = PBits, len_bits = LBits}.
+    Opts = parse_opts(Options, #s77{}),
+    lz77_stop(lz77_compress(Data, 0, byte_size(Data), Opts), Opts).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -350,27 +335,8 @@ lz77d_compress(Data) -> lz77d_compress(Data, []).
 -spec lz77d_compress(data(), [opt()]) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77d_compress(Data, Options) ->
-    Acc = lz77d_compress(Data,
-                         0,
-                         byte_size(Data),
-                         #{},
-                         parse_opts(Options, #s77{min_match = 4})),
-    {RevAcc, PMax, LMax} =
-        lists:foldl(fun(H = {Pos, Len, _}, {A1, PMax, LMax}) when Pos > PMax,
-                                                                  Len > LMax ->
-                            {[H | A1], Pos, Len};
-                       (H = {Pos, _, _}, {A1, PMax, LMax}) when Pos > PMax ->
-                            {[H | A1], Pos, LMax};
-                       (H = {_, Len, _}, {A1, PMax, LMax}) when Len > LMax ->
-                            {[H | A1], PMax, Len};
-                       (H, {A1, PMax, LMax}) ->
-                            {[H | A1], PMax, LMax}
-                    end,
-                    {[], 0, 0},
-                    Acc),
-    PBits = code_bits(PMax, ?W_POWER_TABLE),
-    LBits = code_bits(LMax, ?W_POWER_TABLE),
-   #lz77c{matches = RevAcc, pos_bits = PBits, len_bits = LBits}.
+    Opts = parse_opts(Options, parse_opts(Options, #s77{min_match = 8})),
+    lz77_stop(lz77d_compress(Data, 0, byte_size(Data), #{}, Opts), Opts).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -580,13 +546,51 @@ snappy_uncompress_copy(Pos, Len, T, Acc) ->
     snappy_uncompress_block(T, <<Acc/binary, C1/binary, C2/binary>>).
 
 %% --------------------------------------------------------------------
-%% LZ77
+%% LZ7/LZ77D
 %% --------------------------------------------------------------------
-
 parse_s77_opt({search_length, L}, State) -> State#s77{search = L};
 parse_s77_opt({lookahead_length, L}, State) -> State#s77{lookahead = L};
 parse_s77_opt({min_match, L}, State) -> State#s77{min_match = L};
 parse_s77_opt({return_type, R}, State) -> State#s77{return = R}.
+
+lz77_stop(Acc, _Opts) ->
+    {RevAcc, PMax, LMax} =
+        lists:foldl(fun(H = {Pos, Len, _}, {A1, PMax, LMax}) when Pos > PMax,
+                                                                  Len > LMax ->
+                            {[H | A1], Pos, Len};
+                       (H = {Pos, _, _}, {A1, PMax, LMax}) when Pos > PMax ->
+                            {[H | A1], Pos, LMax};
+                       (H = {_, Len, _}, {A1, PMax, LMax}) when Len > LMax ->
+                            {[H | A1], PMax, Len};
+                       (H, {A1, PMax, LMax}) ->
+                            {[H | A1], PMax, LMax}
+                    end,
+                    {[], 0, 0},
+                    Acc),
+    PBits = code_bits(PMax, ?W_POWER_TABLE),
+    LBits = code_bits(LMax, ?W_POWER_TABLE),
+   #lz77c{matches = RevAcc, pos_bits = PBits, len_bits = LBits}.
+
+lz77_uncompress([], UnCompressed) -> UnCompressed;
+lz77_uncompress([{0, 0, -1} | T], U) -> lz77_uncompress(T, U);
+lz77_uncompress([{0, 0, C} | T], U) -> lz77_uncompress(T, <<U/binary,C:?BYTE>>);
+lz77_uncompress([{Pos, Len, C} | T], U) ->
+    X = case Pos > Len of
+            true -> binary_part(U, byte_size(U) - Pos, Len);
+            false ->
+                Start = byte_size(U) - Pos,
+                C1 = binary:copy(binary_part(U, Start, Pos), Len div Pos),
+                C2 = binary:part(U, Start, Len rem Pos),
+                <<C1/binary, C2/binary>>
+        end,
+    case C of
+        -1 -> lz77_uncompress(T, <<U/binary, X:Len/binary>>);
+        _ -> lz77_uncompress(T, <<U/binary, X:Len/binary, C:?BYTE>>)
+    end.
+
+%% --------------------------------------------------------------------
+%% LZ77
+%% --------------------------------------------------------------------
 
 lz77_compress(_, DLen, DLen, #s77{acc = Acc}) -> Acc;
 lz77_compress(Data, Pos, DLen, State) ->
@@ -641,25 +645,8 @@ match_run(_, _, [], Len) -> {Len, -1};
 match_run([C | M], Match, [C | L], Len) -> match_run(M, Match, L, Len + 1);
 match_run(_, _, [C | _], Len) -> {Len, C}.
 
-lz77_uncompress([], UnCompressed) -> UnCompressed;
-lz77_uncompress([{0, 0, -1} | T], U) -> lz77_uncompress(T, U);
-lz77_uncompress([{0, 0, C} | T], U) -> lz77_uncompress(T, <<U/binary,C:?BYTE>>);
-lz77_uncompress([{Pos, Len, C} | T], U) ->
-    X = case Pos > Len of
-            true -> binary_part(U, byte_size(U) - Pos, Len);
-            false ->
-                Start = byte_size(U) - Pos,
-                C1 = binary:copy(binary_part(U, Start, Pos), Len div Pos),
-                C2 = binary:part(U, Start, Len rem Pos),
-                <<C1/binary, C2/binary>>
-        end,
-    case C of
-        -1 -> lz77_uncompress(T, <<U/binary, X:Len/binary>>);
-        _ -> lz77_uncompress(T, <<U/binary, X:Len/binary, C:?BYTE>>)
-    end.
-
 %% --------------------------------------------------------------------
-%% LZ77d
+%% LZ77D
 %% --------------------------------------------------------------------
 
 lz77d_compress(_, DLen, DLen, _, #s77{acc = Acc}) -> Acc;

@@ -117,7 +117,16 @@ lz78_init_0_lz78w_cont_2_lz78w_end_2_lz78w_uncompress_2_test_() ->
                          jhn_lz:lz78w_cont(T, jhn_lz:lz78_init())),
                        [binary]))) ||
         T <- [rfc(2732), rfc(2818) | ?TEXTS]
-    ].
+    ] ++
+        [?_test(
+            ?assertEqual(<<T/binary, T/binary>>,
+                         jhn_lz:lz78w_uncompress(
+                           jhn_lz:lz78w_end(
+                             chunk(T),
+                             jhn_lz:lz78w_cont(chunk(T), jhn_lz:lz78_init())),
+                           [binary]))) ||
+            T <- [rfc(2732), rfc(2818) | ?TEXTS]
+        ].
 
 %%--------------------------------------------------------------------
 %% lzw_compress/1 <-> lz78w_uncompress/2
