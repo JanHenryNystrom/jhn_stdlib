@@ -704,18 +704,13 @@ matchd_run(_, _, <<C:?BYTE, _/binary>>, Len) ->
 %% --------------------------------------------------------------------
 %% LZ78/LZW
 %% --------------------------------------------------------------------
-lz78w_compress([], State = #s78w{stack = [], cont=false}) -> lz78w_stop(State);
-lz78w_compress(<<>>, State = #s78w{stack=[], cont=false}) -> lz78w_stop(State);
-lz78w_compress([], State = #s78w{stack = []}) -> #lz78w_stream{state = State};
-lz78w_compress(<<>>, State = #s78w{stack = []}) -> #lz78w_stream{state=State};
-lz78w_compress([], State = #s78w{stack = [H | T]}) ->
-    lz78w_compress(H, State#s78w{stack = T});
-lz78w_compress(<<>>, State = #s78w{stack = [H | T]}) ->
-    lz78w_compress(H, State#s78w{stack = T});
-lz78w_compress([H | T], St = #s78w{stack = S}) ->
-    lz78w_compress(H, St#s78w{stack = [T | S]});
-lz78w_compress(I = <<H:?BYTE, T/binary>>, St) ->
-     lz78w_next(I, H, T, St).
+lz78w_compress(Data, State = #s78w{stack = Stack, cont = Flag}) ->
+    case {ingest(Data, Stack), Flag} of
+        {stop, true} -> #lz78w_stream{state = State};
+        {stop, false} -> lz78w_stop(State);
+        {{I = <<H:?BYTE, T/binary>>, Stack1}, _} ->
+            lz78w_next(I, H, T,  State#s78w{stack = Stack1})
+    end.
 
 lz78w_next(I, H, T, St = #s78w{buf = Buf, dict = Dict}) ->
     Buf1 = <<Buf/binary, H/integer>>,
@@ -761,4 +756,11 @@ parse_opts(Opts, Rec = #snappy{}) ->
 delete_opt(_, []) -> [];
 delete_opt(Opt, [{Opt, _} | T]) -> T;
 delete_opt(Opt, [H | T]) -> [H | delete_opt(Opt, T)].
+
+ingest(<<>>, []) -> stop;
+ingest([], []) -> stop;
+ingest(<<>>, [H | T]) -> ingest(H, T);
+ingest([], [H | T]) -> ingest(H, T);
+ingest([H | T], S) ->  ingest(H, [T | S]);
+ingest(B, S) -> {B, S}.
 
