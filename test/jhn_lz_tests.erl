@@ -159,70 +159,76 @@ lzw_compress_2_lz78w_uncompress_2_test_() ->
 %% Performance
 %%--------------------------------------------------------------------
 performance_test_() ->
-    [?_test(
-        ?assertEqual(
-           ok,
-           begin
-               {Timec, D} =
-                   timer:tc(jhn_lz, snappy_compress, [T, [{min_match, 8}]]),
-               D1 = iolist_to_binary(D),
-               {Timeu, _} = timer:tc(jhn_lz, snappy_uncompress, [D1]),
-               Size = byte_size(T),
-               Percent = trunc(100* (byte_size(D1) / Size)),
-               Speedc = (1000000 / Timec) * (Size / math:pow(2, 20)),
-               Speedu = (1000000 / Timeu) * (Size / math:pow(2, 20)),
-               ?debugFmt("~nsnappy ~p:~p ~p% ~.2..f:~.2..f MB/s ~pBytes~n",
-                         [Timec, Timeu, Percent, Speedc, Speedu, Size]),
-               ok
-           end)) ||
+    [{timeout, 10,
+      ?_test(
+         ?assertEqual(
+            ok,
+            begin
+                {Timec, D} =
+                    timer:tc(jhn_lz, snappy_compress, [T, [{min_match, 8}]]),
+                D1 = iolist_to_binary(D),
+                {Timeu, _} = timer:tc(jhn_lz, snappy_uncompress, [D1]),
+                Size = byte_size(T),
+                Percent = trunc(100* (byte_size(D1) / Size)),
+                Speedc = (1000000 / Timec) * (Size / math:pow(2, 20)),
+                Speedu = (1000000 / Timeu) * (Size / math:pow(2, 20)),
+                ?debugFmt("~nsnappy ~p:~p ~p% ~.2..f:~.2..f MB/s ~pBytes~n",
+                          [Timec, Timeu, Percent, Speedc, Speedu, Size]),
+                ok
+            end))} ||
         T <- [jpeg(fireworks), file(alice29), file(html), rfc(2732), rfc(2818)]
     ] ++
-    [?_test(
-        ?assertEqual(ok,
-                     begin
-                         {Timec, D} = timer:tc(jhn_lz, lz77_compress, [T]),
-                         {Timeu, _} = timer:tc(jhn_lz, lz77_uncompress, [D]),
-                         ?debugFmt("~nlz77 ~p:~p~n", [Timec, Timeu]),
-                         ok
-                     end)) ||
-        T <- [file(alice29), file(html), rfc(2732), rfc(2818)]
-    ] ++
-    [?_test(
-        ?assertEqual(
-           ok,
-           begin
-               {Timec, D} = timer:tc(jhn_lz, lz78_compress, [T]),
-               {Timeu, _} = timer:tc(jhn_lz, lz78w_uncompress, [D]),
-               Size = byte_size(T),
-               {Bs, _, Map} = D,
-               Percent = trunc(100 * (byte_size(Bs) / Size)),
-               Speedc = (1000000 / Timec) * (Size / math:pow(2, 20)),
-               Speedu = (1000000 / Timeu) * (Size / math:pow(2, 20)),
-               MaxSize =
-                   maps:fold(fun(_, V, Acc) when V > Acc -> V;
-                                (_, _, Acc) -> Acc
-                             end,
-                             0,
-                             maps:map(fun(K, _) -> byte_size(K) end, Map)),
-               ?debugFmt(
-                  "~nlz78 ~p:~p ~p% ~.2..f:~.2..f MB/s ~pBytes Dict:~p:~p~n",
-                  [Timec, Timeu, Percent, Speedc, Speedu, Size,
-                   maps:size(Map), MaxSize]),
-               ok
+        [{timeout, 10,
+          ?_test(
+             ?assertEqual(
+                ok,
+                begin
+                    {Timec, D} = timer:tc(jhn_lz, lz77_compress, [T]),
+                    {Timeu, _} = timer:tc(jhn_lz, lz77_uncompress, [D]),
+                    ?debugFmt("~nlz77 ~p:~p~n", [Timec, Timeu]),
+                    ok
+                end))} ||
+            T <- [file(alice29), file(html), rfc(2732), rfc(2818)]
+        ] ++
+        [{timeout, 10,
+          ?_test(
+             ?assertEqual(
+                ok,
+                begin
+                    {Timec, D} = timer:tc(jhn_lz, lz78_compress, [T]),
+                    {Timeu, _} = timer:tc(jhn_lz, lz78w_uncompress, [D]),
+                    Size = byte_size(T),
+                    {Bs, _, Map} = D,
+                    Percent = trunc(100 * (byte_size(Bs) / Size)),
+                    Speedc = (1000000 / Timec) * (Size / math:pow(2, 20)),
+                    Speedu = (1000000 / Timeu) * (Size / math:pow(2, 20)),
+                    MaxSize =
+                        maps:fold(fun(_, V, Acc) when V > Acc -> V;
+                                     (_, _, Acc) -> Acc
+                                  end,
+                                  0,
+                                  maps:map(fun(K, _) -> byte_size(K) end, Map)),
+                    ?debugFmt(
+                       "~nlz78 ~p:~p ~p% ~.2..f:~.2..f MB/s ~pBytes "
+                       "Dict:~p:~p~n",
+                       [Timec, Timeu, Percent, Speedc, Speedu, Size,
+                        maps:size(Map), MaxSize]),
+                    ok
 
-                     end)) ||
-        T <- [file(alice29), file(html), rfc(2732), rfc(2818)]
-    ] ++
-        [?_test(
-            ?assertEqual(
-               ok,
-               begin
-                   {Timec, D} = timer:tc(jhn_lz, lz77d_compress, [T]),
-                   {Timeu, _} = timer:tc(jhn_lz, lz77_uncompress, [D]),
-                   ?debugFmt("~nlz77d ~p:~p~n",
-                             [Timec, Timeu]),
-                   ok
-               end)) ||
+                end))} ||
+            T <- [file(alice29), file(html), rfc(2732), rfc(2818)]
+        ] ++
+        [{timeout, 10
+         ,?_test(
+             ?assertEqual(
+                ok,
+                begin
+                    {Timec, D} = timer:tc(jhn_lz, lz77d_compress, [T]),
+                    {Timeu, _} = timer:tc(jhn_lz, lz77_uncompress, [D]),
+                    ?debugFmt("~nlz77d ~p:~p~n",
+                              [Timec, Timeu]),
+                    ok
+                end))} ||
             T <- [file(alice29), file(html), rfc(2732), rfc(2818)]
         ].
 

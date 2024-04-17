@@ -162,9 +162,13 @@
 %% Records
 
 %% Snappy
--record(snappy, {type      = block  :: snappy_type(),
-                 return    = iolist :: return_type()
+-record(snappy, {type   = block  :: snappy_type(),
+                 return = iolist :: return_type()
                 }).
+
+-record(snappy_stream, {state :: #snappy{},
+                        size  :: non_neg_integer()
+                       }).
 
 %% LZ77
 -record(s77, {search    = 16#FFF :: non_neg_integer(),
@@ -178,6 +182,11 @@
                 pos_bits :: non_neg_integer(),
                 len_bits :: non_neg_integer()
                }).
+
+-record(lz77_stream, {state :: #s77{},
+                      data :: binary(),
+                      size :: non_neg_integer()
+                     }).
 
 %% LZ78 and LZW
 -record(s78w, {buf       = <<>>      :: binary(),
@@ -303,8 +312,12 @@ lz77_compress(Data) -> lz77_compress(Data, []).
 -spec lz77_compress(data(), [opt()]) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77_compress(Data, Options) ->
+    Data1 = case is_binary(Data) of
+                true -> Data;
+                false -> collapse(Data, <<>>)
+            end,
     Opts = parse_opts(Options, #s77{}),
-    lz77_stop(lz77_compress(Data, 0, byte_size(Data), Opts), Opts).
+    lz77_stop(lz77_compress(Data1, 0, byte_size(Data1), Opts), Opts).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -335,8 +348,12 @@ lz77d_compress(Data) -> lz77d_compress(Data, []).
 -spec lz77d_compress(data(), [opt()]) -> lz77_compressed().
 %%--------------------------------------------------------------------
 lz77d_compress(Data, Options) ->
-    Opts = parse_opts(Options, parse_opts(Options, #s77{min_match = 8})),
-    lz77_stop(lz77d_compress(Data, 0, byte_size(Data), #{}, Opts), Opts).
+    Data1 = case is_binary(Data) of
+                true -> Data;
+                false -> collapse(Data, <<>>)
+            end,
+    St = parse_opts(Options, parse_opts(Options, #s77{min_match = 8})),
+    lz77_stop(lz77d_compress(Data1, 0, byte_size(Data1), #{}, St), St).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -645,6 +662,11 @@ match_run(_, _, [], Len) -> {Len, -1};
 match_run([C | M], Match, [C | L], Len) -> match_run(M, Match, L, Len + 1);
 match_run(_, _, [C | _], Len) -> {Len, C}.
 
+collapse([], Acc) -> Acc;
+collapse(<<>>, Acc) -> Acc;
+collapse(B = <<_:?BYTE, _/binary>>, Acc) -> <<Acc/binary, B/binary>>;
+collapse([H | T], Acc) -> collapse(T, collapse(H, Acc)).
+
 %% --------------------------------------------------------------------
 %% LZ77D
 %% --------------------------------------------------------------------
@@ -697,7 +719,7 @@ matchd1(F, L = <<H1:?BYTE, T/binary>>, Pos, Len, MPos, H, Dict) ->
 matchd_run(<<>>, Match, L, Len) -> matchd_run(Match, Match, L, Len);
 matchd_run(_, _, <<>>, Len) -> {Len, -1};
 matchd_run(<<C:?BYTE,  M/binary>>, Match, <<C:?BYTE,  L/binary>>, Len) ->
- matchd_run(M, Match, L, Len + 1);
+    matchd_run(M, Match, L, Len + 1);
 matchd_run(_, _, <<C:?BYTE, _/binary>>, Len) ->
     {Len, C}.
 
