@@ -30,7 +30,7 @@
          call/2, call/3,
          sync/1, sync/2,
          cast/2, delayed_cast/2, cancel/1, abcast/2, abcast/3,
-         reply/1, reply/2, from/0
+         reply/1, reply/2, from/0, type/0
         ]).
 
 %% sys callbacks
@@ -331,9 +331,9 @@ reply(From, Msg) ->
 %%--------------------------------------------------------------------
 %% Function: from() -> From.
 %% @doc
-%%   Called inside a handle_req/2 or handle_msg/2 callback function it
-%%   will provide an opaque data data enables a reply to the call or
-%%   cast outside the scope of the callback function.
+%%   Called inside a handle_req/2 of callback function for a call it
+%%   will provide an opaque data data enables a reply to the call
+%%   outside the scope of the callback function.
 %% @end
 %%--------------------------------------------------------------------
 -spec from() -> from().
@@ -342,6 +342,20 @@ from() ->
     case erlang:get('$jhn_msg_store') of
         undefined -> {error, not_a_call};
         #'$jhn_server'{from = From} -> From
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: type() -> call or cast.
+%% @doc
+%%   Called inside a handle_req/2 and it tells if it is a call or a cast.
+%% @end
+%%--------------------------------------------------------------------
+-spec type() -> call | cast.
+%%--------------------------------------------------------------------
+type() ->
+    case erlang:get('$jhn_msg_store') of
+        undefined -> {error, not_a_call};
+        #'$jhn_server'{type = Type} -> Type
     end.
 
 %%====================================================================
