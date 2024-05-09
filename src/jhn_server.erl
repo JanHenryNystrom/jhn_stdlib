@@ -324,7 +324,7 @@ reply(From, Msg) when is_reference(From) ->
     catch
         _:_ -> {error, invalid_from}
     end;
-reply(From, Msg) ->
+reply(_, _) ->
     {error, invalid_from}.
 
 
@@ -398,15 +398,6 @@ system_code_change(State = #state{data = Data, mod = Mod}, _, OldVsn, Extra) ->
 %%--------------------------------------------------------------------
 -spec format_status(_, _) -> [{atom(), _}].
 %%--------------------------------------------------------------------
-format_status(_, [_, SysState, Parent, _, State=#state{format_status=false}]) ->
-    NameTag = case State#state.name of
-                  Name when is_pid(Name) -> pid_to_list(Name);
-                  Name when is_atom(Name) -> Name
-              end,
-    Header = lists:concat(["Status for jhn server ", NameTag]),
-    Specfic = [{data, [{"State", State}]}],
-    [{header, Header},
-     {data, [{"Status", SysState}, {"Parent", Parent}]} | Specfic];
 format_status(Opt, [PDict, SysState, Parent, _, State]) ->
     #state{mod = Mod, data = Data} = State,
     NameTag = case State#state.name of
@@ -414,8 +405,13 @@ format_status(Opt, [PDict, SysState, Parent, _, State]) ->
                   Name when is_atom(Name) -> Name
               end,
     Header = lists:concat(["Status for jhn server ", NameTag]),
-    Specfic = try Mod:format_status(Opt, [PDict, Data])
-              catch _:_ -> [{data, [{"State", Data}]}] end,
+    Specfic =
+        case State#state.format_status of
+            false -> [{data, [{"State", State}]}];
+            true ->
+                try Mod:format_status(Opt, [PDict, Data])
+                catch _:_ -> [{data, [{"State", Data}]}] end
+        end,
     [{header, Header},
      {data, [{"Status", SysState}, {"Parent", Parent}]} | Specfic].
 
@@ -575,14 +571,7 @@ terminate(Reason, Msg, State = #state{terminate = false}) ->
 terminate(Reason, Msg, State = #state{mod = Mod, data = Data}) ->
     try Mod:terminate(Reason, Data) of
         _ ->
-            case Reason of
-                normal -> exit(normal);
-                shutdown -> exit(shutdown);
-                Shutdown = {shutdown, _} -> exit(Shutdown);
-                _ ->
-                    error_info(Reason, Msg, State),
-                    exit(Reason)
-            end
+            terminate(Reason, Msg, State#state{terminate = false})
     catch
         _:Reason1 ->
             error_info(Reason1, Msg, State),
