@@ -39,8 +39,8 @@
          system_code_change/4,
          format_status/2]).
 
-%% Internal exports
--export([init/5, loop/1]).
+%% proc_lib callbacks
+-export([init/4, loop/1]).
 
 %% Includes
 -include_lib("kernel/include/logger.hrl").
@@ -133,15 +133,12 @@ start(Mod) -> start(Mod, []).
 -spec start(atom(),  opts()) -> {ok, pid()} | ignore | {error, _}.
 %%--------------------------------------------------------------------
 start(Mod, Options) ->
-    Ref = make_ref(),
     case opts(Options, #opts{}) of
         #opts{errors = Errors = [_ | _]} -> {error, Errors};
-        Opts = #opts{link = true, arg = Arg} ->
-            Pid = spawn_link(?MODULE, init, [Mod, Arg, Opts, self(), Ref]),
-            wait_ack(Pid, Ref, Opts, undefined);
-        Opts = #opts{arg = Arg} ->
-            Pid = spawn(?MODULE, init, [Mod, Arg, Opts, self(), Ref]),
-            wait_ack(Pid, Ref, Opts, erlang:monitor(process, Pid))
+        Opts = #opts{link = true, arg = A, timeout = T} ->
+            proc_lib:start_link(?MODULE, init, [Mod, A, Opts, self()], T);
+        Opts = #opts{arg = A, timeout = T} ->
+            proc_lib:start(?MODULE, init, [Mod, A, Opts, self()], T)
     end.
 
 %%--------------------------------------------------------------------
@@ -222,7 +219,7 @@ abcast(Nodes, Server, Msg) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec call(server_ref(), _) -> _.
-%%--------------------------------------------------------------------
+%--------------------------------------------------------------------
 call(Server, Msg) -> call(Server, Msg, ?DEFAULT_TIMEOUT).
 
 %%--------------------------------------------------------------------
@@ -416,16 +413,16 @@ format_status(Opt, [PDict, SysState, Parent, _, State]) ->
      {data, [{"Status", SysState}, {"Parent", Parent}]} | Specfic].
 
 %%====================================================================
-%% Internal exports
+%% proc_lib callbacks
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% Function: init(Module, Arguments, Opts, Parent, MonitorRef) ->
+%% Function: init(Module, Arguments, Opts, Parent) ->
 %% @private
 %%--------------------------------------------------------------------
--spec init(atom(), _, #opts{}, pid(), reference()) -> _.
+-spec init(atom(), _, #opts{}, pid()) -> _.
 %%--------------------------------------------------------------------
-init(Mod, Arg, Opts, Parent, Ref) ->
+init(Mod, Arg, Opts, Parent) ->
     State =
         #state{parent = Parent,
                mod = Mod,
@@ -437,23 +434,27 @@ init(Mod, Arg, Opts, Parent, Ref) ->
         {ok, State1} ->
             try Mod:init(Arg) of
                 {ok, Data} ->
-                    Parent ! {ack, Ref},
+                    proc_lib:init_ack(Parent, {ok, self()}),
                     next_loop(State1#state{data = Data});
                 {hibernate, Data} ->
-                    Parent ! {ack, Ref},
+                    proc_lib:init_ack(Parent, {ok, self()}),
                     next_loop(State1#state{data = Data, hibernated = true});
                 ignore ->
-                    Parent ! {ignore, Ref};
+                    fail(Parent, State1, ignore, normal);
+                {error, _}  = Reason ->
+                    fail(Parent, State1, Reason, normal);
                 {stop, Reason} ->
-                    Parent ! {nack, Ref, Reason};
+                    fail(Parent, State1, {error, Reason}, Reason);
                 Other ->
-                    Parent ! {nack, Ref, {bad_return_value, Other}}
+                    Bad = {bad_return_value, Other},
+                    fail(Parent, State1, {error, Bad}, Bad)
             catch
-                throw:Reason -> Parent ! {nack, Ref, Reason};
-                _:Reason:Stack -> Parent ! {nack, Ref,{'EXIT', Reason, Stack}}
+                Class:Reason:Stack ->
+                    Error = {Class, Reason, Stack},
+                    fail(Parent, State1, {error, Error}, Error)
             end;
-        {error, Error} ->
-            Parent ! {nack, Ref, Error}
+        {error, _}  = Error ->
+            proc_lib:init_fail(Parent, Error, {exit, normal})
     end.
 
 %%--------------------------------------------------------------------
@@ -504,40 +505,6 @@ return(Other, _, _, Msg, State) ->
 %%====================================================================
 
 %%--------------------------------------------------------------------
-wait_ack(Pid, Ref, Opts, MRef) ->
-    receive
-        {ack, Ref} ->
-            unmonitor(MRef),
-            {ok, Pid};
-        {ignore, Ref} ->
-            unmonitor(MRef),
-            flush_exit(Pid),
-            ignore;
-        {nack, Ref, Reason} ->
-            unmonitor(MRef),
-            {error, Reason};
-        {'EXIT', Pid, Reason} ->
-            unmonitor(MRef),
-            {error, Reason};
-        {'DOWN', MRef, process, Pid, Reason} ->
-            {error, Reason}
-    after Opts#opts.timeout ->
-            unmonitor(MRef),
-            unlink(Pid),
-            exit(Pid, kill),
-            flush_exit(Pid),
-            {error, timeout}
-    end.
-
-unmonitor(undefined) -> ok;
-unmonitor(Mref) when is_reference(Mref) -> erlang:demonitor(Mref, [flush]).
-
-flush_exit(Pid) ->
-    receive {'EXIT', Pid, _} -> ok
-    after 0 -> ok
-    end.
-
-%%--------------------------------------------------------------------
 opts([], Opts) -> Opts;
 opts([{link, Value} | T], Opts) when is_boolean(Value) ->
     opts(T, Opts#opts{link = Value});
@@ -552,11 +519,20 @@ opts([{arg, Value} | T], Opts) ->
 opts([H | T], Opts = #opts{errors = Errors}) ->
     opts(T, Opts#opts{errors = [H | Errors]}).
 
+
 %%--------------------------------------------------------------------
 name(#opts{name = undefined}, State) -> {ok, State#state{name = self()}};
 name(#opts{name = Name}, State) ->
     try register(Name, self()) of true -> {ok, State#state{name = Name}}
     catch _:_ -> {error, {already_started, Name, whereis(Name)}} end.
+
+unname(Pid) when is_pid(Pid) -> ok;
+unname(Atom) -> unregister(Atom).
+
+%%--------------------------------------------------------------------
+fail(Parent, State, Reason, Exit) ->
+    unname(State#state.name),
+    proc_lib:init_fail(Parent, Reason, {exit, Exit}).
 
 %%--------------------------------------------------------------------
 terminate(Reason, Msg, State = #state{terminate = false}) ->
@@ -636,7 +612,7 @@ send_recv(Server, Msg, Timeout) ->
 
 %%--------------------------------------------------------------------
 next_loop(State = #state{hibernated = true}) ->
-    erlang:hibernate(?MODULE, loop, [State]);
+    proc_lib:hibernate(?MODULE, loop, [State]);
 next_loop(State) ->
     loop(State).
 
@@ -653,5 +629,3 @@ unexpected(Type, #state{mod = Mod, name = Name}, Msg) ->
       "  no matching clause in ~p:~p/2:~n"
       "  ~p~n",
       [Name, self(), Mod, Type, Msg]).
-
-%%--------------------------------------------------------------------

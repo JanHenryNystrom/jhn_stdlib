@@ -257,7 +257,7 @@ run_startstop(badreturninit) ->
     ?assertEqual(false, lists:member(testServer, registered()));
 run_startstop(exitinit) ->
     Result = a_jhn_server:start_link(testServer, exitinit, tester, node()),
-    ?assertMatch({error, {'EXIT', exitinit, _}}, Result),
+    ?assertMatch({error, {exit, exitinit, _}}, Result),
     ?assertEqual(false, lists:member(testServer, registered()));
 run_startstop(dieinit) ->
     Result = a_jhn_server:start(testServer, dieinit, tester, node(), []),
@@ -342,6 +342,7 @@ run_startstop(stoperror) ->
     Pid = whereis(testServer),
     ?assertEqual(ok, a_jhn_server:cast(Pid, {stop, anError})),
     ?assertEqual({terminate, anError}, wait()),
+    timer:sleep(1),
     ?assertEqual(false, is_process_alive(Pid)),
     Result1 = a_jhn_server:start(testServer, simple, tester, node(), []),
     ?assertMatch({ok, _}, Result1),
