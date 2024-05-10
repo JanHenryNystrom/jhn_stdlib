@@ -26,7 +26,7 @@
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% API
--export([start/1, start/2,
+-export([create/1, create/2,
          call/2, call/3,
          sync/1, sync/2,
          cast/2, delayed_cast/2, cancel/1, abcast/2, abcast/3,
@@ -59,7 +59,7 @@
                 data,
                 hibernated = false :: boolean(),
                 %% Optional callbacks
-                handle_msg         :: boolean(),
+                message            :: boolean(),
                 terminate          :: boolean(),
                 code_change        :: boolean(),
                 format_status      :: boolean()
@@ -94,13 +94,13 @@
 
 -callback init(State) -> init_return(State).
 
--callback handle_req(_, State) -> return(State).
--callback handle_msg(_, State) -> return(State).
+-callback request(_, State) -> return(State).
+-callback message(_, State) -> return(State).
 -callback terminate(_, _) -> _.
 -callback code_change(_, State, _) ->  return(State).
 -callback format_status(_, _) -> _.
 
--optional_callbacks([handle_msg/2, terminate/2, code_change/3,
+-optional_callbacks([message/2, terminate/2, code_change/3,
                      format_status/2]).
 
 %%====================================================================
@@ -108,31 +108,31 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% Function: start(CallbackModule) -> Result.
+%% Function: create(CallbackModule) -> Result.
 %% @doc
-%%   Starts a jhn_server.
+%%   Creates a jhn_server.
 %% @end
 %%--------------------------------------------------------------------
--spec start(atom()) -> {ok, pid()} | ignore | {error, _}.
+-spec create(atom()) -> {ok, pid()} | ignore | {error, _}.
 %%--------------------------------------------------------------------
-start(Mod) -> start(Mod, []).
+create(Mod) -> create(Mod, []).
 
 %%--------------------------------------------------------------------
-%% Function: start(CallbackModule, Options) -> Result.
+%% Function: create(CallbackModule, Options) -> Result.
 %% @doc
-%%   Starts a jhn_server with options.
+%%   Creates a jhn_server with options.
 %%   Options are:
 %%     {link, Boolean} -> if the server is linked to the parent, default true
-%%     {timeout, infinity | Integer} -> Time in ms for the server to start and
+%%     {timeout, infinity | Integer} -> Time in ms for the server to create and
 %%         initialise, after that an exception is generated, default 5000.
 %%     {name, Atom} -> name that the server is registered under.
 %%     {arg, Term} -> argument provided to the init/1 callback function,
 %%         default is 'no_arg'.
 %% @end
 %%--------------------------------------------------------------------
--spec start(atom(),  opts()) -> {ok, pid()} | ignore | {error, _}.
+-spec create(atom(),  opts()) -> {ok, pid()} | ignore | {error, _}.
 %%--------------------------------------------------------------------
-start(Mod, Options) ->
+create(Mod, Options) ->
     case opts(Options, #opts{}) of
         #opts{errors = Errors = [_ | _]} -> {error, Errors};
         Opts = #opts{link = true, arg = A, timeout = T} ->
@@ -309,7 +309,7 @@ reply(Msg) ->
 %% @doc
 %%   Called by any process will send a reply to the one that sent the
 %%   request to the server, the From argument is the result from a call
-%%   to from/1 inside a handle_req/2 callback function in response to
+%%   to from/1 inside a request/2 callback function in response to
 %%   a jhn_server:call/2/3
 %% @end
 %%--------------------------------------------------------------------
@@ -328,7 +328,7 @@ reply(_, _) ->
 %%--------------------------------------------------------------------
 %% Function: from() -> From.
 %% @doc
-%%   Called inside a handle_req/2 of callback function for a call it
+%%   Called inside a request/2 of callback function for a call it
 %%   will provide an opaque data data enables a reply to the call
 %%   outside the scope of the callback function.
 %% @end
@@ -344,7 +344,7 @@ from() ->
 %%--------------------------------------------------------------------
 %% Function: type() -> call or cast.
 %% @doc
-%%   Called inside a handle_req/2 and it tells if it is a call or a cast.
+%%   Called inside a request/2 and it tells if it is a call or a cast.
 %% @end
 %%--------------------------------------------------------------------
 -spec type() -> call | cast.
@@ -426,7 +426,7 @@ init(Mod, Arg, Opts, Parent) ->
     State =
         #state{parent = Parent,
                mod = Mod,
-               handle_msg = erlang:function_exported(Mod, handle_msg, 2),
+               message = erlang:function_exported(Mod, message, 2),
                terminate = erlang:function_exported(Mod, terminate, 2),
                code_change = erlang:function_exported(Mod, code_change, 3),
                format_status = erlang:function_exported(Mod, format_status, 2)},
@@ -463,7 +463,7 @@ init(Mod, Arg, Opts, Parent) ->
 %%--------------------------------------------------------------------
 -spec loop(#state{}) -> none().
 %%--------------------------------------------------------------------
-loop(State = #state{parent = Parent, mod = Mod, handle_msg = HM}) ->
+loop(State = #state{parent = Parent, mod = Mod, message = HM}) ->
     receive
         {system, From, Req} ->
             sys:handle_system_msg(Req, From, Parent, ?MODULE, [], State);
@@ -475,16 +475,16 @@ loop(State = #state{parent = Parent, mod = Mod, handle_msg = HM}) ->
         Msg = #'$jhn_server'{payload = Payload} ->
             erlang:put('$jhn_msg_store', Msg),
             Data = State#state.data,
-            Return = try Mod:handle_req(Payload, Data) catch C:E -> {C, E} end,
+            Return = try Mod:request(Payload, Data) catch C:E -> {C, E} end,
             erlang:put('$jhn_msg_store', undefined),
-            return(Return, handle_req, Mod, Msg, State);
+            return(Return, request, Mod, Msg, State);
         Msg when not HM ->
-            unexpected(handle_msg, State, Msg),
+            unexpected(message, State, Msg),
             next_loop(State);
         Msg ->
             Data = State#state.data,
-            Return = try Mod:handle_msg(Msg, Data) catch C:E -> {C, E} end,
-            return(Return, handle_msg, Mod, Msg, State)
+            Return = try Mod:message(Msg, Data) catch C:E -> {C, E} end,
+            return(Return, message, Mod, Msg, State)
     end.
 
 return({ok, NewData}, _, _, _, State) ->
@@ -524,7 +524,7 @@ opts([H | T], Opts = #opts{errors = Errors}) ->
 name(#opts{name = undefined}, State) -> {ok, State#state{name = self()}};
 name(#opts{name = Name}, State) ->
     try register(Name, self()) of true -> {ok, State#state{name = Name}}
-    catch _:_ -> {error, {already_started, Name, whereis(Name)}} end.
+    catch _:_ -> {error, {already_created, Name, whereis(Name)}} end.
 
 unname(Pid) when is_pid(Pid) -> ok;
 unname(Atom) -> unregister(Atom).

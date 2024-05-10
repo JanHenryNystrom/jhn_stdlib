@@ -43,7 +43,7 @@ simple_test_() ->
     {setup,
      fun setup_simple/0,
      fun cleanup_simple/1,
-     {inorder, [{timeout, 120, {"Start", ?_test(run_simple(started))}},
+     {inorder, [{timeout, 120, {"Create", ?_test(run_simple(created))}},
                 {timeout, 120, {"Call", ?_test(run_simple(call))}},
                 {timeout, 120, {"Sync", ?_test(run_simple(sync))}},
                 {timeout, 120, {"Cast", ?_test(run_simple(cast))}},
@@ -63,7 +63,7 @@ setup_simple() ->
 cleanup_simple(_) ->
     ok.
 
-run_simple(started) ->
+run_simple(created) ->
     register(tester, self()),
     Result = a_jhn_server:start_link(testServer, simple, tester, node()),
     ?assertMatch({ok, _}, Result),
@@ -165,57 +165,57 @@ run_simple(stop) ->
     ?assertEqual({terminate, normal}, wait()).
 
 %%%-------------------------------------------------------------------
-% Startstop
+% Createstop
 %%%-------------------------------------------------------------------
-startstop_test_() ->
+createstop_test_() ->
     {setup,
-     fun setup_startstop/0,
-     fun cleanup_startstop/1,
-     {inorder, [{timeout, 120, {"Hibernate", ?_test(run_startstop(hibernate))}},
+     fun setup_createstop/0,
+     fun cleanup_createstop/1,
+     {inorder, [{timeout, 120, {"Hibernate",?_test(run_createstop(hibernate))}},
                 {timeout, 120, {"Call", ?_test(run_simple(call))}},
                 {timeout, 120, {"Sync", ?_test(run_simple(sync))}},
                 {timeout, 120, {"Stop(Normal)", ?_test(run_simple(stop))}},
-                {timeout, 120, {"Unlinked", ?_test(run_startstop(unlinked))}},
+                {timeout, 120, {"Unlinked", ?_test(run_createstop(unlinked))}},
                 {timeout, 120, {"Call", ?_test(run_simple(call))}},
                 {timeout, 120, {"Sync", ?_test(run_simple(sync))}},
                 {timeout, 120, {"Stop(Normal)", ?_test(run_simple(stop))}},
-                {timeout, 120, {"Ignore", ?_test(run_startstop(ignore))}},
-                {timeout, 120, {"Stop(Init)", ?_test(run_startstop(stop))}},
+                {timeout, 120, {"Ignore", ?_test(run_createstop(ignore))}},
+                {timeout, 120, {"Stop(Init)", ?_test(run_createstop(stop))}},
                 {timeout, 120, {"Bad Opt(Init)",
-                                ?_test(run_startstop(badopt))}},
+                                ?_test(run_createstop(badopt))}},
                 {timeout, 120, {"Bad return(Init)",
-                                ?_test(run_startstop(badreturninit))}},
+                                ?_test(run_createstop(badreturninit))}},
                 {timeout, 120, {"Exit(Init)",
-                                ?_test(run_startstop(exitinit))}},
+                                ?_test(run_createstop(exitinit))}},
                 {timeout, 120, {"Die(Init)",
-                                ?_test(run_startstop(dieinit))}},
-                {timeout, 120, {"Started", ?_test(run_startstop(started))}},
-                {timeout, 120, {"No name", ?_test(run_startstop(noname))}},
-                {timeout, 120, {"No arg", ?_test(run_startstop(noarg))}},
+                                ?_test(run_createstop(dieinit))}},
+                {timeout, 120, {"Created", ?_test(run_createstop(created))}},
+                {timeout, 120, {"No name", ?_test(run_createstop(noname))}},
+                {timeout, 120, {"No arg", ?_test(run_createstop(noarg))}},
                 {timeout, 120, {"Timer infinity",
-                                ?_test(run_startstop(timerinf))}},
+                                ?_test(run_createstop(timerinf))}},
                 {timeout, 120, {"Stop(Normal)", ?_test(run_simple(stop))}},
                 {timeout, 120, {"Timer integer",
-                                ?_test(run_startstop(timerint))}},
+                                ?_test(run_createstop(timerint))}},
                 {timeout, 120, {"Stop(Normal)", ?_test(run_simple(stop))}},
                 {timeout, 120, {"Timer timeout",
-                                ?_test(run_startstop(timeout))}},
+                                ?_test(run_createstop(timeout))}},
                 {timeout, 120, {"Stop(shutdown)",
-                                ?_test(run_startstop(shutdown))}},
+                                ?_test(run_createstop(shutdown))}},
                 {timeout, 120, {"Stop(Error)",
-                                ?_test(run_startstop(stoperror))}},
+                                ?_test(run_createstop(stoperror))}},
                 {timeout, 120, {"SYS(terminate)",
-                                ?_test(run_startstop(systerminate))}}
+                                ?_test(run_createstop(systerminate))}}
                ]}
     }.
 
-setup_startstop() ->
+setup_createstop() ->
     ok.
 
-cleanup_startstop(_) ->
+cleanup_createstop(_) ->
     ok.
 
-run_startstop(hibernate) ->
+run_createstop(hibernate) ->
     register(tester, self()),
     Result = a_jhn_server:start_link(testServer, hibernate, tester, node()),
     ?assertMatch({ok, _}, Result),
@@ -224,7 +224,7 @@ run_startstop(hibernate) ->
     Pid = whereis(testServer),
     {links, Links} = process_info(self(), links),
     ?assertEqual(true, lists:member(Pid, Links));
-run_startstop(unlinked) ->
+run_createstop(unlinked) ->
     Result = a_jhn_server:start(testServer, hibernate, tester, node(), []),
     ?assertMatch({ok, _}, Result),
     ?assertEqual(init, wait()),
@@ -232,34 +232,34 @@ run_startstop(unlinked) ->
     Pid = whereis(testServer),
     {links, Links} = process_info(self(), links),
     ?assertEqual(false, lists:member(Pid, Links));
-run_startstop(ignore) ->
+run_createstop(ignore) ->
     Result = a_jhn_server:start_link(testServer, ignore, tester, node()),
     ?assertMatch(ignore, Result),
     {ignore, Pid} = wait(),
     ?assertEqual(false, lists:member(testServer, registered())),
     {links, Links} = process_info(self(), links),
     ?assertEqual(false, lists:member(Pid, Links));
-run_startstop(stop) ->
+run_createstop(stop) ->
     Result = a_jhn_server:start_link(testServer, stop, tester, node()),
     ?assertMatch({error, stopped}, Result),
     {stop, Pid} = wait(),
     ?assertEqual(false, lists:member(testServer, registered())),
     {links, Links} = process_info(self(), links),
     ?assertEqual(false, lists:member(Pid, Links));
-run_startstop(badopt) ->
+run_createstop(badopt) ->
     Result = a_jhn_server:start_link(testServer, simple, tester, node(),
                                      [{link, yes}]),
     ?assertEqual({error, [{link, yes}]}, Result),
     ?assertEqual(false, lists:member(testServer, registered()));
-run_startstop(badreturninit) ->
+run_createstop(badreturninit) ->
     Result = a_jhn_server:start_link(testServer, badreturn, tester, node()),
     ?assertEqual({error, {bad_return_value, {uk, state}}}, Result),
     ?assertEqual(false, lists:member(testServer, registered()));
-run_startstop(exitinit) ->
+run_createstop(exitinit) ->
     Result = a_jhn_server:start_link(testServer, exitinit, tester, node()),
     ?assertMatch({error, {exit, exitinit, _}}, Result),
     ?assertEqual(false, lists:member(testServer, registered()));
-run_startstop(dieinit) ->
+run_createstop(dieinit) ->
     Result = a_jhn_server:start(testServer, dieinit, tester, node(), []),
     ?assertMatch({error, fail}, Result),
     ?assertEqual(false, lists:member(testServer, registered())),
@@ -268,16 +268,16 @@ run_startstop(dieinit) ->
     ?assertMatch({error, fail}, Result),
     ?assertEqual(false, lists:member(testServer, registered())),
     process_flag(trap_exit, Flag);
-run_startstop(started) ->
+run_createstop(created) ->
     unregister(tester),
     register(testServer, self()),
     Result = a_jhn_server:start_link(testServer, simple, tester, node()),
-    ?assertEqual({error, {already_started, testServer, self()}}, Result),
+    ?assertEqual({error, {already_created, testServer, self()}}, Result),
     Result1 = a_jhn_server:start_link(testServer, hibernate, tester, node()),
-    ?assertEqual({error, {already_started, testServer, self()}}, Result1),
+    ?assertEqual({error, {already_created, testServer, self()}}, Result1),
     unregister(testServer),
     register(tester, self());
-run_startstop(noname) ->
+run_createstop(noname) ->
     Result = a_jhn_server:start_link(simple, tester, node()),
     ?assertMatch({ok, _}, Result),
     ?assertEqual(init, wait()),
@@ -287,11 +287,11 @@ run_startstop(noname) ->
     ?assertEqual(true, lists:member(Pid, Links)),
     ?assertEqual(ok, a_jhn_server:cast(Pid, {stop, normal})),
     ?assertEqual({terminate, normal}, wait());
-run_startstop(noarg) ->
+run_createstop(noarg) ->
     Result = a_jhn_server:start_link(),
     ?assertMatch(ignore, Result),
     ?assertEqual(false, lists:member(testServer, registered()));
-run_startstop(timerinf) ->
+run_createstop(timerinf) ->
     Result = a_jhn_server:start_link(testServer, simple, tester, node(),
                                     [{timeout, infinity}]),
     ?assertMatch({ok, _}, Result),
@@ -300,7 +300,7 @@ run_startstop(timerinf) ->
     Pid = whereis(testServer),
     {links, Links} = process_info(self(), links),
     ?assertEqual(true, lists:member(Pid, Links));
-run_startstop(timerint) ->
+run_createstop(timerint) ->
     Result = a_jhn_server:start_link(testServer, simple, tester, node(),
                                     [{timeout, 5000}]),
     ?assertMatch({ok, _}, Result),
@@ -309,14 +309,14 @@ run_startstop(timerint) ->
     Pid = whereis(testServer),
     {links, Links} = process_info(self(), links),
     ?assertEqual(true, lists:member(Pid, Links));
-run_startstop(timeout) ->
+run_createstop(timeout) ->
     Result = a_jhn_server:start_link(testServer, timeout, tester, node(),
                                     [{timeout, 100}]),
     ?assertMatch({error, timeout}, Result),
     ?assertEqual(timeout, wait()),
     timer:sleep(100),
     ?assertEqual(undefined, whereis(testServer));
-run_startstop(shutdown) ->
+run_createstop(shutdown) ->
     Result = a_jhn_server:start(testServer, shutdown, tester, node(), []),
     ?assertMatch({ok, _}, Result),
     ?assertEqual(init, wait()),
@@ -334,7 +334,7 @@ run_startstop(shutdown) ->
     ?assertEqual({terminate, {shutdown, 5000}}, wait()),
     timer:sleep(100),
     ?assertEqual(false, is_process_alive(Pid1));
-run_startstop(stoperror) ->
+run_createstop(stoperror) ->
     Result = a_jhn_server:start(testServer, simple, tester, node(), []),
     ?assertMatch({ok, _}, Result),
     ?assertEqual(init, wait()),
@@ -352,7 +352,7 @@ run_startstop(stoperror) ->
     Pid1 ! {stop, anError},
     ?assertEqual({terminate, anError}, wait()),
     ?assertEqual(false, is_process_alive(Pid));
-run_startstop(systerminate) ->
+run_createstop(systerminate) ->
     Result = a_jhn_server:start(testServer, shutdown, tester, node(), []),
     ?assertMatch({ok, _}, Result),
     ?assertEqual(init, wait()),

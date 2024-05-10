@@ -39,8 +39,8 @@
 
 %% jhn_server callbacks
 -export([init/1,
-         handle_req/2,
-         handle_msg/2,
+         request/2,
+         message/2,
          terminate/2,
          code_change/3,
          format_status/2
@@ -57,24 +57,24 @@
 %%====================================================================
 
 start_link() ->
-    jhn_server:start(?MODULE).
+    jhn_server:create(?MODULE).
 
 start_link(Type, TestName, TestNode) ->
-    jhn_server:start(?MODULE, [{arg, {undefined, Type, TestName, TestNode}}]).
+    jhn_server:create(?MODULE, [{arg, {undefined, Type, TestName, TestNode}}]).
 
 
 start_link(Name, Type, TestName, TestNode) ->
-    jhn_server:start(?MODULE,
+    jhn_server:create(?MODULE,
                      [{arg, {Name, Type, TestName, TestNode}}, {name, Name} ]).
 
 start_link(Name, Type, TestName, TestNode, Opts) ->
-    jhn_server:start(?MODULE,
+    jhn_server:create(?MODULE,
                      [{arg, {Name, Type, TestName, TestNode}},
                       {name, Name} | Opts
                      ]).
 
 start(Name, Type, TestName, TestNode, Opts) ->
-    jhn_server:start(?MODULE,
+    jhn_server:create(?MODULE,
                      [{arg, {Name, Type, TestName, TestNode}},
                       {name, Name},
                       {link, false} | Opts
@@ -137,39 +137,39 @@ init({_Name, Type, TestName, TestNode}) ->
     Controller ! init,
     {ok, #state{type = Type, controller = Controller}}.
 
-handle_req(get_state, State) ->
+request(get_state, State) ->
     jhn_server:reply({state, State}),
     {ok, State};
-handle_req({reply, X}, State) ->
+request({reply, X}, State) ->
     jhn_server:reply({reply, X}),
     {ok, State};
-handle_req({reply, From, X}, State) ->
+request({reply, From, X}, State) ->
     From ! {reply, X},
     {ok, State};
-handle_req({ereply, X}, State) ->
+request({ereply, X}, State) ->
     jhn_server:reply(jhn_server:from(), {reply, X}),
     {ok, State};
-handle_req(hibernate, State) ->
+request(hibernate, State) ->
     jhn_server:reply(hibernate),
     {hibernate, State};
-handle_req({hibernate, From}, State) ->
+request({hibernate, From}, State) ->
     From ! hibernate,
     {hibernate, State};
-handle_req({stop, Reason}, _) ->
+request({stop, Reason}, _) ->
     {stop, Reason};
-handle_req(badreturn, _) ->
+request(badreturn, _) ->
     {bad, call};
-handle_req({terminate, How}, _) ->
+request({terminate, How}, _) ->
     {stop, How}.
 
-handle_msg({reply, X}, State) ->
+message({reply, X}, State) ->
     inform({reply, X}, State),
     {ok, State};
-handle_msg({stop, Reason}, _) ->
+message({stop, Reason}, _) ->
     {stop, Reason};
-handle_msg(badreturn, _) ->
+message(badreturn, _) ->
     {bad, call};
-handle_msg(hibernate, State) ->
+message(hibernate, State) ->
     inform(hibernate, State),
     {hibernate, State}.
 
