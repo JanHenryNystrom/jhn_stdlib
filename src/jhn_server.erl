@@ -81,7 +81,8 @@
 -type server_ref() :: atom() | {atom(), node()} | pid().
 
 -type init_return(State) :: ignore | return(State).
--type return(State)      :: {ok, State} | {hibernate, State} | {stop, State}.
+-type return(State)      :: {ok, State} | {hibernate, State} |
+                            {error, _} | {stop, _}.
 
 -type from() :: reference().
 
@@ -475,29 +476,42 @@ loop(State = #state{parent = Parent, mod = Mod, message = HM}) ->
         Msg = #'$jhn_server'{payload = Payload} ->
             erlang:put('$jhn_msg_store', Msg),
             Data = State#state.data,
-            Return = try Mod:request(Payload, Data) catch C:E -> {C, E} end,
+            Return = try Mod:request(Payload, Data)
+                     catch error:function_clause:Stack ->
+                             {function_clause, Stack};
+                           C:E ->
+                             {C, E}
+                     end,
             erlang:put('$jhn_msg_store', undefined),
-            return(Return, request, Mod, Msg, State);
+            return(Return, request, Msg, State);
         Msg when not HM ->
             unexpected(message, State, Msg),
             next_loop(State);
         Msg ->
             Data = State#state.data,
-            Return = try Mod:message(Msg, Data) catch C:E -> {C, E} end,
-            return(Return, message, Mod, Msg, State)
+            Return = try Mod:message(Msg, Data)
+                     catch error:function_clause:Stack ->
+                             {function_clause, Stack};
+                            C:E ->
+                             {C, E}
+                     end,
+            return(Return, message, Msg, State)
     end.
 
-return({ok, NewData}, _, _, _, State) ->
+return({ok, NewData}, _, _, State) ->
     next_loop(State#state{data = NewData, hibernated = false});
-return({hibernate, NewData}, _, _, _, State) ->
+return({hibernate, NewData}, _, _, State) ->
     NewState = State#state{data = NewData, hibernated = true},
     next_loop(NewState);
-return({stop, Reason}, _, _, Msg, State) ->
+return({stop, Reason}, _, Msg, State) ->
     terminate(Reason, Msg, State);
-return({error, function_clause}, Type, _, Msg,State) ->
-    unexpected(Type, State, Msg),
+return({function_clause, [{M, F, _, _} | _]}, F, Ms, State = #state{mod = M}) ->
+    unexpected(F, State, Ms),
     next_loop(State);
-return(Other, _, _, Msg, State) ->
+return({function_clause, _}, F, Msg, State) ->
+    unexpected(F, State,Msg),
+    next_loop(State);
+return(Other, _, Msg, State) ->
     terminate({bad_return_value, Other}, Msg, State).
 
 %%====================================================================
@@ -541,7 +555,7 @@ terminate(Reason, Msg, State = #state{terminate = false}) ->
         shutdown -> exit(shutdown);
         Shutdown = {shutdown, _} -> exit(Shutdown);
         _ ->
-            error_info(Reason, Msg, State),
+            terminating(Reason, Msg, State),
             exit(Reason)
     end;
 terminate(Reason, Msg, State = #state{mod = Mod, data = Data}) ->
@@ -550,21 +564,8 @@ terminate(Reason, Msg, State = #state{mod = Mod, data = Data}) ->
             terminate(Reason, Msg, State#state{terminate = false})
     catch
         _:Reason1 ->
-            error_info(Reason1, Msg, State),
-            exit(Reason1)
+            terminate(Reason1, Msg, State#state{terminate = false})
     end.
-
-error_info(Reason, [], #state{data = Data, name = Name}) ->
-    error_logger:format("** JHN server ~p terminating \n"
-                        "** When Server state == ~p~n"
-                        "** Reason for termination == ~n** ~p~n",
-                        [Name, Data, Reason]);
-error_info(Reason, Msg, #state{data = Data, name = Name}) ->
-    error_logger:format("** JHN server ~p terminating \n"
-                        "** Last message in was ~p~n"
-                        "** When Server state == ~p~n"
-                        "** Reason for termination == ~n** ~p~n",
-                        [Name, Msg, Data, Reason]).
 
 %%--------------------------------------------------------------------
 do_cast(Server, Msg) ->
@@ -617,15 +618,49 @@ next_loop(State) ->
     loop(State).
 
 %%--------------------------------------------------------------------
-unexpected(Type, #state{mod = Mod, name = undefined}, Msg) ->
-    logger:error(
-      "JHN server ~p received unexpected~n"
-      "  no matching clause in ~p:~p/2:~n"
-      "  ~p~n",
-      [self(), Mod, Type, Msg]);
-unexpected(Type, #state{mod = Mod, name = Name}, Msg) ->
-    logger:error(
-      "JHN server ~p(~p) received unexpected~n"
-      "  no matching clause in ~p:~p/2:~n"
-      "  ~p~n",
-      [Name, self(), Mod, Type, Msg]).
+unexpected(Type, State, Msg) ->
+    Format = "**  JHN server ~p(~p) received unexpected ~p:~n**  ~p~n",
+    Id = case State#state.name of
+             undefined -> State#state.mod;
+             Name -> Name
+         end,
+    Msg1 = case Msg of
+               #'$jhn_server'{payload = Payload} -> Payload;
+               _ -> Msg
+           end,
+    Args = [Id, self(), Type, Msg1],
+    Meta = #{tag => error, report_cb => fun report_to_format/1},
+    logger:log(error,#{label => ?MODULE, format => Format, args => Args}, Meta).
+
+terminating(Reason, Msg, #state{data = Data, name = Name}) ->
+    Name1 = case Name of
+                undefined -> self();
+                _ -> Name
+            end,
+    Msg1 = case Msg of
+               #'$jhn_server'{payload = Payload} -> Payload;
+               _ -> Msg
+           end,
+    {Format, Args} =
+        case Msg1 of
+            [] ->
+                {"** JHN server ~p terminating ~n"
+                 "** When Server state == ~p~n"
+                 "** Reason for termination == ~n** ~p~n",
+                 [Name1, Data, Reason]};
+            _ ->
+                {"** JHN server ~p terminating ~n"
+                 "** Last message in was ~p~n"
+                 "** When Server state == ~p~n"
+                 "** Reason for termination == ~n** ~p~n",
+                 [Name1, Msg1, Data, Reason]}
+        end,
+    Meta = #{tag => error, report_cb => fun report_to_format/1},
+    logger:log(error,#{label => ?MODULE, format => Format, args => Args}, Meta).
+
+log(Format, Args) ->
+    Report = #{label => ?MODULE, format => Format, args => Args},
+    Meta = #{tag => error, report_cb => fun report_to_format/1},
+    logger:log(error, Report, Meta).
+
+report_to_format(#{label := ?MODULE, format := F, args := A}) -> {F, A}.
