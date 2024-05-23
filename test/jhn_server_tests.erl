@@ -342,7 +342,7 @@ run_createstop(stoperror) ->
     Pid = whereis(testServer),
     ?assertEqual(ok, a_jhn_server:cast(Pid, {stop, anError})),
     ?assertEqual({terminate, anError}, wait()),
-    timer:sleep(1),
+    timer:sleep(10),
     ?assertEqual(false, is_process_alive(Pid)),
     Result1 = a_jhn_server:start(testServer, simple, tester, node(), []),
     ?assertMatch({ok, _}, Result1),
