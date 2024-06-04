@@ -66,7 +66,6 @@
                 format_status      :: boolean()
                }).
 
-
 -record('$jhn_server', {from           :: reference(),
                         type    = cast :: cast | call | sync,
                         payload = ok   :: _}).
@@ -98,8 +97,8 @@
 -callback code_change(_, State, _) ->  return(State).
 -callback format_status(_, _) -> _.
 
--optional_callbacks([message/2, terminate/3, code_change/3,
-                     format_status/2]).
+-optional_callbacks([message/2,
+                     terminate/3, code_change/3, format_status/2]).
 
 %%====================================================================
 %% API

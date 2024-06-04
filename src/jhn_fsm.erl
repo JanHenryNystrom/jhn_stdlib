@@ -37,11 +37,8 @@
 
 %% jhn_server callbacks
 -export([init/1,
-         request/2,
-         message/2,
-         terminate/3,
-         code_change/3,
-         format_status/2]).
+         request/2, message/2,
+         terminate/3, code_change/3, format_status/2]).
 
 %% Records
 -record(state, {name                         :: pid() | atom(),
@@ -89,9 +86,8 @@
 -callback code_change(_, atom(), State, _) ->  return(State).
 -callback format_status(_, _) -> _.
 
--optional_callbacks([event/3, message/3, terminate/3, code_change/4,
-                     format_status/2]).
-
+-optional_callbacks([event/3, message/3,
+                     terminate/3, code_change/4, format_status/2]).
 
 %%====================================================================
 %% API
