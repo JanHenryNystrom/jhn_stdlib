@@ -67,7 +67,7 @@
 -type opts()             :: [opt()].
 -type fsm_ref()          :: atom() | {atom(), node()} | pid().
 -type event()            :: _.
--type from()             :: jhn_server:from(). 
+-type from()             :: jhn_server:from().
 
 -type init_return(State) :: ignore | return(State).
 -type return(State)      :: {ok, atom(), State} |
@@ -284,31 +284,25 @@ init({Mod, Opts}) ->
 -spec request(event(), #state{}) -> jhn_server:return().
 %%--------------------------------------------------------------------
 request(Event, State) ->
-    #state{mod = Mod,
-           state_name = StateName,
-           data = Data,
-           event = HE} = State,
-    try Mod:StateName(Event, Data) of
-        Return -> return(Return, request, Event, State)
-    catch
-        error:function_clause:Stack when HE ->
-            case Stack of
-                [{Mod, StateName, _, _} | _] ->
-                    try Mod:event(Event, StateName, Data) of
-                        Return -> return(Return, request, Event, State)
-                    catch
-                        error:function_clause:Stack1  ->
-                            case Stack1 of
-                                [{Mod, event, _, _} | _] ->
-                                    unexpected(event, State, Event),
-                                    {ok, State};
-                                _ ->
-                                    erlang:raise(error, function_clause, Stack1)
-                            end
-                    end;
-                _ ->
-                    erlang:raise(error, function_clause, Stack)
-            end
+    #state{mod = Mod, state_name = StateName, data = Data} = State,
+    case erlang:function_exported(Mod, StateName, 2) of
+        true ->
+            try Mod:StateName(Event, Data) of
+                Return -> return(Return, request, Event, State)
+            catch
+                error:function_clause:Stack ->
+                    case Stack of
+                        [{Mod, StateName, _, _} | _]  when State#state.event ->
+                            handle_all_states(Event, event, request, State);
+                        [{Mod, StateName, _, _} | _] ->
+                            unexpected(event, Event, State),
+                            {ok, State};
+                        _ ->
+                            erlang:raise(error, function_clause, Stack)
+                    end
+            end;
+        false ->
+            handle_all_states(Event, event, request, State)
     end.
 
 %%--------------------------------------------------------------------
@@ -318,21 +312,10 @@ request(Event, State) ->
 -spec message(event(), #state{}) -> jhn_server:return().
 %%--------------------------------------------------------------------
 message(Event, State = #state{message = false}) ->
-    unexpected(message, State, Event),
+    unexpected(message, Event, State),
     {ok, State};
-message(Event, State = #state{mod = Mod, state_name = StateName, data=Data}) ->
-    try Mod:message(Event, StateName, Data) of
-        Return -> return(Return, message, Event, State)
-    catch
-        error:function_clause:Stack ->
-            case Stack of
-                [{Mod, message, _, _} | _] ->
-                    unexpected(message, State, Event),
-                    {ok, State};
-                _ ->
-                    erlang:raise(error, function_clause, Stack)
-            end
-    end.
+message(Event, State) ->
+    handle_all_states(Event, message, message, State).
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, Message, State) ->
@@ -342,9 +325,9 @@ message(Event, State = #state{mod = Mod, state_name = StateName, data=Data}) ->
 %%--------------------------------------------------------------------
 terminate(Reason, Msg, State = #state{terminate = false}) ->
     case Reason of
-        normal -> exit(normal);
-        shutdown -> exit(shutdown);
-        Shutdown = {shutdown, _} -> exit(Shutdown);
+        normal -> normal;
+        shutdown -> shutdown;
+        Shutdown = {shutdown, _} -> Shutdown;
         _ ->
             terminating(Reason, Msg, State),
             exit(Reason)
@@ -392,7 +375,7 @@ format_status(Opt, [PDict, State]) ->
     Specfic =
         case State#state.format_status of
             true ->
-                try Mod:format_status(Opt, [PDict, Data]) 
+                try Mod:format_status(Opt, [PDict, Data])
                 catch
                     _:_ -> [{data, [{"State", State}]}]
                 end;
@@ -406,6 +389,22 @@ format_status(Opt, [PDict, State]) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
+
+%%--------------------------------------------------------------------
+handle_all_states(Event, CallBack, Type, State) ->
+    #state{state_name = StateName, mod = Mod, data = Data} = State,
+    try Mod:CallBack(Event, StateName, Data) of
+        Return -> return(Return, Type, Event, State)
+    catch
+        error:function_clause:Stack  ->
+            case Stack of
+                [{Mod, CallBack, _, _} | _] ->
+                    unexpected(CallBack, Event, State),
+                    {ok, State};
+                _ ->
+                    erlang:raise(error, function_clause, Stack)
+            end
+    end.
 
 %%--------------------------------------------------------------------
 return({ok, NewStateName, NewData}, _, _, State) ->
@@ -435,7 +434,7 @@ return1(_, OK, State) ->
     end.
 
 %%--------------------------------------------------------------------
-unexpected(Type, State, Msg) ->
+unexpected(Type, Msg, State) ->
     Id = case State#state.name of
              undefined -> State#state.mod;
              Name -> Name

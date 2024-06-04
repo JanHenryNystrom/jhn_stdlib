@@ -27,9 +27,9 @@
 
 %% API
 -export([create/1, create/2,
+         cast/2, delayed_cast/2, cancel/1, abcast/2, abcast/3,
          call/2, call/3,
          sync/1, sync/2,
-         cast/2, delayed_cast/2, cancel/1, abcast/2, abcast/3,
          reply/1, reply/2, from/0, type/0
         ]).
 
@@ -42,12 +42,16 @@
 %% proc_lib callbacks
 -export([init/4, loop/1]).
 
+
+%% Defines
+-define(DEFAULT_TIMEOUT, 5000).
+
 %% Records
--record(opts, {arg     = no_arg   :: no_arg | _,
-               link    = true     :: boolean(),
-               timeout = infinity :: timeout(),
-               name               :: atom(),
-               errors  = []       :: [_]
+-record(opts, {arg     = no_arg           :: no_arg | _,
+               link    = true             :: boolean(),
+               timeout = ?DEFAULT_TIMEOUT :: timeout(),
+               name                       :: atom(),
+               errors  = []               :: [_]
               }).
 
 -record(state, {parent             :: pid(),
@@ -66,10 +70,6 @@
 -record('$jhn_server', {from           :: reference(),
                         type    = cast :: cast | call | sync,
                         payload = ok   :: _}).
-
-
-%% Defines
--define(DEFAULT_TIMEOUT, 5000).
 
 %% Types
 -type opt()  :: {atom(), _}.
@@ -147,12 +147,11 @@ create(Mod, Options) ->
 %%--------------------------------------------------------------------
 -spec cast(server_ref(), _) -> ok.
 %%--------------------------------------------------------------------
-cast(Server, Msg) when is_atom(Server) -> do_cast(Server, Msg);
-cast(Server, Msg) when is_pid(Server)-> do_cast(Server, Msg);
-cast(Server = {Name, Node}, Msg) when is_atom(Name), is_atom(Node) ->
-    do_cast(Server, Msg);
-cast(Server, Msg) ->
-    erlang:error(badarg, [Server, Msg]).
+cast(Server, Msg, Timeout) ->
+    case is_server_ref(Server) of
+        false -> erlang:error(badarg, [Server, Timeout]);
+        {true, Server1} -> do_cast(Server1, Msg)
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: delayed_cast(Delay, Message) -> TimerRef.
@@ -232,22 +231,15 @@ call(Server, Msg) -> call(Server, Msg, ?DEFAULT_TIMEOUT).
 %%--------------------------------------------------------------------
 -spec call(server_ref(), _, timeout()) -> _.
 %%--------------------------------------------------------------------
-call(Server, Msg, Timeout)
-  when is_pid(Server), Timeout == infinity;
-       is_pid(Server), is_integer(Timeout), Timeout > 0;
-       is_atom(Server), Timeout == infinity;
-       is_atom(Server), is_integer(Timeout), Timeout > 0 ->
-    do_call(Server, Msg, Timeout);
-call({Name, Node}, Msg, Timeout)
-  when is_atom(Name), Node == node(), Timeout == infinity;
-       is_atom(Name), Node == node(), is_integer(Timeout), Timeout > 0 ->
-    do_call(Name, Msg, Timeout);
-call(Server = {Name, Node}, Msg, Timeout)
-  when is_atom(Name), is_atom(Node), Timeout == infinity;
-       is_atom(Name), is_atom(Node), is_integer(Timeout), Timeout > 0 ->
-    do_call(Server, Msg, Timeout);
 call(Server, Msg, Timeout) ->
-    erlang:error(badarg, [Server, Msg, Timeout]).
+    case is_server_ref(Server) of
+        false -> erlang:error(badarg, [Server, Msg, Timeout]);
+        {true, Server1} -> 
+            case is_timeout(Timeout) of
+                true -> do_call(Server1, Msg, Timeout);
+                false -> erlang:error(badarg, [Server, Msg, Timeout])
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: sync(Server) -> ok.
@@ -270,22 +262,15 @@ sync(Server) -> sync(Server, ?DEFAULT_TIMEOUT).
 %%--------------------------------------------------------------------
 -spec sync(server_ref(), timeout()) -> _.
 %%--------------------------------------------------------------------
-sync(Server, Timeout)
-  when is_pid(Server), Timeout == infinity;
-       is_pid(Server), is_integer(Timeout), Timeout > 0;
-       is_atom(Server), Timeout == infinity;
-       is_atom(Server), is_integer(Timeout), Timeout > 0 ->
-    do_sync(Server, Timeout);
-sync({Name, Node}, Timeout)
-  when is_atom(Name), Node == node(), Timeout == infinity;
-       is_atom(Name), Node == node(), is_integer(Timeout), Timeout > 0 ->
-    do_sync(Name, Timeout);
-sync(Server = {Name, Node}, Timeout)
-  when is_atom(Name), is_atom(Node), Timeout == infinity;
-       is_atom(Name), is_atom(Node), is_integer(Timeout), Timeout > 0 ->
-    do_sync(Server, Timeout);
 sync(Server, Timeout) ->
-    erlang:error(badarg, [Server, Timeout]).
+    case is_server_ref(Server) of
+        false -> erlang:error(badarg, [Server, Timeout]);
+        {true, Server1} -> 
+            case is_timeout(Timeout) of
+                true -> do_sync(Server1, Timeout);
+                false -> erlang:error(badarg, [Server, Timeout])
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: reply(Message) -> ok | {error, not_a_call}.
@@ -482,7 +467,7 @@ loop(State = #state{parent = Parent, mod = Mod, message = HM}) ->
             erlang:put('$jhn_msg_store', undefined),
             return(Return, request, Msg, State);
         Msg when not HM ->
-            unexpected(message, State, Msg),
+            unexpected(message, Msg, State),
             next_loop(State);
         Msg ->
             Data = State#state.data,
@@ -503,11 +488,11 @@ return({hibernate, NewData}, _, _, State) ->
 return({stop, Reason}, _, Msg, State) ->
     terminate(Reason, Msg, State);
 return({function_clause, [{M, F, _, _} | _]}, F, Ms, State = #state{mod = M}) ->
-    unexpected(F, State, Ms),
+    unexpected(F, Ms, State),
     next_loop(State);
-return({function_clause, _}, F, Msg, State) ->
-    unexpected(F, State,Msg),
-    next_loop(State);
+%% return({function_clause, _}, F, Msg, State) ->
+%%     unexpected(F, State,Msg),
+%%     next_loop(State);
 return(Other, _, Msg, State) ->
     terminate({bad_return_value, Other}, Msg, State).
 
@@ -529,7 +514,6 @@ opts([{arg, Value} | T], Opts) ->
     opts(T, Opts#opts{arg = Value});
 opts([H | T], Opts = #opts{errors = Errors}) ->
     opts(T, Opts#opts{errors = [H | Errors]}).
-
 
 %%--------------------------------------------------------------------
 name(#opts{name = undefined}, State) -> {ok, State#state{name = self()}};
@@ -563,6 +547,22 @@ terminate(Reason, Msg, State = #state{mod = Mod, data = Data}) ->
         _:Reason1 ->
             terminate(Reason1, Msg, State#state{terminate = false})
     end.
+
+%%--------------------------------------------------------------------
+is_server_ref(Server) when is_pid(Server) -> {true, Server};
+is_server_ref(Server) when is_atom(Server) -> {true, Server};
+is_server_ref(Server = {Name, Node}) when is_atom(Name) ->
+    case node() of
+        Name -> {true, Name};
+        _ when is_atom(Node) -> {trune, Server};
+        _ -> false
+    end;
+is_server_ref(_) ->
+    false.
+
+is_timeout(infinity) -> true;
+is_timeout(Timeout) when is_integer(Timeout), Timeout > 0 -> true;
+is_timeout(_) -> false.
 
 %%--------------------------------------------------------------------
 do_cast(Server, Msg) ->
@@ -615,7 +615,7 @@ next_loop(State) ->
     loop(State).
 
 %%--------------------------------------------------------------------
-unexpected(Type, State, Msg) ->
+unexpected(Type, Msg, State) ->
     Id = case State#state.name of
              undefined -> State#state.mod;
              Name -> Name

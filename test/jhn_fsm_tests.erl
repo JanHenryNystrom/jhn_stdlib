@@ -33,6 +33,22 @@
                 code_change, format_status, deferred, handling_deferred
                }).
 
+%% logger callbacks
+-export([log/2]).
+
+%% ===================================================================
+%% logger callbacks
+%% ===================================================================
+
+
+log(#{meta := #{error_logger := #{type := crash_report}}}, _) ->
+    inform(crash_report),
+    ?debugFmt("~nCrash:~n", []),
+    ok;
+log(Event, _) ->
+    inform(crash_report),
+    ?debugFmt("~nLog: ~p~n", [Event]).
+
 %% ===================================================================
 %% Tests.
 %% ===================================================================
@@ -57,7 +73,16 @@ simple_test_() ->
     }.
 
 setup_simple() ->
-    ok.
+    logger:remove_handler(default),
+    Config = #{id => ?MODULE,
+               config => none,
+               level => all,
+               module => ?MODULE,
+               filter_default => log,
+               filters => [],
+               formatter => {?MODULE, #{}}
+              },
+    ?debugVal(logger:add_handler(default, ?MODULE, Config)).
 
 cleanup_simple(_) ->
     ok.
@@ -212,6 +237,7 @@ run_startstop(stop) ->
     Result = a_jhn_fsm:start_link(testFsm, stop, tester, node()),
     ?assertMatch({error, stopped}, Result),
     {stop, Pid} = wait(),
+    crash_report = wait(),
     ?assertEqual(false, lists:member(testFsm, registered())),
     {links, Links} = process_info(self(), links),
     ?assertEqual(false, lists:member(Pid, Links));
@@ -223,11 +249,13 @@ run_startstop(badopt) ->
 run_startstop(badreturninit) ->
     Result = a_jhn_fsm:start_link(testFsm, badreturn, tester, node()),
     ?assertEqual({error, {bad_return_value, {uk, state}}}, Result),
-    ?assertEqual(false, lists:member(testFsm, registered()));
+    ?assertEqual(false, lists:member(testFsm, registered())),
+    crash_report = wait();
 run_startstop(exitinit) ->
     Result = a_jhn_fsm:start_link(testFsm, exitinit, tester, node()),
     ?assertMatch({error, {exit, exitinit, _}}, Result),
-    ?assertEqual(false, lists:member(testFsm, registered()));
+    ?assertEqual(false, lists:member(testFsm, registered())),
+    crash_report = wait();
 run_startstop(dieinit) ->
     Result = a_jhn_fsm:start(testFsm, dieinit, tester, node(), []),
     ?assertMatch({error, fail}, Result),
@@ -293,8 +321,7 @@ run_startstop(shutdown) ->
     Pid = whereis(testFsm),
     exit(Pid, shutdown),
     ?assertEqual({terminate, shutdown}, wait()),
-    timer:sleep(10),
-    ?assertEqual(false, is_process_alive(Pid)),
+    ?assertEqual(false, is_alive(Pid, 10)),
     Result1 = a_jhn_fsm:start(testFsm, shutdown, tester, node(), []),
     ?assertMatch({ok, _}, Result1),
     ?assertEqual(init, wait()),
@@ -302,8 +329,7 @@ run_startstop(shutdown) ->
     Pid1 = whereis(testFsm),
     exit(Pid1, {shutdown, 5000}),
     ?assertEqual({terminate, {shutdown, 5000}}, wait()),
-    timer:sleep(100),
-    ?assertEqual(false, is_process_alive(Pid1));
+    ?assertEqual(false, is_alive(Pid1, 10));
 run_startstop(stoperror) ->
     Result = a_jhn_fsm:start(testFsm, simple, tester, node(), []),
     ?assertMatch({ok, _}, Result),
@@ -312,8 +338,8 @@ run_startstop(stoperror) ->
     Pid = whereis(testFsm),
     ?assertEqual(ok, a_jhn_fsm:event(Pid, {stop, anError})),
     ?assertEqual({terminate, anError}, wait()),
-    timer:sleep(10),
-    ?assertEqual(false, is_process_alive(Pid)),
+    ?assertEqual(false, is_alive(Pid, 10)),
+    crash_report = wait(),
     Result1 = a_jhn_fsm:start(testFsm, simple, tester, node(), []),
     ?assertMatch({ok, _}, Result1),
     ?assertEqual(init, wait()),
@@ -321,8 +347,7 @@ run_startstop(stoperror) ->
     Pid1 = whereis(testFsm),
     Pid1 ! {stop, anError},
     ?assertEqual({terminate, anError}, wait()),
-    timer:sleep(10),
-    ?assertEqual(false, is_process_alive(Pid));
+    ?assertEqual(false, is_alive(Pid, 10));
 run_startstop(systerminate) ->
     Result = a_jhn_fsm:start(testFsm, shutdown, tester, node(), []),
     ?assertMatch({ok, _}, Result),
@@ -332,8 +357,7 @@ run_startstop(systerminate) ->
     sys:suspend(testFsm),
     exit(Pid, shutdown),
     ?assertEqual({terminate, shutdown}, wait()),
-    timer:sleep(10),
-    ?assertEqual(false, is_process_alive(Pid)).
+    ?assertEqual(false, is_alive(Pid, 10)).
 
 %%%-------------------------------------------------------------------
 % Error
@@ -613,9 +637,6 @@ run_states(defer) ->
     ?assertEqual(ok, b_jhn_fsm:event(b_jhn_fsm, {goto, second})),
     ?assertEqual(first, b_jhn_fsm:call(b_jhn_fsm, get_state)).
 
-
-
-
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
@@ -627,3 +648,14 @@ wait(Time) -> receive Y -> Y after Time -> timeout end.
 host() ->
     [Host | _] = string:tokens(net_adm:localhost(), "."),
     Host.
+
+is_alive(_, 0) -> timeout;
+is_alive(Pid, N) ->
+    case is_process_alive(Pid) of
+        false -> false;
+        _ ->
+            timer:sleep(10),
+            is_alive(Pid, N - 1)
+    end.
+
+inform(X) -> tester ! X.
