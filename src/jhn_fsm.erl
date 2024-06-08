@@ -40,6 +40,9 @@
          request/2, message/2,
          terminate/3, code_change/3, format_status/2]).
 
+%% logger callback
+-export([report_to_format/2]).
+
 %% Records
 -record(state, {name                         :: pid() | atom(),
                 mod                          :: atom(),
@@ -383,6 +386,44 @@ format_status(Opt, [PDict, State]) ->
      Specfic].
 
 %%====================================================================
+%% logger callback functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% Function: report_to_format(Report, FormatOpts) -> Format.
+%% @private
+%%--------------------------------------------------------------------
+-spec report_to_format(logger:report(), logger:report_cb_config()) ->
+          unicode:chardata().
+%%--------------------------------------------------------------------
+report_to_format(Report = #{label := {?MODULE, unexpected}}, _) ->
+    #{id := Id, pid := Pid, state := State, type := Type, message := Msg} =
+        Report,
+    Format = "**  JHN FSM ~p(~p) in ~p received unexpected ~p:~n**  ~p~n",
+    io_lib:format(Format, [Id, Pid, State, Type, Msg]);
+report_to_format(Report = #{label := {?MODULE, terminating}}, _) ->
+    #{name := Name,
+      state := State,
+      data := Data,
+      message := Msg,
+      reason := Reason} = Report,
+    {Format, Args} =
+        case Msg of
+            [] ->
+                {"** JHN FSM ~p in ~p terminating ~n"
+                 "** When FSM state == ~p~n"
+                 "** Reason for termination == ~n** ~p~n",
+                 [Name, State, Data, Reason]};
+            _ ->
+                {"** JHN FSM ~p in ~p terminating ~n"
+                 "** Last message in was ~p~n"
+                 "** When FSM state == ~p~n"
+                 "** Reason for termination == ~n** ~p~n",
+                 [Name, State, Msg, Data, Reason]}
+        end,
+    io_lib:format(Format, Args).
+
+%%====================================================================
 %% Internal functions
 %%====================================================================
 
@@ -441,7 +482,9 @@ unexpected(Type, Msg, State) ->
                state => State#state.state_name,
                type => Type,
                message => Msg},
-    Meta = #{tag => error, report_cb => fun report_to_format/1},
+    Meta = #{domain => [jhn],
+             tag => error,
+             report_cb => fun ?MODULE:report_to_format/2},
     logger:log(error, Report, Meta).
 
 terminating(Reason, Msg, State = #state{name = Name}) ->
@@ -455,33 +498,10 @@ terminating(Reason, Msg, State = #state{name = Name}) ->
                data => State#state.data,
                message => Msg,
                reason => Reason},
-    Meta = #{tag => error, report_cb => fun report_to_format/1},
+    Meta = #{domain => [jhn],
+             tag => error,
+             report_cb => fun ?MODULE:report_to_format/2},
     logger:log(error, Report, Meta).
-
-report_to_format(Report = #{label := {?MODULE, unexpected}}) ->
-    #{id := Id, pid := Pid, state := State, type := Type, message := Msg} =
-        Report,
-    Format = "**  JHN FSM ~p(~p) in ~p received unexpected ~p:~n**  ~p~n",
-    {Format, [Id, Pid, State, Type, Msg]};
-report_to_format(Report = #{label := {?MODULE, terminating}}) ->
-    #{name := Name,
-      state := State,
-      data := Data,
-      message := Msg,
-      reason := Reason} = Report,
-    case Msg of
-        [] ->
-            {"** JHN FSM ~p in ~p terminating ~n"
-             "** When FSM state == ~p~n"
-             "** Reason for termination == ~n** ~p~n",
-             [Name, State, Data, Reason]};
-        _ ->
-            {"** JHN FSM ~p in ~p terminating ~n"
-             "** Last message in was ~p~n"
-             "** When FSM state == ~p~n"
-             "** Reason for termination == ~n** ~p~n",
-             [Name, State, Msg, Data, Reason]}
-    end.
 
 %%--------------------------------------------------------------------
 insert(Elt, State  = #state{handling_deferred = true}) ->

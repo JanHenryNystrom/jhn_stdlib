@@ -41,7 +41,7 @@
 -export([init/1,
          request/2,
          message/2,
-         terminate/2,
+         terminate/3,
          code_change/3,
          format_status/2
         ]).
@@ -173,11 +173,11 @@ message(hibernate, State) ->
     inform(hibernate, State),
     {hibernate, State}.
 
-terminate(exit, _) ->
+terminate(exit, _, _) ->
     exit({terminated, exit});
-terminate(throw, _) ->
+terminate(throw, _, _) ->
     throw({terminated, throw});
-terminate(Reason, State) ->
+terminate(Reason, _, State) ->
     inform({terminate, Reason}, State),
     ok.
 

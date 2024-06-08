@@ -42,6 +42,8 @@
 %% proc_lib callbacks
 -export([init/4, loop/1]).
 
+%% logger callback
+-export([report_to_format/2]).
 
 %% Defines
 -define(DEFAULT_TIMEOUT, 5000).
@@ -139,16 +141,16 @@ create(Mod, Options) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: cast(Server, Message) -> ok.
+%% Function: cast(Server, Message, ) -> ok.
 %% @doc
 %%   A cast is made to the server, allways returns ok.
 %% @end
 %%--------------------------------------------------------------------
 -spec cast(server_ref(), _) -> ok.
 %%--------------------------------------------------------------------
-cast(Server, Msg, Timeout) ->
+cast(Server, Msg) ->
     case is_server_ref(Server) of
-        false -> erlang:error(badarg, [Server, Timeout]);
+        false -> erlang:error(badarg, [Server, Msg]);
         {true, Server1} -> do_cast(Server1, Msg)
     end.
 
@@ -496,6 +498,39 @@ return(Other, _, Msg, State) ->
     terminate({bad_return_value, Other}, Msg, State).
 
 %%====================================================================
+%% proc_lib callbacks
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% Function: report_to_format(Report, FormatOpts) -> Format.
+%% @private
+%%--------------------------------------------------------------------
+-spec report_to_format(logger:report(), logger:report_cb_config()) ->
+          unicode:chardata().
+%%--------------------------------------------------------------------
+report_to_format(Report = #{label := {?MODULE, unexpected}}, _) ->
+    #{id := Id, pid := Pid, type := Type, message := Msg} = Report,
+    Format = "**  JHN server ~p(~p) received unexpected ~p:~n**  ~p~n",
+    io_lib:format(Format, [Id, Pid, Type, Msg]);
+report_to_format(Report = #{label := {?MODULE, terminating}}, _) ->
+    #{name := Name, data := Data, message := Msg, reason := Reason} = Report,
+    {Format, Args} =
+        case Msg of
+            [] ->
+                {"** JHN server ~p terminating ~n"
+                 "** When Server state == ~p~n"
+                 "** Reason for termination == ~n** ~p~n",
+                 [Name, Data, Reason]};
+            _ ->
+                {"** JHN server ~p terminating ~n"
+                 "** Last message in was ~p~n"
+                 "** When Server state == ~p~n"
+                 "** Reason for termination == ~n** ~p~n",
+                 [Name, Msg, Data, Reason]}
+        end,
+    io_lib:format(Format, Args).
+
+%%====================================================================
 %% Internal functions
 %%====================================================================
 
@@ -553,7 +588,7 @@ is_server_ref(Server) when is_atom(Server) -> {true, Server};
 is_server_ref(Server = {Name, Node}) when is_atom(Name) ->
     case node() of
         Name -> {true, Name};
-        _ when is_atom(Node) -> {trune, Server};
+        _ when is_atom(Node) -> {true, Server};
         _ -> false
     end;
 is_server_ref(_) ->
@@ -614,6 +649,8 @@ next_loop(State) ->
     loop(State).
 
 %%--------------------------------------------------------------------
+%% Logging
+%%--------------------------------------------------------------------
 unexpected(Type, Msg, State) ->
     Id = case State#state.name of
              undefined -> State#state.mod;
@@ -628,7 +665,9 @@ unexpected(Type, Msg, State) ->
                id => Id,
                type => Type,
                message => Msg1},
-    Meta = #{tag => error, report_cb => fun report_to_format/1},
+    Meta = #{domain => [jhn],
+             tag => error,
+             report_cb => fun ?MODULE:report_to_format/2},
     logger:log(error, Report, Meta).
 
 terminating(Reason, Msg, #state{data = Data, name = Name}) ->
@@ -645,25 +684,8 @@ terminating(Reason, Msg, #state{data = Data, name = Name}) ->
                data => Data,
                message => Msg1,
                reason => Reason},
-    Meta = #{tag => error, report_cb => fun report_to_format/1},
+    Meta = #{domain => [jhn],
+             tag => error,
+             report_cb => fun ?MODULE:report_to_format/2},
     logger:log(error, Report, Meta).
 
-report_to_format(Report = #{label := {?MODULE, unexpected}}) ->
-    #{id := Id, pid := Pid, type := Type, message := Msg} = Report,
-    Format = "**  JHN server ~p(~p) received unexpected ~p:~n**  ~p~n",
-    {Format, [Id, Pid, Type, Msg]};
-report_to_format(Report = #{label := {?MODULE, terminating}}) ->
-    #{name := Name, data := Data, message := Msg, reason := Reason} = Report,
-    case Msg of
-        [] ->
-            {"** JHN server ~p terminating ~n"
-             "** When Server state == ~p~n"
-             "** Reason for termination == ~n** ~p~n",
-             [Name, Data, Reason]};
-        _ ->
-            {"** JHN server ~p terminating ~n"
-             "** Last message in was ~p~n"
-             "** When Server state == ~p~n"
-             "** Reason for termination == ~n** ~p~n",
-             [Name, Msg, Data, Reason]}
-    end.

@@ -43,10 +43,18 @@
 
 log(#{meta := #{error_logger := #{type := crash_report}}}, _) ->
     inform(crash_report),
-    ?debugFmt("~nCrash:~n", []),
+    ok;
+log(#{msg := {report, #{label := {jhn_fsm, unexpected}}}}, _) ->
+    inform(unexpected_report),
+    ok;
+log(#{msg := {report, #{label := {jhn_fsm, terminating}}}}, _) ->
+    inform(terminating_report),
+    ok;
+log(#{msg := {report, #{label := {jhn_server, terminating}}}}, _) ->
+    inform(server_terminating_report),
     ok;
 log(Event, _) ->
-    inform(crash_report),
+    inform(report),
     ?debugFmt("~nLog: ~p~n", [Event]).
 
 %% ===================================================================
@@ -339,6 +347,8 @@ run_startstop(stoperror) ->
     ?assertEqual(ok, a_jhn_fsm:event(Pid, {stop, anError})),
     ?assertEqual({terminate, anError}, wait()),
     ?assertEqual(false, is_alive(Pid, 10)),
+    terminating_report = wait(),
+    server_terminating_report = wait(),
     crash_report = wait(),
     Result1 = a_jhn_fsm:start(testFsm, simple, tester, node(), []),
     ?assertMatch({ok, _}, Result1),
@@ -347,6 +357,9 @@ run_startstop(stoperror) ->
     Pid1 = whereis(testFsm),
     Pid1 ! {stop, anError},
     ?assertEqual({terminate, anError}, wait()),
+    terminating_report = wait(),
+    server_terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual(false, is_alive(Pid, 10));
 run_startstop(systerminate) ->
     Result = a_jhn_fsm:start(testFsm, shutdown, tester, node(), []),
@@ -414,6 +427,9 @@ run_error(badreturncall) ->
     ?assertExit({bad_return_value, {bad, call}},
                  a_jhn_fsm:call(testFsm, badreturn)),
     ?assertEqual({terminate, {bad_return_value, {bad, call}}}, wait()),
+    terminating_report = wait(),
+    server_terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual({'EXIT', Pid, {bad_return_value, {bad, call}}}, wait()),
     process_flag(trap_exit, Flag);
 run_error(badreturninfo) ->
@@ -427,6 +443,9 @@ run_error(badreturninfo) ->
     Flag = process_flag(trap_exit, true),
     Pid ! badreturn,
     ?assertEqual({terminate, {bad_return_value, {bad, call}}}, wait()),
+    terminating_report = wait(),
+    server_terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual({'EXIT', Pid, {bad_return_value, {bad, call}}}, wait()),
     process_flag(trap_exit, Flag);
 run_error(nodedown) ->
@@ -443,6 +462,9 @@ run_error(terminateexit) ->
     ?assertEqual(true, lists:member(Pid, Links)),
     Flag = process_flag(trap_exit, true),
     a_jhn_fsm:event(Pid, {terminate, exit}),
+    terminating_report = wait(),
+    server_terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual({'EXIT', Pid, {terminated, exit}}, wait()),
     process_flag(trap_exit, Flag);
 run_error(terminatethrow) ->

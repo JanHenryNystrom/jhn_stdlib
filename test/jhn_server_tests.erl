@@ -30,7 +30,29 @@
 
 %% Defines
 -record(state, {parent, name, mod, data, hibernated,
-                handle_msg, terminate, code_change, format_status}).
+                message, terminate, code_change, format_status}).
+
+%% logger callbacks
+-export([log/2]).
+
+%% ===================================================================
+%% logger callbacks
+%% ===================================================================
+
+
+log(#{meta := #{error_logger := #{type := crash_report}}}, _) ->
+    inform(crash_report),
+    ok;
+log(#{msg := {report, #{label := {jhn_server, unexpected}}}}, _) ->
+    inform(unexpected_report),
+    ok;
+log(#{msg := {report, #{label := {jhn_server, terminating}}}}, _) ->
+    inform(terminating_report),
+    ok;
+log(Event, _) ->
+    inform(report),
+    ?debugFmt("~nLog: ~p~n", [Event]).
+
 
 %% ===================================================================
 %% Tests.
@@ -58,7 +80,16 @@ simple_test_() ->
     }.
 
 setup_simple() ->
-    ok.
+    logger:remove_handler(default),
+    Config = #{id => ?MODULE,
+               config => none,
+               level => all,
+               module => ?MODULE,
+               filter_default => log,
+               filters => [],
+               formatter => {?MODULE, #{}}
+              },
+    logger:add_handler(default, ?MODULE, Config).
 
 cleanup_simple(_) ->
     ok.
@@ -243,6 +274,7 @@ run_createstop(stop) ->
     Result = a_jhn_server:start_link(testServer, stop, tester, node()),
     ?assertMatch({error, stopped}, Result),
     {stop, Pid} = wait(),
+    crash_report = wait(),
     ?assertEqual(false, lists:member(testServer, registered())),
     {links, Links} = process_info(self(), links),
     ?assertEqual(false, lists:member(Pid, Links));
@@ -254,11 +286,13 @@ run_createstop(badopt) ->
 run_createstop(badreturninit) ->
     Result = a_jhn_server:start_link(testServer, badreturn, tester, node()),
     ?assertEqual({error, {bad_return_value, {uk, state}}}, Result),
-    ?assertEqual(false, lists:member(testServer, registered()));
+    ?assertEqual(false, lists:member(testServer, registered())),
+    crash_report = wait();
 run_createstop(exitinit) ->
     Result = a_jhn_server:start_link(testServer, exitinit, tester, node()),
     ?assertMatch({error, {exit, exitinit, _}}, Result),
-    ?assertEqual(false, lists:member(testServer, registered()));
+    ?assertEqual(false, lists:member(testServer, registered())),
+    crash_report = wait();
 run_createstop(dieinit) ->
     Result = a_jhn_server:start(testServer, dieinit, tester, node(), []),
     ?assertMatch({error, fail}, Result),
@@ -344,6 +378,8 @@ run_createstop(stoperror) ->
     ?assertEqual({terminate, anError}, wait()),
     timer:sleep(10),
     ?assertEqual(false, is_process_alive(Pid)),
+    terminating_report = wait(),
+    crash_report = wait(),
     Result1 = a_jhn_server:start(testServer, simple, tester, node(), []),
     ?assertMatch({ok, _}, Result1),
     ?assertEqual(init, wait()),
@@ -351,7 +387,9 @@ run_createstop(stoperror) ->
     Pid1 = whereis(testServer),
     Pid1 ! {stop, anError},
     ?assertEqual({terminate, anError}, wait()),
-    ?assertEqual(false, is_process_alive(Pid));
+    ?assertEqual(false, is_process_alive(Pid)),
+    terminating_report = wait(),
+    crash_report = wait();
 run_createstop(systerminate) ->
     Result = a_jhn_server:start(testServer, shutdown, tester, node(), []),
     ?assertMatch({ok, _}, Result),
@@ -418,6 +456,8 @@ run_error(badreturncall) ->
     ?assertExit({bad_return_value, {bad, call}},
                  a_jhn_server:call(testServer, badreturn)),
     ?assertEqual({terminate, {bad_return_value, {bad, call}}}, wait()),
+    terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual({'EXIT', Pid, {bad_return_value, {bad, call}}}, wait()),
     process_flag(trap_exit, Flag);
 run_error(badreturninfo) ->
@@ -431,6 +471,8 @@ run_error(badreturninfo) ->
     Flag = process_flag(trap_exit, true),
     Pid ! badreturn,
     ?assertEqual({terminate, {bad_return_value, {bad, call}}}, wait()),
+    terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual({'EXIT', Pid, {bad_return_value, {bad, call}}}, wait()),
     process_flag(trap_exit, Flag);
 run_error(nodedown) ->
@@ -447,6 +489,8 @@ run_error(terminateexit) ->
     ?assertEqual(true, lists:member(Pid, Links)),
     Flag = process_flag(trap_exit, true),
     a_jhn_server:cast(Pid, {terminate, exit}),
+    terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual({'EXIT', Pid, {terminated, exit}}, wait()),
     process_flag(trap_exit, Flag);
 run_error(terminatethrow) ->
@@ -459,6 +503,8 @@ run_error(terminatethrow) ->
     ?assertEqual(true, lists:member(Pid, Links)),
     Flag = process_flag(trap_exit, true),
     a_jhn_server:cast(Pid, {terminate, throw}),
+    terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual({'EXIT', Pid, {terminated, throw}}, wait()),
     process_flag(trap_exit, Flag);
 run_error(codechange) ->
@@ -484,6 +530,7 @@ run_error(unexpectedcall) ->
     {links, Links} = process_info(self(), links),
     ?assertEqual(true, lists:member(Pid, Links)),
     ?assertExit(timeout, a_jhn_server:call(testServer, unexpectedcall, 100)),
+    unexpected_report = wait(),
     ?assertEqual(ok, a_jhn_server:cast(testServer, {stop, normal})),
     ?assertEqual({terminate, normal}, wait());
 run_error(unexpectedcast) ->
@@ -495,9 +542,11 @@ run_error(unexpectedcast) ->
     {links, Links} = process_info(self(), links),
     ?assertEqual(true, lists:member(Pid, Links)),
     ?assertEqual(ok, a_jhn_server:cast(testServer, unexpectedcast)),
+    unexpected_report = wait(),
     ?assertEqual(ok, a_jhn_server:cast(testServer, {hibernate, self()})),
     ?assertEqual(hibernate, wait()),
     ?assertEqual(ok, a_jhn_server:cast(testServer, unexpectedcast)),
+    unexpected_report = wait(),
     ?assertEqual(ok, a_jhn_server:cast(testServer, {stop, normal})),
     ?assertEqual({terminate, normal}, wait());
 run_error(unexpectedmessage) ->
@@ -509,9 +558,11 @@ run_error(unexpectedmessage) ->
     {links, Links} = process_info(self(), links),
     ?assertEqual(true, lists:member(Pid, Links)),
     testServer ! unexpectedMessage,
+    unexpected_report = wait(),
     ?assertEqual(ok, a_jhn_server:cast(testServer, {hibernate, self()})),
     ?assertEqual(hibernate, wait()),
     testServer ! unexpectedMessage,
+    unexpected_report = wait(),
     ?assertEqual(ok, a_jhn_server:cast(testServer, {stop, normal})),
     ?assertEqual({terminate, normal}, wait());
 run_error(callnoserver) ->
@@ -553,7 +604,7 @@ run_coverage(format_status) ->
     TheState =
         #state{parent = the_parent, name = the_name, mod = a_jhn_server,
                data = State, hibernated = false,
-               handle_msg = true,
+               message = true,
                terminate = true,
                code_change = true,
                format_status = true},
@@ -561,7 +612,7 @@ run_coverage(format_status) ->
     TheState1 =
         #state{parent = the_parent, name = self(), mod = will_not_exist,
                data = State, hibernated = false,
-               handle_msg = true,
+               message = true,
                terminate = true,
                code_change = true,
                format_status = true},
@@ -569,7 +620,7 @@ run_coverage(format_status) ->
     TheState2 =
         #state{parent = the_parent, name = self(), mod = a_jhn_server,
                data = State, hibernated = false,
-               handle_msg = true,
+               message = true,
                terminate = true,
                code_change = true,
                format_status = true},
@@ -590,3 +641,5 @@ wait(Time) -> receive Y -> Y after Time -> timeout end.
 host() ->
     [Host | _] = string:tokens(net_adm:localhost(), "."),
     Host.
+
+inform(X) -> tester ! X.
