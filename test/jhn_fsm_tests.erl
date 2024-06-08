@@ -477,6 +477,9 @@ run_error(terminatethrow) ->
     ?assertEqual(true, lists:member(Pid, Links)),
     Flag = process_flag(trap_exit, true),
     a_jhn_fsm:event(Pid, {terminate, throw}),
+    terminating_report = wait(),
+    server_terminating_report = wait(),
+    crash_report = wait(),
     ?assertEqual({'EXIT', Pid, {terminated, throw}}, wait()),
     process_flag(trap_exit, Flag);
 run_error(codechange) ->
@@ -503,6 +506,7 @@ run_error(unexpectedcall) ->
     ?assertEqual(true, lists:member(Pid, Links)),
     ?assertExit(timeout, a_jhn_fsm:call(testFsm, unexpectedcall, 100)),
     ?assertEqual(ok, a_jhn_fsm:event(testFsm, {stop, normal})),
+    unexpected_report = wait(),
     ?assertEqual({terminate, normal}, wait());
 run_error(unexpectedevent) ->
     Result = a_jhn_fsm:start_link(testFsm, simple, tester, node()),
@@ -514,9 +518,11 @@ run_error(unexpectedevent) ->
     ?assertEqual(true, lists:member(Pid, Links)),
     ?assertEqual(ok, a_jhn_fsm:event(testFsm, unexpectedevent)),
     ?assertEqual(ok, a_jhn_fsm:event(testFsm, {hibernate, self()})),
+    unexpected_report = wait(),
     ?assertEqual(hibernate, wait()),
     ?assertEqual(ok, a_jhn_fsm:event(testFsm, unexpectedevent)),
     ?assertEqual(ok, a_jhn_fsm:event(testFsm, {stop, normal})),
+    unexpected_report = wait(),
     ?assertEqual({terminate, normal}, wait());
 run_error(unexpectedmessage) ->
     Result = a_jhn_fsm:start_link(testFsm, simple, tester, node()),
@@ -528,9 +534,11 @@ run_error(unexpectedmessage) ->
     ?assertEqual(true, lists:member(Pid, Links)),
     testFsm ! unexpectedMessage,
     ?assertEqual(ok, a_jhn_fsm:event(testFsm, {hibernate, self()})),
+    unexpected_report = wait(),
     ?assertEqual(hibernate, wait()),
     testFsm ! unexpectedMessage,
     ?assertEqual(ok, a_jhn_fsm:event(testFsm, {stop, normal})),
+    unexpected_report = wait(),
     ?assertEqual({terminate, normal}, wait());
 run_error(callnofsm) ->
     ?assertExit(noproc, jhn_fsm:call(does_not_exist, hello));
