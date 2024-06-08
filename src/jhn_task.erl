@@ -29,7 +29,10 @@
 -export([create/1, create/2]).
 
 %% proc_lib callbacks
--export([init/4]).
+-export([init/3]).
+
+%% logger callback
+-export([report_to_format/2]).
 
 %% Defines
 -define(DEFAULT_TIMEOUT, 5000).
@@ -43,9 +46,7 @@
 
 -record(state, {parent             :: pid(),
                 mod                :: atom(),
-                data   = undefined :: _,
-                %% Optional callbacks
-                init               :: boolean()
+                data   = undefined :: _
                }).
 
 %% Types
@@ -101,8 +102,8 @@ create(Mod, Options) ->
         #opts{errors = Errors = [_ | _]} -> {error, Errors};
         Opts = #opts{link = true, arg = A, timeout = T} ->
             proc_lib:start_link(?MODULE, init, [Mod, A, Opts, self()], T);
-        Opts = #opts{arg = A, timeout = T} ->
-            proc_lib:start(?MODULE, init, [Mod, A, Opts, self()], T)
+        _ = #opts{arg = A, timeout = T} ->
+            proc_lib:start(?MODULE, init, [Mod, A, self()], T)
     end.
 
 %%====================================================================
@@ -113,9 +114,9 @@ create(Mod, Options) ->
 %% Function: init(Module, Arguments, Opts, Parent) ->
 %% @private
 %%--------------------------------------------------------------------
--spec init(atom(), _, #opts{}, pid()) -> _.
+-spec init(atom(), _, pid()) -> _.
 %%--------------------------------------------------------------------
-init(Mod, Arg, Opts, Parent) ->
+init(Mod, Arg, Parent) ->
     State = #state{parent = Parent, mod = Mod},
     case erlang:function_exported(Mod, init, 1) of
         true ->
@@ -124,30 +125,51 @@ init(Mod, Arg, Opts, Parent) ->
                     proc_lib:init_ack(Parent, {ok, self()}),
                     do(State#state{data = Data});
                 ignore ->
-                    fail(Parent, State, ignore, normal);
+                    fail(Parent, ignore, normal);
                 {error, _}  = Reason ->
-                    fail(Parent, State, Reason, normal);
+                    fail(Parent, Reason, normal);
                 {stop, Reason} ->
-                    fail(Parent, State, {error, Reason}, Reason);
+                    fail(Parent, {error, Reason}, Reason);
                 Other ->
                     Bad = {bad_return_value, Other},
-                    fail(Parent, State, {error, Bad}, Bad)
+                    fail(Parent, {error, Bad}, Bad)
             catch
                 Class:Reason:Stack ->
                     Error = {Class, Reason, Stack},
-                    fail(Parent, State, {error, Error}, Error)
+                    fail(Parent, {error, Error}, Error)
             end;
         false ->
+            proc_lib:init_ack(Parent, {ok, self()}),
             do(State)
     end.
+
+%%====================================================================
+%% logger callbacks
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% Function: report_to_format(Report, FormatOpts) -> Format.
+%% @private
+%%--------------------------------------------------------------------
+-spec report_to_format(logger:report(), logger:report_cb_config()) ->
+          unicode:chardata().
+%%--------------------------------------------------------------------
+report_to_format(Report = #{label := {?MODULE, terminating}}, _) ->
+    #{pid := Pid, data := Data, reason := Reason} = Report,
+    Format =
+        "** JHN task ~p terminating ~n"
+        "** When Task state == ~p~n"
+        "** Reason for termination == ~n** ~p~n",
+    Args = [Pid, Data, Reason],
+    io_lib:format(Format, Args).
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
 
-do(State = #state{data = Data}) ->
+do(State = #state{mod = Mod, data = Data}) ->
     try Mod:do(Data) of
-        {ok, Data} -> terminate(normal, State);
+        {ok, _} -> terminate(normal, State);
         {error, _}  = Reason -> terminate(Reason, State);
         Other -> terminate({error, {bad_return_value, Other}}, State)
     catch
@@ -168,27 +190,20 @@ opts([H | T], Opts = #opts{errors = Errors}) ->
     opts(T, Opts#opts{errors = [H | Errors]}).
 
 %%--------------------------------------------------------------------
-fail(Parent, State, Reason, Exit) ->
+fail(Parent, Reason, Exit) ->
     proc_lib:init_fail(Parent, Reason, {exit, Exit}).
 
 %%--------------------------------------------------------------------
 terminate(normal, _) -> exit(normal);
 terminate(shutdown, _) -> exit(shutdown);
 terminate(Shutdown = {shutdown, _}, _) -> exit(Shutdown);
-terminate(Reason, state{data = Data}) ->
+terminate(Reason, #state{data = Data}) ->
     Report = #{label => {?MODULE, terminating},
                pid => self(),
                data => Data,
                reason => Reason},
-    Meta = #{tag => error, report_cb => fun report_to_format/1},
+    Meta = #{domain => [jhn],
+             tag => error,
+             report_cb => fun ?MODULE:report_to_format/2},
     logger:log(error, Report, Meta),
     exit(Reason).
-
-%%--------------------------------------------------------------------
-report_to_format(Report = #{label := {?MODULE, terminating}}) ->
-    #{pid := Pid, data := Data, message := Msg, reason := Reason} = Report,
-    {"** JHN task ~p terminating ~n"
-     "** When Task state == ~p~n"
-     "** Reason for termination == ~n** ~p~n",
-     [Pid, Data, Reason]};
-    end.
