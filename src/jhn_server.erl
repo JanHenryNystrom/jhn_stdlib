@@ -491,9 +491,6 @@ return({stop, Reason}, _, Msg, State) ->
 return({function_clause, [{M, F, _, _} | _]}, F, Ms, State = #state{mod = M}) ->
     unexpected(F, Ms, State),
     next_loop(State);
-%% return({function_clause, _}, F, Msg, State) ->
-%%     unexpected(F, State,Msg),
-%%     next_loop(State);
 return(Other, _, Msg, State) ->
     terminate({bad_return_value, Other}, Msg, State).
 
