@@ -101,7 +101,7 @@ create(Mod, Options) ->
     case opts(Options, #opts{}) of
         #opts{errors = Errors = [_ | _]} -> {error, Errors};
         Opts = #opts{link = true, arg = A, timeout = T} ->
-            proc_lib:start_link(?MODULE, init, [Mod, A, Opts, self()], T);
+            proc_lib:start_link(?MODULE, init, [Mod, A, self()], T);
         _ = #opts{arg = A, timeout = T} ->
             proc_lib:start(?MODULE, init, [Mod, A, self()], T)
     end.
@@ -136,7 +136,7 @@ init(Mod, Arg, Parent) ->
             catch
                 Class:Reason:Stack ->
                     Error = {Class, Reason, Stack},
-                    fail(Parent, {error, Error}, Error)
+                    fail(Parent, Error, Error)
             end;
         false ->
             proc_lib:init_ack(Parent, {ok, self()}),
@@ -169,11 +169,11 @@ report_to_format(Report = #{label := {?MODULE, terminating}}, _) ->
 
 do(State = #state{mod = Mod, data = Data}) ->
     try Mod:do(Data) of
-        {ok, _} -> terminate(normal, State);
+        {ok, Data1} -> terminate(normal, State#state{data = Data});
         {error, _}  = Reason -> terminate(Reason, State);
         Other -> terminate({error, {bad_return_value, Other}}, State)
     catch
-        Class:Reason:Stack -> terminate({error, {Class, Reason, Stack}}, State)
+        Class:Reason -> terminate({Class, Reason}, State)
     end.
 
 %%--------------------------------------------------------------------
