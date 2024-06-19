@@ -47,7 +47,7 @@
 
 %% sNaPpY
 -export([snappy_compress/1, snappy_compress/2,
-         %% lz77_init/0, lz77_cont/2, lz77_end/1, lz77_end/2,
+         snappy_pad_compressed/2,
          snappy_uncompress/1, snappy_uncompress/2
         ]).
 
@@ -78,6 +78,16 @@
         ]).
 
 %% Defines.
+
+%% snappy
+-define(SNAPPY_STREAM, 16#FF).
+-define(SNAPPY_COMPRESSED, 16#00).
+-define(SNAPPY_UNCOMPRESSED, 16#01).
+-define(SNAPPY_PAD, 16#FE).
+-define(SNAPPY_IDENTIFIER, <<?SNAPPY_STREAM, 6:24/integer-little, "sNaPpY">>).
+
+-define(SNAPPY_MAX_FRAME, 65536).
+-define(SNAPPY_CONST, 16#A282EAD8).
 
 %% LZ77
 -define(BYTE, 8/integer).
@@ -203,7 +213,7 @@
 
 %% sNaPpY
 -type snappy_block() :: binary().
--type snappy_frame() :: binary().
+-type snappy_frames() :: iolist() | binary().
 
 -type snappy_type() :: block | frame.
 
@@ -238,7 +248,7 @@
 
 -type return_type() :: raw | iolist | binary.
 
-%% ===================================================================
+%% =========p==========================================================
 %% Library functions.
 %% ===================================================================
 
@@ -259,17 +269,26 @@ snappy_compress(Data) -> snappy_compress(Data, []).
 %% @end
 %%--------------------------------------------------------------------
 -spec snappy_compress(data(), [opt()]) ->
-          iolist() | snappy_block() | snappy_frame().
+          iolist() | snappy_block() | snappy_frames().
 %%--------------------------------------------------------------------
 snappy_compress(Data, Opts) ->
-    #snappy{type = block, return = Return} = parse_opts(Opts, #snappy{}),
-    LZ77Opts = [{return_type, raw} | delete_opt(return_type, Opts)],
-    #lz77c{matches = Matches} = lz77d_compress(Data, LZ77Opts),
-    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
-    Block = gather(Matches1, [Literal, varint(byte_size(Data))]),
-    case Return of
-        iolist -> Block;
-        binary -> iolist_to_binary(Block)
+    case parse_opts(Opts, #snappy{}) of
+        #snappy{type = block, return = Return} ->
+            LZ77Opts = [{return_type, raw} | delete_opt(return_type, Opts)],
+            #lz77c{matches = Matches} = lz77d_compress(Data, LZ77Opts),
+            {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
+            Block = gather(Matches1, [Literal, varint(byte_size(Data))]),
+            case Return of
+                iolist -> Block;
+                binary -> iolist_to_binary(Block)
+            end;
+        #snappy{type = frame, return = Return} ->
+            LZ77Opts = [{return_type, raw} | delete_opt(return_type, Opts)],
+            Frames = compress_frame(Data, LZ77Opts, [?SNAPPY_IDENTIFIER]),
+            case Return of
+                iolist -> Frames;
+                binary -> iolist_to_binary(Frames)
+            end;
     end.
 
 %%--------------------------------------------------------------------
@@ -278,7 +297,55 @@ snappy_compress(Data, Opts) ->
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec snappy_uncompress(snappy_block() | snappy_frame()) -> binary().
+-spec snappy_pad(snappy_frames(), integer(), [opt()]) -> snappy_frames().
+%%--------------------------------------------------------------------
+snappy_pad(Frames, Size, Opts) when Size > 4 ->
+    PSize = Size - 4,
+    Frame = <<?SNAPPY_PAD, PSize:24/integer-little, 0:(PSize * 8)/integer>>,
+    case parse_opts(Opts, #snappy{}) of
+        #snappy{type = block, return = iolist} -> [Frames, Frame];
+        #snappy{type = block, return = binary} ->
+            iolist_to_binary([Frames, Frame])
+    end.
+
+compress_frame(Data, Opts, Acc) when byte_size(Data) =< ?SNAPPY_MAX_FRAME ->
+    #lz77c{matches = Matches} = lz77d_compress(Data, Opts),
+    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
+    Compressed = gather(Matches1, [Literal]),
+    Max = trunc(byte_size(Data) * 0.98),
+    Frame = select_frame(iolist_size(Compressed), Max, Compressed, Data),
+    lists:reverse([Frame | Acc]);
+compress_frame(<<H:?SNAPPY_MAX_FRAME, T:/binary>>, Opts, Acc) ->
+    #lz77c{matches = Matches} = lz77d_compress(Data, Opts),
+    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
+    Compressed = gather(Matches1, [Literal]),
+    Size = iolist_size(Compressed),
+    Frame = select_frame(Size, ?SNAPPY_MAX_COMPRESSED, Compressed, Data),
+    compress_frame(T, Opts, [Frame | Acc]).
+
+select_frame(Size, Max, Compressed, Data) when Size < Max ->
+    [<<?SNAPPY_COMPRESSED,
+       (byte_size(Compressed) + 4):24/integer-little,
+       (snappy_checksum(Data)):32/integer-little>>,
+     Compressed];
+select_frame(_, Compressed, Data) ->
+    [<<?SNAPPY_UNCOMPRESSED,
+       (byte_size(Data) + 4):24/integer-little,
+       (snappy_checksum(Data)):32/integer-little>>,
+     Data];
+
+snappy_checksum(Data) ->
+    CRC = jhn_hash:crc32c(Data),
+    Checksum = (jhn_math:rotr(CRC, 15) + ?SNAPPY_CONST) rem 16#100000000,
+    <<Checksum:32/integer-little>>.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec snappy_uncompress(snappy_block() | snappy_frames()) -> binary().
 %%--------------------------------------------------------------------
 snappy_uncompress(Frame) -> snappy_uncompress(Frame, []).
 
@@ -288,10 +355,51 @@ snappy_uncompress(Frame) -> snappy_uncompress(Frame, []).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec snappy_uncompress(snappy_block() | snappy_frame(), [opt()]) -> binary().
+-spec snappy_uncompress(snappy_block() | snappy_frames(), [opt()]) ->
+          iolist() | binary().
 %%--------------------------------------------------------------------
-snappy_uncompress(Block, _Opts) ->
+snappy_uncompress(<<?SNAPPY_IDENTIFIER, T/binary>>, Opts) ->
+    #snappy{return = Return} = parse_opts(Opts, #snappy{}),
+    Frames = snappy_uncompress_frames(T, []),
+    case Return of
+        iolist -> Frames;
+        binary -> iolist_to_binary(Frames)
+    end;
+snappy_uncompress(Block, _) ->
     snappy_uncompress_block(snappy_drop_varint(Block), <<>>).
+
+snappy_uncompress_frames(<<>>, Acc) -> lists:reverse(Acc);
+snappy_uncompress_frames(<<?SNAPPY_COMPRESSED,
+                           Size:24/integer-little,
+                           Checksum:32/integer-little,
+                           B:(Size - 4)/binary,
+                           T/binary>>,
+                         Acc) ->
+    Data = snappy_uncompress_block(B),
+    Checksum = snappy_checksum(Data),
+    snappy_uncompress_frames(T, [Data | Acc]);
+snappy_uncompress_frames(<<?SNAPPY_UNCOMPRESSED,
+                           Size:24/integer-little,
+                           Checksum:32/integer-little,
+                           U:(Size - 4)/binary,
+                           T/binary>>,
+                         Acc) ->
+    Checksum = snappy_checksum(U),
+    snappy_uncompress_frames(T, [U | Acc]);
+snappy_uncompress_frames(<<?SNAPPY_PAD,
+                           Size:24/integer-little,
+                           U:Size/binary,
+                           T/binary>>,
+                         Acc) ->
+    snappy_uncompress_frames(T, Acc);
+snappy_uncompress_frames(<<Type,
+                           Size:24/integer-little,
+                           _:Size/binary,
+                           T/binary>>,
+                         Acc) when Type >= 16#80, Type =< 16#FD ->
+    snappy_uncompress_frames(T, Acc);
+snappy_uncompress_frames(<<Type, T/binary>>, _) ->
+    erlang:error(badarg, [unskippabale_chunk, Type]).
 
 %%--------------------------------------------------------------------
 %% Function: 

@@ -29,9 +29,12 @@
 -compile({no_auto_import, [float_to_binary/1]}).
 
 %% Library functions.
--export([float_to_binary/1, rotl32/2]).
+-export([rotl32/2, rotr32/2, float_to_binary/1]).
 
 %% Defines.
+
+%% rotx32
+-define(MAX32, 16#FFFFFFFF)
 
 %% float_to_binary/1.
 -define(BIG_POW, (1 bsl 52)).
@@ -44,12 +47,22 @@
 %%--------------------------------------------------------------------
 %% Function: rotl32(Integer, Steps) -> RotatedInteger
 %% @doc
-%%   Performs a Steps many rotation on a 32 bit integer.
+%%   Performs a Steps many left rotation on a 32 bit integer.
 %% @end
 %%--------------------------------------------------------------------
 -spec rotl32(non_neg_integer(), non_neg_integer()) -> non_neg_integer().
 %%--------------------------------------------------------------------
-rotl32(I, Steps) when I >= 0, I =< 16#FFFFFFFF -> do_rotl32(I, Steps rem 32).
+rotl32(I, Steps) when I >= 0, I =< ?MAX32 -> do_rotl32(I, Steps rem 32).
+
+%%--------------------------------------------------------------------
+%% Function: rotr32(Integer, Steps) -> RotatedInteger
+%% @doc
+%%   Performs a Steps many right rotation on a 32 bit integer.
+%% @end
+%%--------------------------------------------------------------------
+-spec rotr32(non_neg_integer(), non_neg_integer()) -> non_neg_integer().
+%%--------------------------------------------------------------------
+rotr32(I, Steps) when I >= 0, I =< ?MAX32 -> do_rotl32(I, 32 - (Steps rem 32)).
 
 %%--------------------------------------------------------------------
 %% Function: float_to_binary(Float) -> String
