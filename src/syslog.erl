@@ -113,7 +113,7 @@
                opts        = []        :: [{atom(), _}],
                ipv         = ipv4      :: ipv4 | ipv6,
                dest                    :: inet:ip_address() | inet:hostname(),
-               dest_port               :: inet:port(),
+               dest_port               :: inet:port_number() | undefined,
                precision   = seconds   :: seconds | milli | micro,
                timeout                 :: integer() | undefined,
                version     = 'tlsv1.2' :: 'tlsv1.2' | 'tlsv1.3',
@@ -121,14 +121,15 @@
 
 -record(transport, {type                 :: type() | listen_type(),
                     role                 :: client | server,
-                    port                 :: inet:port(),
+                    port                 :: inet:port_number() | undefined,
                     ipv                  :: ipv4 | ipv6 | undefined,
                     dest                 :: inet:ip_address() | inet:hostname(),
-                    dest_port            :: inet:port(),
+                    dest_port            :: inet:port_number() | undefined,
                     socket               :: gen_udp:socket() |
                                             gen_tcp:socket() |
-                                            ssl:socket(),
-                    listen_socket        :: gen_tcp:socket() | ssl:socket(),
+                                            ssl:sslsocket() | undefined,
+                    listen_socket        :: gen_tcp:socket() | ssl:sslsocket() |
+                                            undefined,
                     buf           = <<>> :: binary()
                    }).
 
@@ -138,7 +139,8 @@
 -type line() :: map().
 -type type() :: udp | dtls | tcp | tls.
 -type listen_type() :: dtls_listen | tcp_listen | tls_listen.
--type socket_options() :: gen_udp:option() | gen_tcp:option() | ssl:option().
+-type socket_options() :: gen_udp:option() | gen_tcp:option() |
+                          ssl:socket_option()| ssl:tls_option().
 
 %% Defines
 -define(UTF8_BOM, 239,187,191).
