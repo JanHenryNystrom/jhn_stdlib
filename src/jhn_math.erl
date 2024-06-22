@@ -34,7 +34,7 @@
 %% Defines.
 
 %% rotx32
--define(MAX32, 16#FFFFFFFF)
+-define(MAX32, 16#FFFFFFFF).
 
 %% float_to_binary/1.
 -define(BIG_POW, (1 bsl 52)).
