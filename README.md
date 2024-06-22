@@ -4,6 +4,7 @@ jhn_stdlib [(γ)][5]
 A few thought experiments solidified as code.
 
   * [Introduction](#introduction)
+  * [Behaviours](#behaviours)
   * [Features/Modules](#features)
   * [Deprecated Features/Modules](#deprecated)
   * [Build](#build)
@@ -20,6 +21,13 @@ about Erlang and coding in general or concerning a pericular protocol or
 technique. So there is little of cohesion in purposes between the different
 library modules. But having published these I will continue to support these
 since the road to enlightenment is one without terminus.
+
+Behaviours
+--------
+
+  * jhn_server -- A generic server
+  * jhn_fsm -- A FSM with the ability to defer acting on events until
+    a later state
 
 <a name='features'>
 
@@ -130,7 +138,7 @@ feedback please [create an issue here on GitHub.] [2]
 Patches are greatly appreciated, but since these libraries reflect my
 learning process and I have rather peculiar notions of code hygiene
 I may do extensive rewrites that does not in any way diminish the
-appreciation I feel or indeed [express.] [3]
+appreciation I feel or indeed express
 
 For a much nicer history, please [write good commit messages][4].
 I know I really should.
@@ -139,8 +147,6 @@ I know I really should.
        "Rebar3 - A build tool for Erlang"
   [2]: http://github.com/JanHenryNystrom/jhn_stdlib/issues
        "jhn_stdlib issues"
-  [3]: http://github.com/JanHenryNystrom/jhn_stdlib/blob/master/THANKS
-       "thanks"
   [4]: http://github.com/erlang/otp/wiki/Writing-good-commit-messages
        "Erlang/OTP commit messages"
   [5]: http://en.wikipedia.org/wiki/Software_release_life_cycle
