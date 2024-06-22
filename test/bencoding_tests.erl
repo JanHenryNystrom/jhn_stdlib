@@ -58,7 +58,7 @@
 %%--------------------------------------------------------------------
 encode_1_test_() ->
     [{format(D),
-      ?_test(?assertMatch(_, bencoding:encode(D)))} ||
+      ?_test(?assertMatch([_ | _], bencoding:encode(D)))} ||
         D <- ?DECODED].
 
 encode_2_test_() ->
@@ -70,7 +70,7 @@ encode_2_test_() ->
 %% Decode
 %%--------------------------------------------------------------------
 decode_1_test_() ->
-    [{D, ?_test(?assertMatch(_, bencoding:decode(D)))} ||
+    [{D, ?_test(bencoding:decode(D))} ||
         D <- ?ENCODED].
 
 decode_2_test_() ->
