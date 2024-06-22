@@ -18,6 +18,7 @@
 %%% @doc
 %%%  A timestamp library based on:
 %%%    Date and Time on the Internet: Timestamps                       (rfc3339)
+%%%    Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content   (rfc7231)
 %%%
 %%%  The timestamp is represented as follows:
 %%%
@@ -55,9 +56,11 @@
 -export_type([posix/0, stamp/0]).
 
 %% Records
--record(opts, {precision = seconds :: seconds | milli | micro | nano,
-               continue = false :: boolean(),
-               return_type = iolist :: iolist | binary | list | posix}).
+-record(opts,
+        {precision = seconds  :: seconds | milli | micro | nano,
+         continue = false     :: boolean(),
+         rfc7231 = false      :: boolean(),
+         return_type = iolist :: iolist | binary | list | posix}).
 
 %% Types
 -type posix() :: integer().
@@ -65,7 +68,7 @@
 
 
 -type opt() :: seconds | milli | micro | nano |
-               iolist | binary | list | posix | continue.
+               rfc7231 | iolist | binary | list | posix | continue.
 
 %% Defines
 -define(SECONDS_PER_MINUTE, 60).
@@ -103,6 +106,8 @@ gen() -> gen([]).
 %%     binary -> a binary is returned
 %%     list -> a flat list is returned
 %%     iolist (default) -> an iolist is returned
+%%     rfc7231 -> the returned string is rfc7231 compatible, and precision is
+%%                seconds, e.g., 
 %%     posix -> a posix integer timestamp is returned
 %% @end
 %%--------------------------------------------------------------------
@@ -139,6 +144,7 @@ encode(Stamp) -> encode(Stamp, #opts{}).
 %%     binary -> a binary is returned
 %%     list -> a flat list is returned
 %%     iolist -> an iolist is returned
+%%     rfc7231 -> the returned string is rfc7231 compatible
 %%     posix -> a posix integer timestamp is returned
 %% @end
 %%--------------------------------------------------------------------
@@ -178,14 +184,16 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%     milli -> milli second precision
 %%     micro -> micro second precision
 %%     nano -> nano second precision
+%%     rfc7231 -> the binary is a rfc7231 compatible
 %%     continue -> all remaining indata is returned when decoding a binary
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary() | posix(), [opt()] | #opts{}) -> stamp() |
                                                        {stamp(), binary()}.
 %%--------------------------------------------------------------------
-decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
-decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
+decode(Binary, Opts = #opts{rfc7231 = true}) -> decode_rfc7231(Binary, Opts);
+decode(Binary, Opts = #opts{rfc7231 = false}) -> do_decode(Binary, Opts);
+decode(Binary, Opts) -> decode(Binary, parse_opts(Opts, #opts{})).
 
 %% ===================================================================
 %% Internal functions.
@@ -220,7 +228,7 @@ do_encode(Map, #opts{return_type = posix, precision = P}) ->
         micro -> Seconds * 1000000 + Fraction;
         nano -> Seconds * 1000000000 + Fraction
     end;
-do_encode(Map = #{}, #opts{precision = Precision}) ->
+do_encode(Map = #{}, #opts{precision = Precision, rfc7231 = RFC7231}) ->
     #{year := Year, month := Month, day := Day,
       hour := Hour, minute := Minute, second := Second} = Map,
     Fraction = case {Precision, maps:get(fraction, Map, 0)} of
@@ -233,13 +241,22 @@ do_encode(Map = #{}, #opts{precision = Precision}) ->
                  'Z' -> "Z";
                  #{sign := '+', hours := 0, minutes := 0} -> "Z";
                  #{sign := '+', hours := Hours, minutes := Minutes} ->
-                     [$+, pad(Hours, 2), $:, pad(Minutes, 2)];
+                     [$+, pad(Hours), $:, pad(Minutes)];
                  #{sign := '-', hours := Hours, minutes := Minutes} ->
-                     [$-, pad(Hours, 2), $:, pad(Minutes, 2)]
+                     [$-, pad(Hours), $:, pad(Minutes)]
              end,
-    [pad(Year, 4), $-, pad(Month, 2), $-, pad(Day, 2), $T,
-     pad(Hour, 2), $:, pad(Minute, 2), $:, pad(Second, 2),
-     Fraction, Offset];
+    case RFC7231 of
+        false ->
+            [pad(Year, 4), $-, pad(Month), $-, pad(Day), $T,
+             pad(Hour), $:, pad(Minute), $:, pad(Second),
+             Fraction, Offset];
+        true ->
+            Days = (encode(Map, [posix]) + ?EPOCH) div ?SECONDS_PER_DAY,
+            WD = (Days + 5) rem 7 + 1,
+            [weekday(WD), ", ", pad(Day), " ", month(Month), " ",
+             integer_to_binary(Year), " ",
+             pad(Hour), $:, pad(Minute), $:, pad(Second), " GMT"]
+    end;
 do_encode(Seconds, Opts = #opts{precision = seconds}) ->
     do_encode(decode_posix(Seconds, 0), Opts);
 do_encode(Milli, Opts = #opts{precision = milli}) ->
@@ -269,6 +286,39 @@ leap(_, 1) -> 0;
 leap(_, 2) -> 0;
 leap(Year, _) when Year rem 4 =:= 0, Year rem 100 > 0; Year rem 400 =:= 0 -> 1;
 leap(_, _) -> 0.
+
+weekday(1) -> <<"Mon">>;
+weekday(2) -> <<"Tue">>;
+weekday(3) -> <<"Wed">>;
+weekday(4) -> <<"Thu">>;
+weekday(5) -> <<"Fri">>;
+weekday(6) -> <<"Sat">>;
+weekday(7) -> <<"Sun">>.
+
+month(1) -> <<"Jan">>;
+month(2) -> <<"Feb">>;
+month(3) -> <<"Mar">>;
+month(4) -> <<"Apr">>;
+month(5) -> <<"May">>;
+month(6) -> <<"Jun">>;
+month(7) -> <<"Jul">>;
+month(8) -> <<"Aug">>;
+month(9) -> <<"Sep">>;
+month(10) -> <<"Oct">>;
+month(11) -> <<"Nov">>;
+month(12) -> <<"Dec">>.
+
+pad(0) -> <<"00">>;
+pad(1) -> <<"01">>;
+pad(2) -> <<"02">>;
+pad(3) -> <<"03">>;
+pad(4) -> <<"04">>;
+pad(5) -> <<"05">>;
+pad(6) -> <<"06">>;
+pad(7) -> <<"07">>;
+pad(8) -> <<"08">>;
+pad(9) -> <<"09">>;
+pad(N) -> integer_to_binary(N).
 
 pad(Integer, Size) ->
     List = integer_to_list(Integer),
@@ -301,6 +351,36 @@ do_decode(Micro, #opts{precision = micro}) ->
     decode_posix(Micro div 1000000, Micro rem 1000000);
 do_decode(Nano, #opts{precision = nano}) ->
     decode_posix(Nano div 1000000000, Nano rem 1000000000).
+
+decode_rfc7231(B, #opts{continue = Continue}) ->
+    {Day, B1} = decode_digit(2, skip_day(B), $\s, []),
+    {Month, B2} = decode_month(B1),
+    {Year, B3} = decode_digit(4, B2, $\s, []),
+    {Hour, B4} = decode_digit(2, B3, $:, []),
+    {Minute, B5} = decode_digit(2, B4, $:, []),
+    {Second, B6} = decode_digit(2, B5, $\s, []),
+    <<"GMT", B7/binary>> = B6,
+    Stamp = #{year => Year, month => Month, day => Day,
+              hour => Hour, minute => Minute, second => Second},
+    case Continue of
+        true -> {Stamp, B7};
+        false -> Stamp
+    end.
+
+skip_day(<<_:3/binary, ", ", T/binary>>) -> T.
+
+decode_month(<<"Jan ", T/binary>>) -> {1, T};
+decode_month(<<"Feb ", T/binary>>) -> {2, T};
+decode_month(<<"Mar ", T/binary>>) -> {3, T};
+decode_month(<<"Apr ", T/binary>>) -> {4, T};
+decode_month(<<"May ", T/binary>>) -> {5, T};
+decode_month(<<"Jun ", T/binary>>) -> {6, T};
+decode_month(<<"Jul ", T/binary>>) -> {7, T};
+decode_month(<<"Aug ", T/binary>>) -> {8, T};
+decode_month(<<"Sep ", T/binary>>) -> {9, T};
+decode_month(<<"Oct ", T/binary>>) -> {10, T};
+decode_month(<<"Nov ", T/binary>>) -> {11, T};
+decode_month(<<"Dec ", T/binary>>) -> {12, T}.
 
 decode_digit(0, Binary, Skip, Acc) ->
     {list_to_integer(lists:reverse(Acc)), skip(Skip, Binary)};
@@ -407,4 +487,5 @@ parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(list, Opts) -> Opts#opts{return_type = list};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(posix, Opts) -> Opts#opts{return_type = posix};
+parse_opt(rfc7231, Opts) -> Opts#opts{rfc7231 = true};
 parse_opt(_, _) -> erlang:error(badarg).

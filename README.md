@@ -49,7 +49,8 @@ Features/Modules
                                                        [rfc5952][17],
                                                        [rfc4632][18]
     * Generating/encoding/decoding Timestamps Posix/Erlang -- timestamp
-                                                              [rfc3339][19]
+                                                              [rfc3339][19],
+                                                              [rfc7231][21]
   * Clients
     * A simple HTTP client -- shttpc [rfc7230][20], [rfc7231][21],
                                      [rfc7538][22], [rfc5789][23],
