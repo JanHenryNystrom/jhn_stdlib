@@ -24,10 +24,8 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2016-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(bloom).
+-module(jhn_bloom).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
-
--deprecated(module).
 
 %% Library functions
 -export([filter/0, filter/1,

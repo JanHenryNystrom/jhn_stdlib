@@ -27,10 +27,8 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2016-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(ip_addr).
+-module(jhn_ip_addr).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
-
--deprecated(module).
 
 %% Library functions
 -export([encode/1, encode/2,

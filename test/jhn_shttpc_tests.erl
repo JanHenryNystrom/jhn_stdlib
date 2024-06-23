@@ -29,7 +29,7 @@
 %%% @author Jan Henry Nyström <JanHenryNystrom@gmail.com>
 %%% @end
 
--module(shttpc_tests).
+-module(jhn_shttpc_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 

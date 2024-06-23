@@ -86,9 +86,7 @@
 -module(json).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
--deprecated({encode, '_'}).
--deprecated({decode, '_'}).
--deprecated({eval, '_'}).
+-deprecated(module).
 
 %% Library functions
 -export([encode/1, encode/2,
@@ -487,7 +485,7 @@ encode_value(BinaryString, State) when is_binary(BinaryString) ->
 encode_value(Integer, State) when is_integer(Integer) ->
     encode_chars(integer_to_list(Integer), State);
 encode_value(Float, State) when is_float(Float) ->
-    encode_chars(jhn_math:float_to_binary(Float), State);
+    encode_chars(erlang:float_to_binary(Float, [short]), State);
 encode_value(_, _) ->
     erlang:error(badarg).
 

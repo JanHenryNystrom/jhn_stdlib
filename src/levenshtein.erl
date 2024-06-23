@@ -25,6 +25,8 @@
 -module(levenshtein).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
+-deprecated(module).
+
 %% Compiler options
 -compile({inline, [{min, 3}]}).
 

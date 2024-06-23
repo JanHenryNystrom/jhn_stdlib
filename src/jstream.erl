@@ -132,7 +132,7 @@ encode(Object = #{}) -> encode_object(Object);
 encode([]) -> <<"[]">>;
 encode(List = [_ | _]) -> encode_array(List);
 encode(I) when is_integer(I) -> integer_to_binary(I);
-encode(F) when is_float(F) -> jhn_math:float_to_binary(F);
+encode(F) when is_float(F) -> erlang:float_to_binary(F, [short]);
 encode(String) when is_binary(String) -> encode_string(String);
 encode(String) when is_atom(String) ->
     encode_string(atom_to_binary(String, utf8)).

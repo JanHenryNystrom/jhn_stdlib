@@ -189,7 +189,7 @@ encode(Object = #{}) -> encode_object(Object);
 encode([]) -> <<"[]">>;
 encode(List = [_ | _]) -> encode_array(List);
 encode(I) when is_integer(I) -> integer_to_binary(I);
-encode(F) when is_float(F) -> jhn_math:float_to_binary(F);
+encode(F) when is_float(F) -> erlang:float_to_binary(F, [short]);
 encode(String) when is_binary(String) -> encode_string(String);
 encode(String) when is_atom(String) ->
     encode_string(atom_to_binary(String, utf8)).
@@ -277,7 +277,7 @@ next(B) -> do_next(B).
 %% Function: next(Binary, Cont) -> {Binary, Binary} | {more, Cont}.
 %% @doc
 %%   Picks the first json on a stream given a continuation and returns that
-%%   and the rest or {moew Continuation} is if it was not a complete value.
+%%   and the rest or {more Continuation} is if it was not a complete value.
 %% @end
 %%--------------------------------------------------------------------
 -spec next(binary(), next_cont()) -> {binary(), binary()} | {more, next_cont()}.

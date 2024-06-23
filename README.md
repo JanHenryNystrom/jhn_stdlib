@@ -35,58 +35,79 @@ Features/Modules
 --------
 
   * String Processing Functions for binary encoded strings
-    * blist -- drop in replacement for the lists module in stdlib
-    * bstring -- drop in replacement for the string module in stdlib
-    * mustache -- Mustache template rendering
+    * jhn_blist -- drop in replacement for the lists module in stdlib
+    * jhn_bstring -- drop in replacement for the string module in stdlib
+    * jhn_mustache -- [Mustache (template system)][37]
   * Protocols
     * Encoding/decoding JSON/Erlang  -- jhn_json [rfc8259][30]
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- jhn_json [rfc6901][8]
     * Patch JSON -- jhn_json [rfc6902][31]
     * Merge patch JSON -- jhn_json [rfc7396][32]
-    * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
-                                     [draft-fge-json-schema-validation-00][11]
-    * MessagePack -- msgpack [MessagePack][12]/Erlang
-    * Bencoding -- bencoding
-    * Encoding/decoding Syslog/Erlang -- syslog [rfc5424][13],
-                                                [rfc5427][14],
-                                                [rfc6012][29]
-    * Consistent Hashing -- jhn_chash [J. Lamping, Eric Veach][28]
+    * MessagePack -- jhn_msgpack [MessagePack][12]/Erlang
+    * Bencoding -- jhn_bencoding
+    * Encoding/decoding Syslog/Erlang -- jhn_syslog [rfc5424][13],
+                                                    [rfc5427][14],
+                                                    [rfc6012][29]
   * Standards
-    * Encoding/decoding URI/Erlang -- uri [rfc3986][15]
-    * Encoding/decoding IP addresses/Erlang -- ip_addr [rfc4291][16],
-                                                       [rfc5952][17],
-                                                       [rfc4632][18]
-    * Generating/encoding/decoding Timestamps Posix/Erlang -- timestamp
+    * Encoding/decoding URI/Erlang -- jhn_uri [rfc3986][15]
+    * Encoding/decoding IP addresses/Erlang -- jhn_ip_addr [rfc4291][16],
+                                                           [rfc5952][17],
+                                                           [rfc4632][18]
+    * Generating/encoding/decoding Timestamps Posix/Erlang -- jhn_timestamp
                                                               [rfc3339][19],
                                                               [rfc7231][21]
   * Clients
-    * A simple HTTP client -- shttpc [rfc7230][20], [rfc7231][21],
-                                     [rfc7538][22], [rfc5789][23],
-                                     [rfc2818][24]
-    * Server/client for Syslog -- syslog [rfc5425][25], [rfc5426][26],
-                                         [rfc6587][27]
+    * A simple HTTP client -- jhn_shttpc [rfc7230][20], [rfc7231][21],
+                                         [rfc7538][22], [rfc5789][23],
+                                         [rfc2818][24]
+    * Server/client for Syslog -- jhn_syslog [rfc5425][25], [rfc5426][26],
+                                             [rfc6587][27]
   * Pull oriented data source abstraction
-    * lazy -- abstracts different data sources as uniform lazy data
+    * lazy -- jhn_lazy abstracts different data sources as uniform lazy data
   * Data structures
-    * Bloom filters -- bloom
-    * Property lists -- plist
-    * Prefix trees -- p_tree
-    * Binary(UTF-8) Prefix trees -- pb_tree
-    * Range trees -- r_tree
-    * T-trees -- t_tree
+    * Bloom filters -- jhn_bloom [Bloom Filters][36]
+    * Property lists -- jhn_plist
+    * Prefix trees -- jhn_p_tree [Prefix Tree][38]
+    * Binary(UTF-8) Prefix trees -- jhn_pb_tree [Prefix Tree][38]
+                                                [UTF-8][39]
+    * Range trees -- jhn_r_tree [Range Tree][40]
+    * T-trees -- t_tree [T-tree][41]
   * Algorithms
-    * Levenshtein distance -- levenshtein
-    * CRC32-C checksum -- jhn_hash [rfc9260][33]
-    * xxHash-32 checksum -- jhn_hash [xxHash][34]
+    * Levenshtein distance -- jhn_math:levenshtein/2 [Levenshtein][35]
+    * CRC32-C checksum -- jhn_hash:crc32c/1 [rfc9260][33]
+    * xxHash-32 checksum -- jhn_hash:xxh32/1/2 [xxHash][34]
+    * Consistent Hashing -- jhn_chash [J. Lamping, Eric Veach][28]
 
 <a name='deprecated'>
 
 Deprecated Features/Modules
 --------
 
-  * json -- use jhn_json instead, with the exception of validation
-  * jstream -- use jhn_json instead
-
+  * Replaced
+    * json -- use jhn_json
+    * jstream -- use jhn_json
+    * levenshtein -- use jhn_math:levenshtein/2
+  * Renamed
+    * bencoding -- use jhn_bencoding
+    * blist -- use jhn_blist
+    * bloom -- use jhn_bloom
+    * bstring -- use jhn_bstring
+    * ip_addr -- use jhn_ip_addr
+    * lazy -- use jhn_lazy
+    * msgpack -- use jhn_msgpack
+    * mustache -- use jhn_mustache
+    * p_tree -- use jhn_p_tree
+    * pb_tree -- use jhn_pb_tree
+    * plist -- use jhn_plist
+    * r_tree -- use jhn_r_tree
+    * shttpc -- use jhn_shttpc
+    * syslog -- use jhn_syslog
+    * t_tree -- use jhn_t_tree
+    * timestamp -- use jhn_timestamp
+    * uri -- use jhn_uri
+  * Removed
+    * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
+                                     [draft-fge-json-schema-validation-00][11]
 
 <a name='build'>
 
@@ -210,3 +231,17 @@ I know I really should.
                        6, June 1993."
   [34]: http://github.com/Cyan4973/xxHash
         "xxHash - Extremely fast hash algorithm"
+  [35]: https://en.wikipedia.org/wiki/Levenshtein_distance
+        "Levenshtein distance"
+  [36]: https://en.wikipedia.org/wiki/Bloom_filter
+        "Bloom filter"
+  [37]: https://en.wikipedia.org/wiki/Mustache_(template_system)
+        "Mustache (template system)"
+  [38]: https://en.wikipedia.org/wiki/Trie
+        "Trie"
+  [39]: https://en.wikipedia.org/wiki/UTF-8
+        "UTF-8"
+  [40]: https://en.wikipedia.org/wiki/Range_tree
+        "Range tree"
+  [41]: https://en.wikipedia.org/wiki/T-tree
+        "T-tree"

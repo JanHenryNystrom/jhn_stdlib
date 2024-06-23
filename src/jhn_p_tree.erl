@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2021-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2016-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -17,20 +17,18 @@
 %%%-------------------------------------------------------------------
 %%% @doc
 %%   Implements Prefix trees that allows you to find a value associated
-%%   with the longest prefix of the key used. All keys are utf8 binaries.
+%%   with the longest prefix of the key used. All keys are lists of terms.
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2021-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2016-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(pb_tree).
+-module(jhn_p_tree).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
-
--deprecated(module).
 
 %% Library functions
 -export([new/0,
-         is_pb_tree/1, is_empty/1,
+         is_p_tree/1, is_empty/1,
          add/3, add/4, adds/2, adds/3,
          delete/2, delete/3, deletes/2, deletes/3,
          member/2, find/2, find/3,
@@ -44,22 +42,22 @@
                  rest   = [] :: [{value(), value()}],
                  values = [] :: [value()]}).
 
--record(pb_node, {pivot         :: value(),
-                 left  = pb_nil :: pb_tree(),
-                 next  = pb_nil :: pb_tree(),
-                 right = pb_nil :: pb_tree(),
+-record(p_node, {pivot         :: value(),
+                 left  = p_nil :: p_tree(),
+                 next  = p_nil :: p_tree(),
+                 right = p_nil :: p_tree(),
                  value         :: value()}).
 
 
 %% Types
--opaque pb_tree()   :: #pb_node{} | pb_nil.
--type   key()    :: binary().
+-opaque p_tree()   :: #p_node{} | p_nil.
+-type   key()    :: [_].
 -type   value()    :: _.
 -type   default()  :: _.
 -type   flag()     :: check | nocheck.
 
 %% Exported Types
--export_type([pb_tree/0]).
+-export_type([p_tree/0]).
 
 %% Defines
 
@@ -73,21 +71,21 @@
 %%   Creates an empty P-tree.
 %% @end
 %%--------------------------------------------------------------------
--spec new() -> pb_tree().
+-spec new() -> p_tree().
 %%--------------------------------------------------------------------
-new() -> pb_nil.
+new() -> p_nil.
 
 %%--------------------------------------------------------------------
-%% Function: is_pb_tree(X) -> Boolean().
+%% Function: is_p_tree(X) -> Boolean().
 %% @doc
 %%   Returns true if X is a P-tree, false otherwise.
 %% @end
 %%--------------------------------------------------------------------
--spec is_pb_tree(_) -> boolean().
+-spec is_p_tree(_) -> boolean().
 %%--------------------------------------------------------------------
-is_pb_tree(pb_nil) -> true;
-is_pb_tree(#pb_node{}) -> true;
-is_pb_tree(_) -> false.
+is_p_tree(p_nil) -> true;
+is_p_tree(#p_node{}) -> true;
+is_p_tree(_) -> false.
 
 %%--------------------------------------------------------------------
 %% Function: is_empty(Tree) -> Boolean.
@@ -97,7 +95,7 @@ is_pb_tree(_) -> false.
 %%--------------------------------------------------------------------
 -spec is_empty(_) -> boolean().
 %%--------------------------------------------------------------------
-is_empty(pb_nil) -> true;
+is_empty(p_nil) -> true;
 is_empty(_) -> false.
 
 %%--------------------------------------------------------------------
@@ -108,7 +106,7 @@ is_empty(_) -> false.
 %%   add(Key, Value, Tree) is equivalent to add(Key, Value, Tree,nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec add(key(), value(), pb_tree()) -> pb_tree().
+-spec add(key(), value(), p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
 add(Key, Value, Tree) -> add(Key, Value, Tree, nocheck).
 
@@ -120,21 +118,21 @@ add(Key, Value, Tree) -> add(Key, Value, Tree, nocheck).
 %%   check an exception is generated and if nocheck the value is replaced.
 %% @end
 %%--------------------------------------------------------------------
--spec add(key(), value(), pb_tree(), flag()) -> pb_tree().
+-spec add(key(), value(), p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
-add(<<H/utf8>>, Value, pb_nil, _) -> #pb_node{pivot = H, value = Value};
-add(<<H/utf8, T/binary>>, Value, pb_nil, _) ->
-    #pb_node{pivot = H, next = add(T, Value, pb_nil, nocheck)};
-add(<<H/utf8>>, Value, Tree = #pb_node{pivot = H}, nocheck) ->
-    Tree#pb_node{value = Value};
-add(<<H/utf8>>, Value, Tree = #pb_node{pivot = H, value = undefined}, _) ->
-    Tree#pb_node{value = Value};
-add(<<H/utf8, T/binary>>, Value, Tree = #pb_node{pivot = H, next =Next},Flag) ->
-    Tree#pb_node{next = add(T, Value, Next, Flag)};
-add(I = <<H/utf8,_/binary>>,V,Tree=#pb_node{pivot=P,left=Left},Flag) when H<P ->
-    Tree#pb_node{left = add(I, V, Left, Flag)};
-add(I, Value, Tree = #pb_node{right = Right}, Flag) ->
-    Tree#pb_node{right = add(I, Value, Right, Flag)}.
+add([H], Value, p_nil, _) -> #p_node{pivot = H, value = Value};
+add([H | T], Value, p_nil, _) ->
+    #p_node{pivot = H, next = add(T, Value, p_nil, nocheck)};
+add([H], Value, Tree = #p_node{pivot = H}, nocheck) ->
+    Tree#p_node{value = Value};
+add([H], Value, Tree = #p_node{pivot = H, value = undefined}, _) ->
+    Tree#p_node{value = Value};
+add([H | T], Value, Tree = #p_node{pivot = H, next = Next}, Flag) ->
+    Tree#p_node{next = add(T, Value, Next, Flag)};
+add(I = [H | _], Value, Tree = #p_node{pivot=P, left=Left}, Flag) when H < P ->
+    Tree#p_node{left = add(I, Value, Left, Flag)};
+add(I, Value, Tree = #p_node{right = Right}, Flag) ->
+    Tree#p_node{right = add(I, Value, Right, Flag)}.
 
 %%--------------------------------------------------------------------
 %% Function: adds(Pairs, Tree) -> Tree.
@@ -144,7 +142,7 @@ add(I, Value, Tree = #pb_node{right = Right}, Flag) ->
 %%   adds(Pairs, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec adds([{key(), value()}], pb_tree()) -> pb_tree().
+-spec adds([{key(), value()}], p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
 adds(Pairs, Tree) -> adds(Pairs, Tree, nocheck).
 
@@ -158,7 +156,7 @@ adds(Pairs, Tree) -> adds(Pairs, Tree, nocheck).
 %%   if the flag is nocheck the values will be replaced.
 %% @end
 %%--------------------------------------------------------------------
--spec adds([{key(), value()}], pb_tree(), flag()) -> pb_tree().
+-spec adds([{key(), value()}], p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
 adds(Pairs, Tree, nocheck) ->
     Pairs1 = lists:keymerge(1, lists:keysort(1, Pairs), to_list(Tree)),
@@ -177,7 +175,7 @@ adds(Pairs, Tree, check) ->
 %%   to delete(Key, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec delete(key(), pb_tree()) -> pb_tree().
+-spec delete(key(), p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
 delete(Key, Tree) -> delete(Key, Tree, nocheck).
 
@@ -191,25 +189,25 @@ delete(Key, Tree) -> delete(Key, Tree, nocheck).
 %%   is nocheck the unchanged tree is returned.
 %% @end
 %%--------------------------------------------------------------------
--spec delete(key(), pb_tree(), flag()) -> pb_tree().
+-spec delete(key(), p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
-delete(_, pb_nil, check) -> erlang:error(badarg);
-delete(_, pb_nil, nocheck) -> pb_nil;
-delete(<<H/utf8>>, #pb_node{pivot = H, value = undefined}, check) ->
+delete(_, p_nil, check) -> erlang:error(badarg);
+delete(_, p_nil, nocheck) -> p_nil;
+delete([H], #p_node{pivot = H, value = undefined}, check) ->
     erlang:error(badarg);
-delete(<<H/utf8>>, #pb_node{pivot =H,left=pb_nil,next=pb_nil,right=pb_nil},_) ->
-    pb_nil;
-delete(<<H/utf8>>, #pb_node{pivot = H, left=Left,next=pb_nil,right=pb_nil},_) ->
+delete([H], #p_node{pivot = H, left = p_nil, next = p_nil, right = p_nil}, _) ->
+    p_nil;
+delete([H], #p_node{pivot = H, left = Left, next = p_nil, right = p_nil}, _) ->
     Left;
-delete(<<H/utf8>>, #pb_node{pivot = H,left=pb_nil,next=pb_nil,right=Right},_) ->
+delete([H], #p_node{pivot = H, left = p_nil, next = p_nil, right = Right}, _) ->
     Right;
-delete(<<H/utf8>>, Tree = #pb_node{pivot = H}, _) ->
-    Tree#pb_node{value = undefined};
-delete(<<H/utf8, T/binary>>, #pb_node{pivot = H, next = Next}, Flag) ->
+delete([H], Tree = #p_node{pivot = H}, _) ->
+    Tree#p_node{value = undefined};
+delete([H | T], #p_node{pivot = H, next = Next}, Flag) ->
     delete(T, Next, Flag);
-delete(I = <<H/utf8, _/binary>>, #pb_node{pivot=P,left=Left},Flag) when H < P ->
+delete(I = [H | _], #p_node{pivot = P, left = Left}, Flag) when H < P ->
     delete(I, Left, Flag);
-delete(I, #pb_node{right = Right}, Flag) ->
+delete(I, #p_node{right = Right}, Flag) ->
     delete(I, Right, Flag).
 
 %%--------------------------------------------------------------------
@@ -220,7 +218,7 @@ delete(I, #pb_node{right = Right}, Flag) ->
 %%  deletes(Keys, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec deletes([key()], pb_tree()) -> pb_tree().
+-spec deletes([key()], p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
 deletes(Keys, Tree) -> deletes(Keys, Tree, nocheck).
 
@@ -234,7 +232,7 @@ deletes(Keys, Tree) -> deletes(Keys, Tree, nocheck).
 %%   is returned with the other associations removed.
 %% @end
 %%--------------------------------------------------------------------
--spec deletes([key()], pb_tree(), flag()) -> pb_tree().
+-spec deletes([key()], p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
 deletes(Keys, Tree, nocheck) ->
     build(bucket_sort(deletes1(lists:sort(Keys), to_list(Tree)), []));
@@ -257,15 +255,13 @@ deletes1(I, [_ | T]) -> deletes1(I, T).
 %%   otherwise false.
 %% @end
 %%--------------------------------------------------------------------
--spec member(key(), pb_tree()) -> boolean().
+-spec member(key(), p_tree()) -> boolean().
 %%--------------------------------------------------------------------
-member(_, pb_nil) -> false;
-member(<<H/utf8>>, #pb_node{pivot = H, value = Value}) -> Value /= undefined;
-member(<<H/utf8, T/binary>>, #pb_node{pivot = H, next=Next}) -> member(T, Next);
-member(I = <<H/utf8, _/binary>>, #pb_node{pivot = P, left = L}) when H < P ->
-    member(I, L);
-member(I, #pb_node{right = R}) ->
-    member(I, R).
+member(_, p_nil) -> false;
+member([H], #p_node{pivot = H, value = Value}) -> Value /= undefined;
+member([H | T], #p_node{pivot = H, next = Next}) -> member(T, Next);
+member(I = [H | _], #p_node{pivot = P, left = L}) when H < P -> member(I, L);
+member(I, #p_node{right = R}) -> member(I, R).
 
 %%--------------------------------------------------------------------
 %% Function: find(Key, Tree) -> Value.
@@ -275,7 +271,7 @@ member(I, #pb_node{right = R}) ->
 %%   The call find(Key, Tree) is equivalent to find(Key, Tree, undefined).
 %% @end
 %%--------------------------------------------------------------------
--spec find(key(), pb_tree()) -> value() | undefined.
+-spec find(key(), p_tree()) -> value() | undefined.
 %%--------------------------------------------------------------------
 find(Key, Tree) -> find(Key, Tree, undefined).
 
@@ -286,15 +282,15 @@ find(Key, Tree) -> find(Key, Tree, undefined).
 %%   Tree or Default if no such association exists.
 %% @end
 %%--------------------------------------------------------------------
--spec find(key(), pb_tree(), default()) -> value() | default().
+-spec find(key(), p_tree(), default()) -> value() | default().
 %%--------------------------------------------------------------------
-find(_, pb_nil, Prev) -> Prev;
-find(<<H/utf8>>, #pb_node{pivot = H, value = V}, Prev) -> update(V, Prev);
-find(<<H/utf8, T/binary>>, #pb_node{pivot = H, next = Next, value = V},Prev) ->
+find(_, p_nil, Prev) -> Prev;
+find([H], #p_node{pivot = H, value = V}, Prev) -> update(V, Prev);
+find([H | T], #p_node{pivot = H, next = Next, value = V}, Prev) ->
     find(T, Next, update(V, Prev));
-find(I = <<H/utf8, _/binary>>, #pb_node{pivot = P,left=Left},Prev) when H < P ->
+find(I = [H | _], #p_node{pivot = P, left = Left}, Prev) when H < P ->
     find(I, Left, Prev);
-find(I, #pb_node{right = Right}, Prev) ->
+find(I, #p_node{right = Right}, Prev) ->
     find(I, Right, Prev).
 
 update(undefined, Prev) -> Prev;
@@ -306,19 +302,19 @@ update(New, _) -> New.
 %%   Returns all the keys in ascending order.
 %% @end
 %%--------------------------------------------------------------------
--spec keys(pb_tree()) -> [key()].
+-spec keys(p_tree()) -> [key()].
 %%--------------------------------------------------------------------
 keys(Tree) -> keys(Tree, [], []).
 
-keys(pb_nil, _, Acc) -> Acc;
-keys(#pb_node{pivot = P, left=L,next=N,right=R,value=undefined},Xiferp,Acc) ->
+keys(p_nil, _, Acc) -> Acc;
+keys(#p_node{pivot = P, left=L,next=N,right=R,value=undefined},Xiferp,Acc) ->
     Xiferp1 = [P | Xiferp],
     keys(L, Xiferp, keys(N, Xiferp1, keys(R, Xiferp, Acc)));
-keys(#pb_node{pivot = P, left=L, next=N, right=R}, Xiferp, Acc) ->
+keys(#p_node{pivot = P, left=L, next=N, right=R}, Xiferp, Acc) ->
     Xiferp1 = [P | Xiferp],
     keys(L,
             Xiferp,
-            [<< <<X/utf8>> || X <- lists:reverse(Xiferp1)>> |
+            [lists:reverse(Xiferp1) |
              keys(N, Xiferp1, keys(R, Xiferp, Acc))]).
 
 %%--------------------------------------------------------------------
@@ -327,14 +323,14 @@ keys(#pb_node{pivot = P, left=L, next=N, right=R}, Xiferp, Acc) ->
 %%   Returns all the values in ascending order of their keys.
 %% @end
 %%--------------------------------------------------------------------
--spec values(pb_tree()) -> [key()].
+-spec values(p_tree()) -> [key()].
 %%--------------------------------------------------------------------
 values(Tree) -> values(Tree, []).
 
-values(pb_nil, Acc) -> Acc;
-values(#pb_node{left = L, next = N, right = R, value = undefined}, Acc) ->
+values(p_nil, Acc) -> Acc;
+values(#p_node{left = L, next = N, right = R, value = undefined}, Acc) ->
     values(L, values(N, values(R, Acc)));
-values(#pb_node{left = L, next = N, right = R, value = V}, Acc) ->
+values(#p_node{left = L, next = N, right = R, value = V}, Acc) ->
     values(L, [V | values(N, values(R, Acc))]).
 
 %%--------------------------------------------------------------------
@@ -346,7 +342,7 @@ values(#pb_node{left = L, next = N, right = R, value = V}, Acc) ->
 %%   replace(Key, Value, Tree, nocheck).
 %% @end
 %%--------------------------------------------------------------------
--spec replace(key(), value(), pb_tree()) -> pb_tree().
+-spec replace(key(), value(), p_tree()) -> p_tree().
 %%--------------------------------------------------------------------
 replace(Key, Value, Tree) -> replace(Key, Value, Tree, nocheck).
 
@@ -358,23 +354,22 @@ replace(Key, Value, Tree) -> replace(Key, Value, Tree, nocheck).
 %%   an exception is generated, otherwise the value is added.
 %% @end
 %%--------------------------------------------------------------------
--spec replace(key(), value(), pb_tree(), flag()) -> pb_tree().
+-spec replace(key(), value(), p_tree(), flag()) -> p_tree().
 %%--------------------------------------------------------------------
 replace(Key, Value, Tree, nocheck) -> add(Key, Value, Tree, nocheck);
 replace(Key, Value, Tree, check) -> replace_check(Key, Value, Tree).
 
-replace_check(_, _, pb_nil) -> erlang:error(badarg);
-replace_check(<<H/utf8>>, _, #pb_node{pivot = H, value = undefined}) ->
+replace_check(_, _, p_nil) -> erlang:error(badarg);
+replace_check([H], _, #p_node{pivot = H, value = undefined}) ->
     erlang:error(badarg);
-replace_check(<<H/utf8>>, Value, Tree = #pb_node{pivot = H}) ->
-    Tree#pb_node{value = Value};
-replace_check(<<H/utf8, T/binary>>, Value, Tree =#pb_node{pivot=H,next=Next}) ->
-    Tree#pb_node{next = replace_check(T, Value, Next)};
-replace_check(I = <<H/utf8, _/binary>>, Value, Tree=#pb_node{pivot=P,left=Left})
-  when H < P ->
-    Tree#pb_node{left = replace_check(I, Value, Left)};
-replace_check(I, Value, Tree = #pb_node{right = Right}) ->
-    Tree#pb_node{right = replace_check(I, Value, Right)}.
+replace_check([H], Value, Tree = #p_node{pivot = H}) ->
+    Tree#p_node{value = Value};
+replace_check([H | T], Value, Tree = #p_node{pivot = H, next = Next}) ->
+    Tree#p_node{next = replace_check(T, Value, Next)};
+replace_check(I = [H|_], Value, Tree = #p_node{pivot=P,left=Left}) when H < P ->
+    Tree#p_node{left = replace_check(I, Value, Left)};
+replace_check(I, Value, Tree = #p_node{right = Right}) ->
+    Tree#p_node{right = replace_check(I, Value, Right)}.
 
 %%--------------------------------------------------------------------
 %% Function: to_list(Tree) -> Pairs.
@@ -382,19 +377,19 @@ replace_check(I, Value, Tree = #pb_node{right = Right}) ->
 %%    From a P-tree a list of {Key, Value} pairs.
 %% @end
 %%--------------------------------------------------------------------
--spec to_list(pb_tree()) -> [{key(), value()}].
+-spec to_list(p_tree()) -> [{key(), value()}].
 %%--------------------------------------------------------------------
 to_list(Tree) -> to_list(Tree, [], []).
 
-to_list(pb_nil, _, Acc) -> Acc;
-to_list(#pb_node{pivot = P,left=L,next=N,right=R,value=undefined},Xiferp,Acc) ->
+to_list(p_nil, _, Acc) -> Acc;
+to_list(#p_node{pivot = P, left=L,next=N,right=R,value=undefined},Xiferp,Acc) ->
     Xiferp1 = [P | Xiferp],
     to_list(L, Xiferp, to_list(N, Xiferp1, to_list(R, Xiferp, Acc)));
-to_list(#pb_node{pivot = P, left=L, next=N, right=R, value=V}, Xiferp, Acc) ->
+to_list(#p_node{pivot = P, left=L, next=N, right=R, value=V}, Xiferp, Acc) ->
     Xiferp1 = [P | Xiferp],
     to_list(L,
             Xiferp,
-            [{<< <<X/utf8>> || X <- lists:reverse(Xiferp1)>>, V} |
+            [{lists:reverse(Xiferp1), V} |
              to_list(N, Xiferp1, to_list(R, Xiferp, Acc))]).
 
 %%--------------------------------------------------------------------
@@ -404,7 +399,7 @@ to_list(#pb_node{pivot = P, left=L, next=N, right=R, value=V}, Xiferp, Acc) ->
 %%   key in the Tree.
 %% @end
 %%--------------------------------------------------------------------
--spec from_list([{key(), value()}]) -> pb_tree().
+-spec from_list([{key(), value()}]) -> p_tree().
 %%--------------------------------------------------------------------
 from_list(Plist) -> build(bucket_sort(Plist)).
 
@@ -417,38 +412,38 @@ bucket_sort(L) -> bucket_sort(lists:sort(L), []).
 bucket_sort([], []) -> [];
 bucket_sort([], [B = #bucket{rest = R} | Acc]) ->
     lists:reverse([B#bucket{rest = bucket_sort(lists:reverse(R))} | Acc]);
-bucket_sort([{<<H/utf8>>, V} | T], []) ->
+bucket_sort([{[H], V} | T], []) ->
     bucket_sort(T, [#bucket{pivot = H, values = [V]}]);
-bucket_sort([{<<H/utf8, P/binary>>, V} | T], []) ->
+bucket_sort([{[H | P], V} | T], []) ->
     bucket_sort(T, [#bucket{pivot = H, rest = [{P, V}]}]);
-bucket_sort([{<<H/utf8>>, V} | T], [B = #bucket{pivot = H, values = Vs}|Acc]) ->
+bucket_sort([{[H], V} | T], [B = #bucket{pivot = H, values = Vs} | Acc]) ->
     bucket_sort(T, [B#bucket{values = [V | Vs]} | Acc]);
-bucket_sort([{<<H/utf8, P/binary>>, V} |T],[B=#bucket{pivot=H,rest=T1} |Acc]) ->
+bucket_sort([{[H | P], V} | T], [B = #bucket{pivot = H, rest = T1} |Acc]) ->
     bucket_sort(T, [B#bucket{rest = [{P, V} | T1]} | Acc]);
-bucket_sort([{<<H/utf8>>, V} | T], [B = #bucket{rest = R} | Acc]) ->
+bucket_sort([{[H], V} | T], [B = #bucket{rest = R} | Acc]) ->
     bucket_sort(T, [#bucket{pivot = H, values = [V]},
                     B#bucket{rest = bucket_sort(lists:reverse(R))} | Acc]);
-bucket_sort([{<<H/utf8, P/binary>>, V} | T], [B = #bucket{rest = R} | Acc]) ->
+bucket_sort([{[H | P], V} | T], [B = #bucket{rest = R} | Acc]) ->
     bucket_sort(T, [#bucket{pivot = H, rest = [{P, V}]},
                     B#bucket{rest = bucket_sort(lists:reverse(R))} | Acc]).
 
-build([]) -> pb_nil;
+build([]) -> p_nil;
 build([#bucket{pivot = P, rest = R, values = [V]}]) ->
-    #pb_node{pivot = P, next = build(R), value = V};
+    #p_node{pivot = P, next = build(R), value = V};
 build([#bucket{pivot = P1, rest = R1, values = [V1]},
        #bucket{pivot = P2, rest = R2, values = [V2]}]) ->
-    #pb_node{pivot = P1, next = build(R1), value = V1,
-            right = #pb_node{pivot = P2, next = build(R2), value = V2}};
+    #p_node{pivot = P1, next = build(R1), value = V1,
+            right = #p_node{pivot = P2, next = build(R2), value = V2}};
 build(Bs) ->
     Size = length(Bs),
     case split(Size - 1 - ((Size - 1) div 2), Bs, []) of
         {Left, #bucket{pivot = P, rest = Rest, values = []}, Right} ->
-            #pb_node{pivot = P,
+            #p_node{pivot = P,
                     next = build(Rest),
                     left = build(Left),
                     right = build(Right)};
         {Left, #bucket{pivot = P, rest = Rest, values = [V]}, Right} ->
-            #pb_node{pivot = P,
+            #p_node{pivot = P,
                     next = build(Rest),
                     left = build(Left),
                     right = build(Right),

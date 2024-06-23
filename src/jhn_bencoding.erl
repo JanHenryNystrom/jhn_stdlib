@@ -31,10 +31,8 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2018-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(bencoding).
+-module(jhn_bencoding).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
-
--deprecated(module).
 
 %% Library functions
 -export([encode/1, encode/2,
@@ -152,7 +150,7 @@ do_decode(<<$i, I/binary>>) -> decode_integer(I, []);
 do_decode(<<$l, L/binary>>) -> decode_list(L, []);
 do_decode(<<$d, D/binary>>) -> decode_dictionary(D, []);
 do_decode(B) -> decode_string(B, []).
-    
+
 decode_integer(<<$e, T/binary>>, Acc) ->
     {list_to_integer(lists:reverse(Acc)), T};
 decode_integer(<<H, T/binary>>, Acc) ->

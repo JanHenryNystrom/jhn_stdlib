@@ -26,6 +26,8 @@
 -module(p_tree).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
+-deprecated(module).
+
 %% Library functions
 -export([new/0,
          is_p_tree/1, is_empty/1,
