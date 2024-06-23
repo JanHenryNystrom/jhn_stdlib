@@ -35,16 +35,14 @@ Features/Modules
 --------
 
   * String Processing Functions for binary encoded strings
-    * blist -- drop in replacement for the lists module in stdlib
-    * bstring -- drop in replacement for the string module in stdlib
-    * mustache -- Mustache template rendering [Mustache (template system)][37]
+    * jhn_blist -- drop in replacement for the lists module in stdlib
+    * jhn_bstring -- drop in replacement for the string module in stdlib
+    * jhn_mustache -- [Mustache (template system)][37]
   * Protocols
     * Encoding/decoding JSON/Erlang  -- jhn_json [rfc8259][30]
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- jhn_json [rfc6901][8]
     * Patch JSON -- jhn_json [rfc6902][31]
     * Merge patch JSON -- jhn_json [rfc7396][32]
-    * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
-                                     [draft-fge-json-schema-validation-00][11]
     * MessagePack -- jhn_msgpack [MessagePack][12]/Erlang
     * Bencoding -- jhn_bencoding
     * Encoding/decoding Syslog/Erlang -- syslog [rfc5424][13],
@@ -52,9 +50,9 @@ Features/Modules
                                                 [rfc6012][29]
   * Standards
     * Encoding/decoding URI/Erlang -- uri [rfc3986][15]
-    * Encoding/decoding IP addresses/Erlang -- ip_addr [rfc4291][16],
-                                                       [rfc5952][17],
-                                                       [rfc4632][18]
+    * Encoding/decoding IP addresses/Erlang -- jhn_ip_addr [rfc4291][16],
+                                                           [rfc5952][17],
+                                                           [rfc4632][18]
     * Generating/encoding/decoding Timestamps Posix/Erlang -- timestamp
                                                               [rfc3339][19],
                                                               [rfc7231][21]
@@ -68,10 +66,10 @@ Features/Modules
     * lazy -- jhn_lazy abstracts different data sources as uniform lazy data
   * Data structures
     * Bloom filters -- jhn_bloom [Bloom Filters][36]
-    * Property lists -- plist
-    * Prefix trees -- p_tree
-    * Binary(UTF-8) Prefix trees -- pb_tree
-    * Range trees -- r_tree
+    * Property lists -- jhn_plist
+    * Prefix trees -- jhn_p_tree
+    * Binary(UTF-8) Prefix trees -- jhn_pb_tree
+    * Range trees -- jhn_r_tree
     * T-trees -- t_tree
   * Algorithms
     * Levenshtein distance -- jhn_math:levenshtein/2 [Levenshtein][35]
@@ -97,7 +95,13 @@ Deprecated Features/Modules
     * lazy -- use jhn_lazy
     * msgpack -- use jhn_msgpack
     * mustache -- use jhn_mustache
-
+    * p_tree -- use jhn_p_tree
+    * pb_tree -- use jhn_pb_tree
+    * plist -- use jhn_plist
+    * r_tree -- use jhn_r_tree
+  * Removed
+    * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
+                                     [draft-fge-json-schema-validation-00][11]
 
 <a name='build'>
 
