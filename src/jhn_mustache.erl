@@ -26,10 +26,8 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2017-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(mustache).
+-module(jhn_mustache).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
-
--deprecated(module).
 
 %% Library functions.
 -export([render/2, render/3]).

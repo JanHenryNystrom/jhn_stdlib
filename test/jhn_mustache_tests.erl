@@ -22,7 +22,7 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2017-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(mustache_tests).
+-module(jhn_mustache_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% Includes

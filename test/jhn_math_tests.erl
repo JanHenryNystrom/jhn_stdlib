@@ -41,6 +41,22 @@ rotl32_2_test_() ->
         S <- lists:seq(1, 31)
     ].
 
+%%--------------------------------------------------------------------
+%% levenshtein
+%%--------------------------------------------------------------------
+
+levenshtein_test_() ->
+    [{"equal",
+      ?_test(?assertEqual(0, levenshtein:distance("Rose", "Rose")))},
+     {"Empty one",
+      ?_test(?assertEqual(4, levenshtein:distance("", "Rose")))},
+     {"Empty two",
+      ?_test(?assertEqual(4, levenshtein:distance("Rose", "")))},
+     {"kitte/sitting",
+      ?_test(?assertEqual(3, levenshtein:distance("kitten", "sitting")))}
+    ].
+
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================

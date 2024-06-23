@@ -37,7 +37,7 @@ Features/Modules
   * String Processing Functions for binary encoded strings
     * blist -- drop in replacement for the lists module in stdlib
     * bstring -- drop in replacement for the string module in stdlib
-    * mustache -- Mustache template rendering
+    * mustache -- Mustache template rendering [Mustache (template system)][37]
   * Protocols
     * Encoding/decoding JSON/Erlang  -- jhn_json [rfc8259][30]
     * Encoding/decoding/evaluation JSON Pointer/Erlang  -- jhn_json [rfc6901][8]
@@ -45,12 +45,11 @@ Features/Modules
     * Merge patch JSON -- jhn_json [rfc7396][32]
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
                                      [draft-fge-json-schema-validation-00][11]
-    * MessagePack -- msgpack [MessagePack][12]/Erlang
-    * Bencoding -- bencoding
+    * MessagePack -- jhn_msgpack [MessagePack][12]/Erlang
+    * Bencoding -- jhn_bencoding
     * Encoding/decoding Syslog/Erlang -- syslog [rfc5424][13],
                                                 [rfc5427][14],
                                                 [rfc6012][29]
-    * Consistent Hashing -- jhn_chash [J. Lamping, Eric Veach][28]
   * Standards
     * Encoding/decoding URI/Erlang -- uri [rfc3986][15]
     * Encoding/decoding IP addresses/Erlang -- ip_addr [rfc4291][16],
@@ -66,18 +65,19 @@ Features/Modules
     * Server/client for Syslog -- syslog [rfc5425][25], [rfc5426][26],
                                          [rfc6587][27]
   * Pull oriented data source abstraction
-    * lazy -- abstracts different data sources as uniform lazy data
+    * lazy -- jhn_lazy abstracts different data sources as uniform lazy data
   * Data structures
-    * Bloom filters -- bloom
+    * Bloom filters -- jhn_bloom [Bloom Filters][36]
     * Property lists -- plist
     * Prefix trees -- p_tree
     * Binary(UTF-8) Prefix trees -- pb_tree
     * Range trees -- r_tree
     * T-trees -- t_tree
   * Algorithms
-    * Levenshtein distance -- levenshtein
-    * CRC32-C checksum -- jhn_hash [rfc9260][33]
-    * xxHash-32 checksum -- jhn_hash [xxHash][34]
+    * Levenshtein distance -- jhn_math:levenshtein/2 [Levenshtein][35]
+    * CRC32-C checksum -- jhn_hash:crc32c/1 [rfc9260][33]
+    * xxHash-32 checksum -- jhn_hash:xxh32/1/2 [xxHash][34]
+    * Consistent Hashing -- jhn_chash [J. Lamping, Eric Veach][28]
 
 <a name='deprecated'>
 
@@ -85,13 +85,15 @@ Deprecated Features/Modules
 --------
 
   * Replaced
-    * json -- use jhn_json instead
-    * jstream -- use jhn_json instead
+    * json -- use jhn_json
+    * jstream -- use jhn_json
+    * levenshtein -- use jhn_math:levenshtein/2
   * Renamed
-    * bencoding -- use jhn_bencoding instead
-    * bloom -- use jhn_bloom instead
-    * lazy -- use jhn_lazy instead
-    * msgpack -- use jhn_msgpack instead
+    * bencoding -- use jhn_bencoding
+    * bloom -- use jhn_bloom
+    * lazy -- use jhn_lazy
+    * msgpack -- use jhn_msgpack
+    * mustache -- use jhn_mustache
 
 
 <a name='build'>
@@ -216,3 +218,9 @@ I know I really should.
                        6, June 1993."
   [34]: http://github.com/Cyan4973/xxHash
         "xxHash - Extremely fast hash algorithm"
+  [35]: https://en.wikipedia.org/wiki/Levenshtein_distance
+        "Levenshtein distance"
+  [36]: https://en.wikipedia.org/wiki/Bloom_filter
+        "Bloom filter"
+  [37]: https://en.wikipedia.org/wiki/Mustache_(template_system)
+        "Mustache (template system)"

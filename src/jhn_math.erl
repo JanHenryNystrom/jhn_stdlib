@@ -28,8 +28,14 @@
 %% Compiler directives
 -compile({no_auto_import, [float_to_binary/1]}).
 
+%% Compiler options
+-compile({inline, [{min, 3}]}).
+
 %% Library functions.
--export([rotl32/2, rotr32/2, float_to_binary/1]).
+-export([rotl32/2, rotr32/2,
+         float_to_binary/1,
+         levenshtein/2
+        ]).
 
 %% Defines.
 
@@ -77,6 +83,24 @@ float_to_binary(Float) when is_float(Float) ->
     {Sign, Frac, Exp} = mantissa_exponent(Float),
     {Place, Digits} = float_to_digits(Float, Exp, Frac, (Frac band 1) =:= 0),
     insert_decimal(Place, << <<($0 + D)>> || <<D>> <= Digits>>, Sign).
+
+%%--------------------------------------------------------------------
+%% Function: levenshtein(String1 String2) -> Distance.
+%% @doc
+%%   Computes the Levenshtein distance between String1 and String2.
+%% @end
+%%--------------------------------------------------------------------
+-spec levenshtein(string(), string()) -> integer().
+%%--------------------------------------------------------------------
+levenshtein([], S) -> length(S);
+levenshtein(S, []) -> length(S);
+levenshtein(S, T) ->
+    case equal(S, T, 0, true) of
+        true -> 0;
+        TLen ->
+            V0 = lists:seq(0, TLen),
+            i(V0, 0, S, T)
+    end.
 
 %% ===================================================================
 %% Internal functions.
@@ -247,3 +271,28 @@ log2floor(Int) when is_integer(Int), Int > 0 -> log2floor(Int, 0).
 
 log2floor(0, N) -> N;
 log2floor(Int, N) -> log2floor(Int bsr 1, 1 + N).
+
+%% --------------------------------------------------------------------
+%% levenshtein
+%% --------------------------------------------------------------------
+
+equal([], [], _, Equal) -> Equal;
+equal([H | S], [H | T], Len, true) -> equal(S, T, Len + 1, true);
+equal(_, T, Len, _) -> Len + length(T).
+
+i(V0, _, [], _) -> lists:last(V0);
+i(V0, I, [Si | S], T) ->
+    V1N = [I + 1 | j(Si, T, V0, I + 1)],
+    i(V1N, I + 1, S, T).
+
+j(_, [], _, _) -> [];
+j(Si, [Si | T], [V0j | V0 =  [V0j1 | _]], V1j) ->
+    V1j1 = min(V1j + 1, V0j1 + 1, V0j),
+    [V1j1 | j(Si, T, V0, V1j1)];
+j(Si, [_ | T], [V0j | V0 =  [V0j1 | _]], V1j) ->
+    V1j1 = 1 + min(V1j, V0j1, V0j),
+    [V1j1 | j(Si, T, V0, V1j1)].
+
+min(A, B, C) when A < B, A < C -> A;
+min(A, B, C) when B < A, B < C -> B;
+min(_, _, C) -> C.
