@@ -29,10 +29,8 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2013-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(bstring).
+-module(jhn_bstring).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
-
--deprecated(module).
 
 %% Library functions
 -export([len/1,equal/2,concat/2,chr/2,rchr/2,str/2,rstr/2,

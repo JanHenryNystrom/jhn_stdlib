@@ -90,7 +90,10 @@ Deprecated Features/Modules
     * levenshtein -- use jhn_math:levenshtein/2
   * Renamed
     * bencoding -- use jhn_bencoding
+    * blist -- use jhn_blist
     * bloom -- use jhn_bloom
+    * bstring -- use jhn_bstring
+    * ip_addr -- use jhn_ip_addr
     * lazy -- use jhn_lazy
     * msgpack -- use jhn_msgpack
     * mustache -- use jhn_mustache
