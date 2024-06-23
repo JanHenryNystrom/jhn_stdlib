@@ -86,9 +86,7 @@
 -module(json).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
--deprecated({encode, '_'}).
--deprecated({decode, '_'}).
--deprecated({eval, '_'}).
+-deprecated(module).
 
 %% Library functions
 -export([encode/1, encode/2,

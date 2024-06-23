@@ -38,10 +38,8 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2013-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(msgpack).
+-module(jhn_msgpack).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
-
--deprecated(module).
 
 %% Library functions
 -export([encode/1, encode/2,

@@ -22,7 +22,7 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2016-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(bloom_tests).
+-module(jhn_bloom_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% Includes

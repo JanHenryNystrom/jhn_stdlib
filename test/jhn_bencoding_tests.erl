@@ -22,7 +22,7 @@
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2018-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
--module(bencoding_tests).
+-module(jhn_bencoding_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% Includes

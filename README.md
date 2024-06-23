@@ -84,8 +84,14 @@ Features/Modules
 Deprecated Features/Modules
 --------
 
-  * json -- use jhn_json instead, with the exception of validation
-  * jstream -- use jhn_json instead
+  * Replaced
+    * json -- use jhn_json instead
+    * jstream -- use jhn_json instead
+  * Renamed
+    * bencoding -- use jhn_bencoding instead
+    * bloom -- use jhn_bloom instead
+    * lazy -- use jhn_lazy instead
+    * msgpack -- use jhn_msgpack instead
 
 
 <a name='build'>
