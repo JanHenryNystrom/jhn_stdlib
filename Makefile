@@ -14,7 +14,7 @@
 # limitations under the License.
 #==============================================================================
 
-BASE := $(strip $(wildcard deps/makefiles/erlang.mk))
+BASE := $(strip $(wildcard deps/makefiles/erlang3.mk))
 
 ifeq (${BASE},)
   DUMMY := $(shell mkdir -p deps)
