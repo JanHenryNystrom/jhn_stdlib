@@ -45,32 +45,33 @@ Features/Modules
     * Merge patch JSON -- jhn_json [rfc7396][32]
     * MessagePack -- jhn_msgpack [MessagePack][12]/Erlang
     * Bencoding -- jhn_bencoding
-    * Encoding/decoding Syslog/Erlang -- syslog [rfc5424][13],
-                                                [rfc5427][14],
-                                                [rfc6012][29]
+    * Encoding/decoding Syslog/Erlang -- jhn_syslog [rfc5424][13],
+                                                    [rfc5427][14],
+                                                    [rfc6012][29]
   * Standards
-    * Encoding/decoding URI/Erlang -- uri [rfc3986][15]
+    * Encoding/decoding URI/Erlang -- jhn_uri [rfc3986][15]
     * Encoding/decoding IP addresses/Erlang -- jhn_ip_addr [rfc4291][16],
                                                            [rfc5952][17],
                                                            [rfc4632][18]
-    * Generating/encoding/decoding Timestamps Posix/Erlang -- timestamp
+    * Generating/encoding/decoding Timestamps Posix/Erlang -- jhn_timestamp
                                                               [rfc3339][19],
                                                               [rfc7231][21]
   * Clients
-    * A simple HTTP client -- shttpc [rfc7230][20], [rfc7231][21],
-                                     [rfc7538][22], [rfc5789][23],
-                                     [rfc2818][24]
-    * Server/client for Syslog -- syslog [rfc5425][25], [rfc5426][26],
-                                         [rfc6587][27]
+    * A simple HTTP client -- jhn_shttpc [rfc7230][20], [rfc7231][21],
+                                         [rfc7538][22], [rfc5789][23],
+                                         [rfc2818][24]
+    * Server/client for Syslog -- jhn_syslog [rfc5425][25], [rfc5426][26],
+                                             [rfc6587][27]
   * Pull oriented data source abstraction
     * lazy -- jhn_lazy abstracts different data sources as uniform lazy data
   * Data structures
     * Bloom filters -- jhn_bloom [Bloom Filters][36]
     * Property lists -- jhn_plist
-    * Prefix trees -- jhn_p_tree
-    * Binary(UTF-8) Prefix trees -- jhn_pb_tree
-    * Range trees -- jhn_r_tree
-    * T-trees -- t_tree
+    * Prefix trees -- jhn_p_tree [Prefix Tree][38]
+    * Binary(UTF-8) Prefix trees -- jhn_pb_tree [Prefix Tree][38]
+                                                [UTF-8][39]
+    * Range trees -- jhn_r_tree [Range Tree][40]
+    * T-trees -- t_tree [T-tree][41]
   * Algorithms
     * Levenshtein distance -- jhn_math:levenshtein/2 [Levenshtein][35]
     * CRC32-C checksum -- jhn_hash:crc32c/1 [rfc9260][33]
@@ -99,6 +100,11 @@ Deprecated Features/Modules
     * pb_tree -- use jhn_pb_tree
     * plist -- use jhn_plist
     * r_tree -- use jhn_r_tree
+    * shttpc -- use jhn_shttpc
+    * syslog -- use jhn_syslog
+    * t_tree -- use jhn_t_tree
+    * timestamp -- use jhn_timestamp
+    * uri -- use jhn_uri
   * Removed
     * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
                                      [draft-fge-json-schema-validation-00][11]
@@ -231,3 +237,11 @@ I know I really should.
         "Bloom filter"
   [37]: https://en.wikipedia.org/wiki/Mustache_(template_system)
         "Mustache (template system)"
+  [38]: https://en.wikipedia.org/wiki/Trie
+        "Trie"
+  [39]: https://en.wikipedia.org/wiki/UTF-8
+        "UTF-8"
+  [40]: https://en.wikipedia.org/wiki/Range_tree
+        "Range tree"
+  [41]: https://en.wikipedia.org/wiki/T-tree
+        "T-tree"
