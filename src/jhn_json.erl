@@ -277,7 +277,7 @@ next(B) -> do_next(B).
 %% Function: next(Binary, Cont) -> {Binary, Binary} | {more, Cont}.
 %% @doc
 %%   Picks the first json on a stream given a continuation and returns that
-%%   and the rest or {moew Continuation} is if it was not a complete value.
+%%   and the rest or {more Continuation} is if it was not a complete value.
 %% @end
 %%--------------------------------------------------------------------
 -spec next(binary(), next_cont()) -> {binary(), binary()} | {more, next_cont()}.
