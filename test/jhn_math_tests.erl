@@ -47,13 +47,13 @@ rotl32_2_test_() ->
 
 levenshtein_test_() ->
     [{"equal",
-      ?_test(?assertEqual(0, levenshtein:distance("Rose", "Rose")))},
+      ?_test(?assertEqual(0, jhn_math:levenshtein("Rose", "Rose")))},
      {"Empty one",
-      ?_test(?assertEqual(4, levenshtein:distance("", "Rose")))},
+      ?_test(?assertEqual(4, jhn_math:levenshtein("", "Rose")))},
      {"Empty two",
-      ?_test(?assertEqual(4, levenshtein:distance("Rose", "")))},
+      ?_test(?assertEqual(4, jhn_math:levenshtein("Rose", "")))},
      {"kitte/sitting",
-      ?_test(?assertEqual(3, levenshtein:distance("kitten", "sitting")))}
+      ?_test(?assertEqual(3, jhn_math:levenshtein("kitten", "sitting")))}
     ].
 
 

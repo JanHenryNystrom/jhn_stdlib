@@ -25,27 +25,41 @@
 %%%
 %%%  A jhn_server process assumes all specific parts to be located in a
 %%%  callback module exporting a predefined set of functions, some optional.
+%%%  <![CDATA[
 %%%  The relationship between the behavior functions and the callback
 %%%  functions is as follows: ----->/-----> fuction call/return
 %%%   ====> message sent
 %%%
-%%%   User module                  jhn_server module     Callback module
-%%%   -----------                  -------               -------
-%%%   jhn_server:create/1/2 -----> proc_lib:spawn -----> init/1
-%%%                         <====                 <-----
+%%%   User module: <-------------> jhn_server module: <--/==> Callback module:
 %%%
-%%%   jhn_server:call/2/3   =====>                -----> request/2
-%%%                         <=====                <----- jhn_server:reply/1/2
+%%%   -----------------------------------------------------------------------
+%%%
+%%%   jhn_server:create/1/2 -----> proc_lib:spawn ----> init/1
+%%%
+%%%   jhn_server:create/1/2 <----- proc_lib:spawn <==== init/1
+%%%
+%%%   -----------------------------------------------------------------------
+%%%
+%%%   jhn_server:call/2/3   =====>  (jhn_server)  -----> request/2
+%%%
+%%%   jhn_server:call/2/3   <=====  (jhn_server)  <----- jhn_server:reply/1/2
 %%%                                                       (optional)
-%%%   jhn_server:sync/1/2   =====>
-%%%                         <=====
 %%%
-%%%   jhn_server:cast/2/3   =====>                -----> request/2
+%%%   -----------------------------------------------------------------------
+%%%
+%%%   jhn_server:sync/1/2  =====> (jhn_server)
+%%%
+%%%   jhn_server:sync/1/2  <===== (jhn_server)
+%%%
+%%%   -----------------------------------------------------------------------
+%%%
+%%%   jhn_server:cast/2/3   =====> (jhn_server)   -----> request/2
 %%%
 %%%   All the following are optional
 %%%
-%%%   Other process                 Callback module
-%%%   -----------                   -------
+%%%   Other process         =====> Callback module
+%%%
+%%%   -----------------------------------------------------------------------
 %%%
 %%%   Id ! Message          =====>  message/2
 %%%
@@ -53,7 +67,7 @@
 %%%
 %%%   sys:code_change/4     =====>  code_change/3
 %%%
-%%%   sys:get_status/2       =====>  format_status/2
+%%%   sys:get_status/2      =====>  format_status/2
 %%%
 %%%   If a callback function fails or returns a bad value, the jhn_server
 %%%   process terminates. N.B. that a gen_server process does not trap exit
@@ -69,33 +83,37 @@
 %%%   The callback module shall export:
 %%%
 %%%   init(Args)
-%%%      ==> {ok, State}
-%%%          {hibernate, State}
-%%%          ignore
-%%%          {error, stop}
+%%%      ==> {ok, State} |
+%%%          {hibernate, State} |
+%%%          ignore |
+%%%          {error, stop} |
 %%%          {stop, Reason}
 %%%
 %%%   request(Msg, State)
-%%%      ==> {ok, State}
-%%%          {hibernate, State}
+%%%      ==> {ok, State} |
+%%%          {hibernate, State} |
 %%%          {stop, Reason}
 %%%
 %%%   The callback module can export:
+%%%
 %%%   message(Msg, State)
-%%%      ==> {ok, State}
-%%%          {hibernate, State}
+%%%      ==> {ok, State} |
+%%%          {hibernate, State} |
 %%%          {stop, Reason}
 %%%
-%%%   Lets the user module clean up always called when server terminates
 %%%   terminate(Reason, State)
 %%%      ==> Return value ignored
+%%%
+%%%   Lets the user module clean up always called when server terminates
 %%%
 %%%   code_change(OldVsn, Data, Extra)
 %%%      ==> {ok, State}
 %%%
 %%%   format_status(Opt, _)
-%%%      Uses the old format will be replaced.
 %%%      ==> {ok, State}
+%%%
+%%%      Uses the old format will be replaced.
+%%%  ]]>
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
