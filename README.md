@@ -17,7 +17,7 @@ Introduction
 ------------
 
 This library consists mainly of code that arose out of my curiosity, either
-about Erlang and coding in general or concerning a pericular protocol or
+about Erlang and coding in general or concerning a perticular protocol or
 technique. So there is little of cohesion in purposes between the different
 library modules. But having published these I will continue to support these
 since the road to enlightenment is one without terminus.
