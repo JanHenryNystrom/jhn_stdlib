@@ -114,9 +114,9 @@ gen() -> gen([]).
 -spec gen([opt()] | #opts{}) -> list()| iolist() | binary() | posix().
 %%--------------------------------------------------------------------
 gen(#opts{precision = Precision, return_type = posix}) ->
-    os:system_time(precision(Precision));
+    erlang:system_time(precision(Precision));
 gen(Opts = #opts{precision = Precision}) ->
-    encode(os:system_time(precision(Precision)), Opts);
+    encode(erlang:system_time(precision(Precision)), Opts);
 gen(Opts) ->
     gen(parse_opts(Opts, #opts{})).
 
