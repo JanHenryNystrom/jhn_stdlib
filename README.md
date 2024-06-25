@@ -2,6 +2,7 @@ jhn_stdlib [(γ)][5]
 ==========
 
 A few thought experiments solidified as code.
+JSON, MessagePack, syslog, URI, IP addresses, Timestamps
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
@@ -39,29 +40,28 @@ Features/Modules
     * jhn_bstring -- drop in replacement for the string module in stdlib
     * jhn_mustache -- [Mustache (template system)][37]
   * Protocols
-    * Encoding/decoding JSON/Erlang  -- jhn_json [rfc8259][30]
-    * Encoding/decoding/evaluation JSON Pointer/Erlang  -- jhn_json [rfc6901][8]
-    * Patch JSON -- jhn_json [rfc6902][31]
-    * Merge patch JSON -- jhn_json [rfc7396][32]
-    * MessagePack -- jhn_msgpack [MessagePack][12]/Erlang
-    * Bencoding -- jhn_bencoding
-    * Encoding/decoding Syslog/Erlang -- jhn_syslog [rfc5424][13],
-                                                    [rfc5427][14],
-                                                    [rfc6012][29]
+    * JSON  -- encoding/decoding -- jhn_json [rfc8259][30]
+    * JSON Pointer -- encoding/decoding/evaluation -- jhn_json [rfc6901][8]
+    * JSON Patch -- evaluation -- jhn_json [rfc6902][31]
+    * JSON Merge Patch  -- evaluation -- jhn_json [rfc7396][32]
+    * MessagePack -- encoding/decoding -- jhn_msgpack [MessagePack][12]/Erlang
+    * Bencoding -- encoding/decoding -- jhn_bencoding
+    * Syslog -- encoding/decoding  -- jhn_syslog [rfc5424][13],
+                                                 [rfc5427][14],
+                                                 [rfc6012][29]
   * Standards
-    * Encoding/decoding URI/Erlang -- jhn_uri [rfc3986][15]
-    * Encoding/decoding IP addresses/Erlang -- jhn_ip_addr [rfc4291][16],
-                                                           [rfc5952][17],
-                                                           [rfc4632][18]
-    * Generating/encoding/decoding Timestamps Posix/Erlang -- jhn_timestamp
-                                                              [rfc3339][19],
-                                                              [rfc7231][21]
+    * URI -- encoding/decoding -- jhn_uri [rfc3986][15]
+    * IP Addresses -- encoding/decoding -- jhn_ip_addr [rfc4291][16],
+                                                       [rfc5952][17],
+                                                        [rfc4632][18]
+    * Timestamps -- generating/encoding/decoding -- jhn_timestamp [rfc3339][19],
+                                                                  [rfc7231][21]
   * Clients
-    * A simple HTTP client -- jhn_shttpc [rfc7230][20], [rfc7231][21],
-                                         [rfc7538][22], [rfc5789][23],
-                                         [rfc2818][24]
-    * Server/client for Syslog -- jhn_syslog [rfc5425][25], [rfc5426][26],
-                                             [rfc6587][27]
+    * HTTP -- client -- jhn_shttpc [rfc7230][20], [rfc7231][21],
+                                   [rfc7538][22], [rfc5789][23],
+                                   [rfc2818][24]
+    * Syslog -- server/client -- jhn_syslog [rfc5425][25], [rfc5426][26],
+                                            [rfc6587][27]
   * Pull oriented data source abstraction
     * lazy -- jhn_lazy abstracts different data sources as uniform lazy data
   * Data structures
@@ -83,10 +83,6 @@ Features/Modules
 Deprecated Features/Modules
 --------
 
-  * Replaced
-    * json -- use jhn_json
-    * jstream -- use jhn_json
-    * levenshtein -- use jhn_math:levenshtein/2
   * Renamed
     * bencoding -- use jhn_bencoding
     * blist -- use jhn_blist
@@ -105,9 +101,6 @@ Deprecated Features/Modules
     * t_tree -- use jhn_t_tree
     * timestamp -- use jhn_timestamp
     * uri -- use jhn_uri
-  * Removed
-    * Validation JSON schema -- json [draft-zyp-json-schema-04][10],
-                                     [draft-fge-json-schema-validation-00][11]
 
 <a name='build'>
 

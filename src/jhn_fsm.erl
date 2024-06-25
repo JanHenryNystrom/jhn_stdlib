@@ -28,27 +28,43 @@
 %%%
 %%%  A jhn_fsm process assumes all specific parts to be located in a
 %%%  callback module exporting a predefined set of functions, some optional.
+%%%  <![CDATA[
 %%%  The relationship between the behavior functions and the callback
 %%%  functions is as follows: ----->/-----> fuction call/return
 %%%   ====> message sent
 %%%
 %%%   User module                  jhn_fsm module        Callback module
-%%%   -----------                  -------               -------
+%%%
+%%%   -----------------------------------------------------------------------
+%%%
 %%%   jhn_fsm:create/1/2    -----> proc_lib:spawn -----> init/1
-%%%                         <====                 <-----
 %%%
-%%%   jhn_fsm:call/2/3      =====>                -----> StateName/2 or event/3
-%%%                         <=====                <----- jhn_fsm:reply/1/2
+%%%   jhn_fsm:create/1/2    <-----  proc_lib:spawn <==== init/1
+%%%
+%%%   -----------------------------------------------------------------------
+%%%
+%%%
+%%%   jhn_fsm:call/2/3      =====>   (jhn_fsm)    -----> StateName/2 or event/3
+%%%
+%%%   jhn_fsm:call/2/3      <=====   (jhn_fsm)    <----- jhn_fsm:reply/1/2
 %%%                                                       (optional)
-%%%   jhn_fsm:sync/1/2      =====>
-%%%                         <=====
 %%%
-%%%   jhn_fsm:cast/2/3      =====>                -----> StateName/2 or event/3
+%%%   -----------------------------------------------------------------------
+%%%
+%%%   jhn_fsm:sync/1/2      =====>   (jhn_fsm)
+%%%
+%%%   jhn_fsm:sync/1/2      <=====   (jhn_fsm)
+%%%
+%%%   -----------------------------------------------------------------------
+%%%
+%%%   jhn_fsm:cast/2/3      =====>   (jhn_server) -----> StateName/2 or event/3
+%%%
 %%%
 %%%   All the following are optional
 %%%
 %%%   Other process                 Callback module
-%%%   -----------                   -------
+%%%
+%%%   -----------------------------------------------------------------------
 %%%
 %%%   Id ! Message          =====>  message/3
 %%%
@@ -79,42 +95,45 @@
 %%%   The callback module shall export:
 %%%
 %%%   init(Args)
-%%%      ==> {ok, StateName, State}
-%%%          {hibernate, StateName, State}
-%%%          ignore
-%%%          {error, stop}
-%%%          {stop, Reason}
+%%%      ==> {ok, StateName, State} |
+%%%          {hibernate, StateName, State} |
+%%%          ignore |
+%%%          {error, stop} |
+%%%          {stop, Reason} |
 %%%
 %%%   The callback module can export:
 %%%
 %%%   StateName(Msg, State)
-%%%      ==> {ok, StateName, State}
-%%%          {hibernate, StateName, State}
-%%%          deferred
+%%%      ==> {ok, StateName, State} |
+%%%          {hibernate, StateName, State} |
+%%%          deferred |
 %%%          {stop, Reason}
 %%%
 %%%   message(Msg, StateName, State)
-%%%      ==> {ok, StateName, State}
-%%%          {hibernate, StateName, State}
-%%%          deferred
+%%%      ==> {ok, StateName, State} |
+%%%          {hibernate, StateName, State} |
+%%%          deferred |
 %%%          {stop, Reason}
 %%%
 %%%   event(Msg, StateName, State)
-%%%      ==> {ok, StateName, State}
-%%%          {hibernate, StateName, State}
-%%%          deferred
+%%%      ==> {ok, StateName, State} |
+%%%          {hibernate, StateName, State} |
+%%%          deferred |
 %%%          {stop, Reason}
 %%%
-%%%   Lets the user module clean up always called when server terminates
 %%%   terminate(Reason, StateName, State)
 %%%      ==> Return value ignored
+%%%
+%%%   Lets the user module clean up always called when server terminates
 %%%
 %%%   code_change(OldVsn, StateName, Data, Extra)
 %%%      ==> {ok, State}
 %%%
 %%%   format_status(Opt, _)
-%%%      Uses the old format will be replaced.
 %%%      ==> {ok, State}
+%%%
+%%%      Uses the old format will be replaced.
+%%%  !]]>
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
