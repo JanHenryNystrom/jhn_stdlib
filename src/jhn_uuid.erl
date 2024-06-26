@@ -50,7 +50,7 @@
          name                    :: iodata() | undefined,
          name_space              :: atom() | iodata() | undefined,
          %% v8
-         custom                  :: non_neg_integer() | binary() | undefined,
+         custom                  :: non_neg_integer() | bitstring() | undefined,
          %% format
          human          = false  :: boolean(),
          urn            = false  :: boolean(),
@@ -60,8 +60,7 @@
 -type uuid() :: #{version => 1,
                   node => node_type(),
                   clock_sequence => non_neg_integer(),
-                  %% This may have to be a posix nano seconds,
-                  %% change after test are in place.
+                  %% This is a posix timestamp, nanoseconds precision.
                   timestamp => non_neg_integer() | binary()} |
                 #{version => 3,
                   name_space => atom() | iodata(), name => iodata(),
@@ -73,8 +72,7 @@
                 #{version => 6,
                   node => node_type(),
                   clock_sequence => non_neg_integer(),
-                  %% This may have to be a posix nano seconds,
-                  %% change after test are in place.
+                  %% This is a posix timestamp, nanoseconds precision.
                   timestamp => non_neg_integer() | binary()} |
                 #{version => 7,
                   random => non_neg_integer(),
@@ -156,33 +154,43 @@ gen(X) -> erlang:error(badarg, [X]).
 %%     uuid -> a map representing the UUID is generated that can be passed to
 %%             encode but can differ from the one generated from decode since
 %%             some information may have been lost.
+%%
+%%     human -> when combined with uuid provides human readable timstamps for
+%%              v1, v6 and v7
+%%
 %%     urn -> the URN is returned (can be combined with  binary, iolist, list)
 %%
 %%    Type specific options. They are all optional if not marked as required:
 %%
 %%    v1:
 %%
-%%    {node, Node}
-%%    {clock_sequence, CSeq}
+%%    {node, Node} -> binary MAC, integer or the atoms random and undefined
+%%
+%%    {clock_sequence, CSeq} -> integer
 %%
 %%    v3:
 %%
-%%    {name, Name} (required)
-%%    {name_space, NameSpace}
+%%    {name, Name} (required) -> iodata representing the name
+%%
+%%    {name_space, NameSpace} -> iodata representing namespace or an atom
+%%                               representing one of the predefined namespaces:
+%%                               dns, url, oid, x500, nil and max
 %%
 %%    v5:
 %%
-%%    {name, Name} (required)
-%%    {name_space, NameSpace}
+%%    {name, Name} (required) -> same as for v3
+%%
+%%    {name_space, NameSpace} -> same as for v3
 %%
 %%    v6:
 %%
-%%    {node, Node}
-%%    {clock_sequence, CSeq}
+%%    {node, Node} -> same as for v1
+%%
+%%    {clock_sequence, CSeq} -> same as for v1
 %%
 %%    v8:
 %%
-%%    {custom, Custom} (required)
+%%    {custom, Custom} (required) -> an integer or 122 bit binary
 %%
 %%
 %% @end
@@ -285,10 +293,15 @@ decode(Binary, Opts) -> decode(Binary, parse_opts(format, Opts, #opts{})).
 %% ===================================================================
 do_gen(nil, _) -> nil;
 do_gen(max, _) -> max;
-do_gen(v1, #opts{clock_sequence = CSeq0, node = Node0}) ->
+do_gen(v1, Opts = #opts{clock_sequence = CSeq0, node = Node0}) ->
     CSeq = gen_cseq(CSeq0),
     Node = gen_node(Node0),
-    TS = to_timestamp(erlang:system_time(nano_seconds)),
+    TS = case Opts of
+             #opts{human = true, return_type = uuid} ->
+                 jhn_timestamp:gen([binary, nano]);
+             _ ->
+                 erlang:system_time(nano_seconds)
+         end,
     #{version => 1, timestamp => TS, clock_sequence => CSeq, node => Node};
 do_gen(v3, Opts = #opts{name_space = undefined}) ->
     do_gen(v3, Opts#opts{name_space = gen(v1)});
@@ -303,10 +316,15 @@ do_gen(v5, #opts{name_space = Namespace, name = Name}) ->
     #{version => 5, name_space => Namespace, name => Name};
 do_gen(v6, Opts) ->
     (do_gen(v1, Opts))#{version => 6};
-do_gen(v7, _) ->
+do_gen(v7, Opts) ->
+    TS = case Opts of
+             #opts{human = true, return_type = uuid} ->
+                 jhn_timestamp:gen([binary, milli]);
+             _ ->
+                 erlang:system_time(milli_seconds)
+         end,
     <<Random:74, _:6>> = crypto:strong_rand_bytes(10),
-    #{version => 7, timestamp => jhn_timestamp:gen([posix, milli]),
-      random => Random};
+    #{version => 7, timestamp => TS, random => Random};
 do_gen(v8, #opts{custom = Custom}) when is_integer(Custom) ->
     #{version => 8, custom => Custom};
 do_gen(v8, #opts{custom = Custom = <<_:122>>}) ->
@@ -417,7 +435,7 @@ name_space(nil) ->  encode(nil);
 name_space(max) ->  encode(max);
 name_space(UUID) -> UUID.
 
-encode_nano_ts(TS) when is_integer(TS) -> <<TS:60>>;
+encode_nano_ts(TS) when is_integer(TS) -> <<(to_timestamp(TS)):60>>;
 encode_nano_ts(TS) when is_binary(TS) ->
     TS1 = jhn_timestamp:encode(jhn_timestamp:decode(TS, [nano]),
                                [posix, nano]),
@@ -473,7 +491,7 @@ pad(I) ->
         B -> B
     end.
 
-decode_ts(TS, false) -> TS;
+decode_ts(TS, false) -> from_timestamp(TS);
 decode_ts(TS, true) -> jhn_timestamp:encode(from_timestamp(TS), [binary, nano]).
 
 
@@ -490,7 +508,7 @@ parse_opt(_, iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(_, uuid, Opts) -> Opts#opts{return_type = uuid};
 parse_opt(_, urn, Opts) -> Opts#opts{urn = true};
 parse_opt(format, human, Opts) -> Opts#opts{human = true};
-%parse_opt(v1, human, Opts) -> Opts#opts{human = true};
+parse_opt(v1, human, Opts) -> Opts#opts{human = true};
 parse_opt(v1, {node, undefined}, Opts) -> Opts#opts{node = undefined};
 parse_opt(v1, {node, random}, Opts) -> Opts#opts{node = random};
 parse_opt(v1, {node, I}, Opts) when is_integer(I) -> Opts#opts{node = I};
@@ -502,7 +520,7 @@ parse_opt(v3, {name_space, NameSpace}, Opts) -> Opts#opts{name_space=NameSpace};
 parse_opt(v5, {name, Name}, Opts) -> Opts#opts{name = Name};
 parse_opt(v5, {name_space, NameSpace}, Opts) -> Opts#opts{name_space=NameSpace};
 parse_opt(v6, Opt, Opts) -> parse_opt(v1, Opt, Opts);
-%parse_opt(v7, human, Opts) -> Opts#opts{human = true};
+parse_opt(v7, human, Opts) -> Opts#opts{human = true};
 parse_opt(v8, {custom, C}, Opts) when is_integer(C) -> Opts#opts{custom = C};
 parse_opt(v8, {custom, C = <<_:122>>}, Opts) -> Opts#opts{custom = C};
 parse_opt(Type, Opt, _) -> erlang:error(badarg, [Type, Opt]).

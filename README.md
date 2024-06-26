@@ -2,7 +2,7 @@ jhn_stdlib [(γ)][5]
 ==========
 
 A few thought experiments solidified as code.
-JSON, MessagePack, syslog, URI, IP addresses, Timestamps
+JSON, MessagePack, syslog, URI, IP addresses, Timestamps, UUIDs
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
