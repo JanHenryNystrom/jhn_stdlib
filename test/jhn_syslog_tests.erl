@@ -60,7 +60,7 @@
 %% open/0
 %%--------------------------------------------------------------------
 open_0_test_() ->
-    [?_test(?assertMatch(#transport{}, syslog:open()))
+    [?_test(?assertMatch(#transport{}, jhn_syslog:open()))
     ].
 
 %%--------------------------------------------------------------------
@@ -79,39 +79,39 @@ open_1_client_test_() ->
              [server_stop(Type, Server) || {Type, Server} <- Servers],
              [application:stop(App) || App <- Apps]
      end,
-    [?_test(?assertMatch(ok, syslog:close(syslog:open([])))),
-     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv4])))),
-     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, client])))),
-     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv6])))),
+    [?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open([])))),
+     ?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open([udp, ipv4])))),
+     ?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open([udp, client])))),
+     ?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open([udp, ipv6])))),
      ?_test(?assertEqual(ok,
-                         syslog:close(
-                           syslog:open([dtls,
+                         jhn_syslog:close(
+                           jhn_syslog:open([dtls,
                                         {opts, [{verify, verify_none}]},
                                         {destination, "127.0.0.1"},
                                         {destination_port, ?DTLS}])))),
      ?_test(?assertEqual(ok,
-                         syslog:close(
-                           syslog:open([tcp,
+                         jhn_syslog:close(
+                           jhn_syslog:open([tcp,
                                         {destination, {127, 0, 0, 1}},
                                         {destination_port, ?UDP}])))),
      ?_test(?assertEqual(ok,
-                         syslog:close(
-                           syslog:open([tls,
+                         jhn_syslog:close(
+                           jhn_syslog:open([tls,
                                         {opts, [{verify, verify_none}]},
                                         {destination, "127.0.0.1"},
                                         {destination_port, ?TLS}])))),
      ?_test(?assertEqual({error, {exit, badarg}},
-                         syslog:open([{opts, [{ip, none}]}]))),
-     ?_test(?assertMatch({error, _}, syslog:open([tcp]))),
+                         jhn_syslog:open([{opts, [{ip, none}]}]))),
+     ?_test(?assertMatch({error, _}, jhn_syslog:open([tcp]))),
      ?_test(?assertMatch({error, {exit, _}},
-                         syslog:open([tcp, {opts, [{ip, none}]}]))),
+                         jhn_syslog:open([tcp, {opts, [{ip, none}]}]))),
      %% Connect so the server must be there for dlts
-     %% ?_test(?assertMatch({error, _},
-     %%                     syslog:open([dtls,
-     %%                                  {destination, "::1"},
-     %%                                  {destination_port, ?DTLS}]))),
      ?_test(?assertMatch({error, _},
-                         syslog:open([tls,
+                         jhn_syslog:open([dtls,
+                                      {destination, "::1"},
+                                      {destination_port, ?DTLS}]))),
+     ?_test(?assertMatch({error, _},
+                         jhn_syslog:open([tls,
                                       {destination, "::1"},
                                       {destination_port, 4712}])))
     ]}.
@@ -129,37 +129,37 @@ open_1_client_timeout_test_() ->
              [server_stop(Type, Server) || {Type, Server} <- Servers],
              [application:stop(App) || App <- Apps]
      end,
-    [?_test(?assertMatch(ok, syslog:close(syslog:open([])))),
-     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv4])))),
-     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, client])))),
-     ?_test(?assertMatch(ok, syslog:close(syslog:open([udp, ipv6])))),
+    [?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open([])))),
+     ?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open([udp, ipv4])))),
+     ?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open([udp, client])))),
+     ?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open([udp, ipv6])))),
      ?_test(?assertEqual(ok,
-                         syslog:close(
-                           syslog:open([dtls,
+                         jhn_syslog:close(
+                           jhn_syslog:open([dtls,
                                         {opts, [{verify, verify_none}]},
                                         {timeout, 500},
                                         {destination, {127, 0, 0, 1}},
                                         {destination_port, ?DTLS}])))),
      ?_test(?assertEqual(ok,
-                         syslog:close(
-                           syslog:open([tcp,
+                         jhn_syslog:close(
+                           jhn_syslog:open([tcp,
                                         {timeout, 500},
                                         {destination, {127, 0, 0, 1}},
                                         {destination_port, ?UDP}])))),
      ?_test(?assertEqual(ok,
-                         syslog:close(
-                           syslog:open([tls,
+                         jhn_syslog:close(
+                           jhn_syslog:open([tls,
                                         {timeout, 500},
                                         {opts, [{verify, verify_none}]},
                                         {destination, {127, 0, 0, 1}},
                                         {destination_port, ?TLS}])))),
-     ?_test(?assertMatch({error, _}, syslog:open([tcp, {timeout, 500}]))),
+     ?_test(?assertMatch({error, _}, jhn_syslog:open([tcp, {timeout, 500}]))),
      ?_test(?assertMatch({error, {exit, _}},
-                         syslog:open([tcp,
+                         jhn_syslog:open([tcp,
                                       {timeout, 500},
                                       {opts, [{ip, none}]}]))),
      ?_test(?assertMatch({error, _},
-                         syslog:open([tls,
+                         jhn_syslog:open([tls,
                                       {timeout, 500},
                                       {destination, {0, 0, 0, 0, 0, 0, 0, 1}},
                                       {destination_port, 4711}])))
@@ -170,33 +170,43 @@ open_1_server_test_() ->
      fun() -> application:ensure_all_started(ssl) end,
      fun({ok, Apps}) -> [application:stop(App) || App <- Apps] end,
      [?_test(
-         ?assertMatch(ok, syslog:close(syslog:open([server, {port, ?UDPS}])))),
+         ?assertMatch(ok,
+                      jhn_syslog:close(
+                        jhn_syslog:open([server, {port, ?UDPS}])))),
       ?_test(
          ?assertMatch(ok,
-                      syslog:close(syslog:open([udp, server, {port, ?UDPS}])))),
+                      jhn_syslog:close(
+                        jhn_syslog:open([udp, server, {port, ?UDPS}])))),
       ?_test(
          ?assertMatch(ok,
-                      syslog:close(
-                        syslog:open([udp, ipv6, server, {port, ?UDPS}])))),
+                      jhn_syslog:close(
+                        jhn_syslog:open([udp, ipv6, server, {port, ?UDPS}])))),
       ?_test(
          ?assertMatch(ok,
-                      syslog:close(syslog:open([tcp, server, {port, ?UDP}])))),
+                      jhn_syslog:close(
+                        jhn_syslog:open([tcp, server, {port, ?UDP}])))),
       ?_test(
          ?assertMatch(ok,
-                      syslog:close(
-                        syslog:open([tcp, server, ipv6, {port, ?UDP}])))),
-      ?_test(?assertMatch(ok, syslog:close(syslog:open([tls, ipv6, server])))),
+                      jhn_syslog:close(
+                        jhn_syslog:open([tcp, server, ipv6, {port, ?UDP}])))),
       ?_test(
          ?assertMatch(ok,
-                      syslog:close(syslog:open([tls, server, {port, ?TLS}])))),
-      %% ?_test(?assertEqual({error,eacces}, syslog:open([server, udp]))),
-      %% ?_test(?assertEqual({error,eacces}, syslog:open([server, tcp]))),
-      ?_test(?assertMatch({error, {exit, _}},
-                          syslog:open([tcp, server, {opts, [{ip, none}]}]))),
+                      jhn_syslog:close(jhn_syslog:open([tls, ipv6, server])))),
+      ?_test(
+         ?assertMatch(ok,
+                      jhn_syslog:close(
+                        jhn_syslog:open([tls, server, {port, ?TLS}])))),
+      %% ?_test(?assertEqual({error,eacces}, jhn_syslog:open([server, udp]))),
+      %% ?_test(?assertEqual({error,eacces}, jhn_syslog:open([server, tcp]))),
+      ?_test(
+         ?assertMatch({error, {exit, _}},
+                      jhn_syslog:open([tcp, server, {opts, [{ip, none}]}]))),
       ?_test(?assertMatch({error, _},
-                          syslog:open([tls, server, {opts, [{depth, -1}]}]))),
+                          jhn_syslog:open([tls,
+                                           server,
+                                           {opts, [{depth, -1}]}]))),
       ?_test(?assertMatch({error, _},
-                          syslog:open([tls, server, {opts, [{ip, none}]}])))
+                          jhn_syslog:open([tls, server, {opts, [{ip, none}]}])))
      ]}.
 
 %%--------------------------------------------------------------------
@@ -208,16 +218,16 @@ send_2_test_() ->
      fun() ->
              {ok, Apps} = application:ensure_all_started(ssl),
              UDPS = {udp, server_start(udp, ?UDPS, send_2_test_)},
-             UDPC = syslog:open([{destination, {127, 0, 0, 1}},
+             UDPC = jhn_syslog:open([{destination, {127, 0, 0, 1}},
                                  {destination_port, ?UDPS}]),
              true = ets:insert(send_2_test, {udpc, UDPC}),
              TCPS = {tcp, server_start(tcp, ?UDP, send_2_test_)},
-             TCPC = syslog:open([tcp,
+             TCPC = jhn_syslog:open([tcp,
                                  {destination, {127, 0, 0, 1}},
                                  {destination_port, ?UDP}]),
              true = ets:insert(send_2_test, {tcpc, TCPC}),
              TLSS = {tls, server_start(tls, ?TLS, send_2_test_)},
-             TLSC = syslog:open([tls,
+             TLSC = jhn_syslog:open([tls,
                                  {opts, [{verify, verify_none}]},
                                  {destination, {127, 0, 0, 1}},
                                  {destination_port, ?TLS}]),
@@ -225,40 +235,40 @@ send_2_test_() ->
              {Apps, [UDPC, TCPC, TLSC], [UDPS, TCPS , TLSS]}
      end,
      fun({Apps, Clients, Servers}) ->
-             [syslog:close(Client) || Client <- Clients],
+             [jhn_syslog:close(Client) || Client <- Clients],
              [server_stop(Type, Server) || {Type, Server} <- Servers],
              [application:stop(App) || App <- Apps]
      end,
      [?_test(?assertEqual(true, register(send_2_test_, self()))),
-      ?_test(?assertMatch(ok, syslog:send(sock(send_2_test, udpc), #{}))),
-      ?_test(?assertMatch(#{}, syslog:decode(active(udp)))),
+      ?_test(?assertMatch(ok, jhn_syslog:send(sock(send_2_test, udpc), #{}))),
+      ?_test(?assertMatch(#{}, jhn_syslog:decode(active(udp)))),
       ?_test(?assertMatch(ok,
-                          syslog:send(sock(send_2_test, udpc),
+                          jhn_syslog:send(sock(send_2_test, udpc),
                                       #{},
                                       [{destination, {127, 0, 0, 1}},
                                        {destination_port, ?UDPS}]))),
-      ?_test(?assertMatch(#{}, syslog:decode(active(udp)))),
-      ?_test(?assertMatch(ok, syslog:send(sock(send_2_test, tcpc), #{}))),
+      ?_test(?assertMatch(#{}, jhn_syslog:decode(active(udp)))),
+      ?_test(?assertMatch(ok, jhn_syslog:send(sock(send_2_test, tcpc), #{}))),
       ?_test(?assertMatch(#{},
-                          syslog:decode(
-                            element(1, syslog:unframe(tcp, active(tcp)))))),
+                          jhn_syslog:decode(
+                            element(1, jhn_syslog:unframe(tcp, active(tcp)))))),
 
-      ?_test(?assertMatch(ok, syslog:send(sock(send_2_test, tlsc), #{}))),
+      ?_test(?assertMatch(ok, jhn_syslog:send(sock(send_2_test, tlsc), #{}))),
       ?_test(?assertMatch(#{}, unframe(tls, active(tls)))),
       ?_test(
          ?assertEqual({error, function_clause},
-                      syslog:send(#transport{type = udp}, #{}))),
+                      jhn_syslog:send(#transport{type = udp}, #{}))),
       ?_test(
          ?assertEqual({error, function_clause},
-                      syslog:send(#transport{type = udp},
+                      jhn_syslog:send(#transport{type = udp},
                                   #{},
                                   [{destination, {127, 0, 0, 1}}]))),
       ?_test(
          ?assertEqual({error, function_clause},
-                      syslog:send(#transport{type = tcp}, #{}))),
+                      jhn_syslog:send(#transport{type = tcp}, #{}))),
       ?_test(
          ?assertEqual({error, function_clause},
-                      syslog:send(#transport{type = tls}, #{})))
+                      jhn_syslog:send(#transport{type = tls}, #{})))
      ]}.
 
 %%--------------------------------------------------------------------
@@ -270,18 +280,18 @@ recv_1_test_() ->
      fun() ->
              {ok, Apps} = application:ensure_all_started(ssl),
              UDPS = server_start(udp, ?UDPS, recv_1_test_),
-             UDPC = syslog:open([{destination, "127.0.0.1"},
+             UDPC = jhn_syslog:open([{destination, "127.0.0.1"},
                                  {destination_port, ?UDPS}]),
              true = ets:insert(recv_1_test, {udps, UDPS}),
              true = ets:insert(recv_1_test, {udpc, UDPC}),
              TCPS = server_start(tcp, ?UDP, recv_1_test_),
-             TCPC = syslog:open([tcp,
+             TCPC = jhn_syslog:open([tcp,
                                  {destination, {127, 0, 0, 1}},
                                  {destination_port, ?UDP}]),
              true = ets:insert(recv_1_test, {tcps, TCPS}),
              true = ets:insert(recv_1_test, {tcpc, TCPC}),
              TLSS = server_start(tls, ?TLS, recv_1_test_),
-             TLSC = syslog:open([tls,
+             TLSC = jhn_syslog:open([tls,
                                  {opts, [{verify, verify_none}]},
                                  {destination, {127, 0, 0, 1}},
                                  {destination_port, ?TLS}]),
@@ -292,63 +302,66 @@ recv_1_test_() ->
               [{udp, UDPS}, {tcp, TCPS}, {tls, TLSS}]}
      end,
      fun({Apps, Clients, Servers}) ->
-             [syslog:close(Client) || Client <- Clients],
+             [jhn_syslog:close(Client) || Client <- Clients],
              [server_stop(Type, Server) || {Type, Server} <- Servers],
              [application:stop(App) || App <- Apps]
      end,
      [?_test(?assertEqual(true, register(recv_1_test_, self()))),
       ?_test(?assertMatch({error, _},
-                          syslog:recv(sock(recv_1_test, udpc)))),
+                          jhn_syslog:recv(sock(recv_1_test, udpc)))),
       ?_test(?assertMatch(passive, passify(pid(recv_1_test, udps)))),
-      ?_test(?assertMatch(ok, syslog:send(sock(recv_1_test, udpc), #{}))),
+      ?_test(?assertMatch(ok, jhn_syslog:send(sock(recv_1_test, udpc), #{}))),
       ?_test(?assertMatch({ok, #{}}, passive(pid(recv_1_test, udps)))),
       ?_test(?assertMatch({error, _},
-                          syslog:recv(sock(recv_1_test, tcpc)))),
+                          jhn_syslog:recv(sock(recv_1_test, tcpc)))),
       ?_test(?assertMatch({error, _},
-                          syslog:recv(sock(recv_1_test, tcpc),
+                          jhn_syslog:recv(sock(recv_1_test, tcpc),
                                       [{timeout, 5}]))),
       ?_test(?assertMatch(passive, passify(pid(recv_1_test, tcps)))),
-      ?_test(?assertMatch(ok, syslog:send(sock(recv_1_test, tcpc), #{}))),
+      ?_test(?assertMatch(ok, jhn_syslog:send(sock(recv_1_test, tcpc), #{}))),
       ?_test(?assertMatch(#{}, passive(pid(recv_1_test, tcps)))),
       ?_test(?assertMatch({error, _},
-                          syslog:recv(sock(recv_1_test, tlsc)))),
+                          jhn_syslog:recv(sock(recv_1_test, tlsc)))),
       ?_test(?assertMatch({error, _},
-                          syslog:recv(sock(recv_1_test, tlsc),
+                          jhn_syslog:recv(sock(recv_1_test, tlsc),
                                       [{timeout, 5}]))),
       ?_test(?assertMatch(passive, passify(pid(recv_1_test, tlss)))),
-      ?_test(?assertMatch(ok, syslog:send(sock(recv_1_test, tlsc), #{}))),
+      ?_test(?assertMatch(ok, jhn_syslog:send(sock(recv_1_test, tlsc), #{}))),
       ?_test(?assertMatch(#{},passive(pid(recv_1_test, tlss)))),
-      ?_test(?assertMatch({error, _}, syslog:recv(#transport{type = udp}))),
-      ?_test(?assertMatch({error, _}, syslog:recv(#transport{type = tcp}))),
-      ?_test(?assertMatch({error, _}, syslog:recv(#transport{type = tls})))
+      ?_test(?assertMatch({error, _}, jhn_syslog:recv(#transport{type = udp}))),
+      ?_test(?assertMatch({error, _}, jhn_syslog:recv(#transport{type = tcp}))),
+      ?_test(?assertMatch({error, _}, jhn_syslog:recv(#transport{type = tls})))
      ]}.
 
 recv_2_test_() ->
     [?_test(?assertMatch({error, _},
-                         syslog:recv(#transport{type = udp}, [{timeout, 5}]))),
+                         jhn_syslog:recv(#transport{type = udp},
+                                         [{timeout, 5}]))),
      ?_test(?assertMatch({error, _},
-                         syslog:recv(syslog:open(), [{timeout, 5}]))),
+                         jhn_syslog:recv(jhn_syslog:open(), [{timeout, 5}]))),
      ?_test(?assertMatch({error, _},
-                         syslog:recv(#transport{type = tcp}, [{timeout, 5}]))),
+                         jhn_syslog:recv(#transport{type = tcp},
+                                         [{timeout, 5}]))),
      ?_test(?assertMatch({error, _},
-                         syslog:recv(#transport{type = tls}, [{timeout, 5}])))
+                         jhn_syslog:recv(#transport{type = tls},
+                                         [{timeout, 5}])))
     ].
 
 %%--------------------------------------------------------------------
 %% close/1
 %%--------------------------------------------------------------------
 close_1_test_() ->
-    [?_test(?assertMatch(ok, syslog:close(syslog:open()))),
+    [?_test(?assertMatch(ok, jhn_syslog:close(jhn_syslog:open()))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:close(#transport{type = udp}))),
+                         jhn_syslog:close(#transport{type = udp}))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:close(#transport{type = tcp}))),
+                         jhn_syslog:close(#transport{type = tcp}))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:close(#transport{type = tcp_listen}))),
+                         jhn_syslog:close(#transport{type = tcp_listen}))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:close(#transport{type = tls}))),
+                         jhn_syslog:close(#transport{type = tls}))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:close(#transport{type = tls_listen})))
+                         jhn_syslog:close(#transport{type = tls_listen})))
     ].
 
 %%--------------------------------------------------------------------
@@ -356,11 +369,11 @@ close_1_test_() ->
 %%--------------------------------------------------------------------
 setopts_2_test_() ->
     [?_test(?assertMatch({error, _},
-                         syslog:setopts(#transport{type = udp}, self()))),
+                         jhn_syslog:setopts(#transport{type = udp}, self()))),
      ?_test(?assertMatch({error, _},
-                         syslog:setopts(#transport{type = tcp}, self()))),
+                         jhn_syslog:setopts(#transport{type = tcp}, self()))),
      ?_test(?assertMatch({error, _},
-                         syslog:setopts(#transport{type = tls}, self())))
+                         jhn_syslog:setopts(#transport{type = tls}, self())))
     ].
 
 %%--------------------------------------------------------------------
@@ -368,22 +381,24 @@ setopts_2_test_() ->
 %%--------------------------------------------------------------------
 controlling_process_2_test_() ->
     [?_test(?assertMatch({error, _},
-                         syslog:controlling_process(#transport{type = udp},
+                         jhn_syslog:controlling_process(#transport{type = udp},
                                                     self()))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:controlling_process(#transport{type = tcp},
+                         jhn_syslog:controlling_process(#transport{type = tcp},
                                                     self()))),
      ?_test(
         ?assertEqual({error, function_clause},
-                     syslog:controlling_process(#transport{type = tcp_listen},
-                                                    self()))),
+                     jhn_syslog:controlling_process(
+                       #transport{type = tcp_listen},
+                       self()))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:controlling_process(#transport{type = tls},
+                         jhn_syslog:controlling_process(#transport{type = tls},
                                                     self()))),
      ?_test(
         ?assertEqual({error, function_clause},
-                     syslog:controlling_process(#transport{type = tls_listen},
-                                                self())))
+                     jhn_syslog:controlling_process(
+                       #transport{type = tls_listen},
+                       self())))
     ].
 
 %%--------------------------------------------------------------------
@@ -391,9 +406,9 @@ controlling_process_2_test_() ->
 %%--------------------------------------------------------------------
 accept_1_test_() ->
     [?_test(?assertEqual({error, function_clause},
-                         syslog:accept(#transport{type = tcp_listen}))),
+                         jhn_syslog:accept(#transport{type = tcp_listen}))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:accept(#transport{type = tls_listen})))
+                         jhn_syslog:accept(#transport{type = tls_listen})))
     ].
 
 %%--------------------------------------------------------------------
@@ -401,10 +416,10 @@ accept_1_test_() ->
 %%--------------------------------------------------------------------
 accept_2_test_() ->
     [?_test(?assertEqual({error, function_clause},
-                         syslog:accept(#transport{type = tcp_listen},
+                         jhn_syslog:accept(#transport{type = tcp_listen},
                                        [{timeout, 500}]))),
      ?_test(?assertEqual({error, function_clause},
-                         syslog:accept(#transport{type = tls_listen},
+                         jhn_syslog:accept(#transport{type = tls_listen},
                                        [{timeout, 500}])))
     ].
 
@@ -422,21 +437,23 @@ encode_2_decode_1_test_() ->
                                         severity := info,
                                         version := 1
                                        }},
-                          syslog:decode(iolist_to_binary(syslog:encode(#{}))))),
+                          jhn_syslog:decode(
+                            iolist_to_binary(jhn_syslog:encode(#{}))))),
       ?_test(?assertMatch(#{header := #{facility := kern,
                                         severity := info,
                                         version := 1
                                        }},
-                          syslog:decode(
+                          jhn_syslog:decode(
                             iolist_to_binary(
-                              syslog:encode(#{header => #{facility => kern}},
-                                            [iolist]))))),
+                              jhn_syslog:encode(
+                                #{header => #{facility => kern}},
+                                [iolist]))))),
       ?_test(?assertMatch(#{header := #{facility := cron,
                                         severity := warning,
                                         version := 1
                                        }},
-                          syslog:decode(
-                            syslog:encode(#{header => #{facility => cron,
+                          jhn_syslog:decode(
+                            jhn_syslog:encode(#{header => #{facility => cron,
                                                         severity => warning}},
                                           [binary]),
                             []))),
@@ -444,17 +461,18 @@ encode_2_decode_1_test_() ->
                                         severity := info,
                                         version := 2
                                        }},
-                          syslog:decode(
-                            syslog:encode(#{header => #{version => 2}},
+                          jhn_syslog:decode(
+                            jhn_syslog:encode(#{header => #{version => 2}},
                                           [binary])))),
       [?_test(?assertMatch(#{header := #{facility := Facility,
                                          severity := Severity,
                                          version := 1
                                         }},
-                           syslog:decode(
-                             syslog:encode(#{header => #{facility => Facility,
-                                                         severity => Severity}},
-                                           [binary])))) ||
+                           jhn_syslog:decode(
+                             jhn_syslog:encode(
+                               #{header => #{facility => Facility,
+                                             severity => Severity}},
+                               [binary])))) ||
           Severity <- [emerg, alert, crit, err, warning, notice, info, debug],
           Facility <- [kern, user, mail, daemon, auth, syslog, lpr, news, uucp,
                        cron, authpriv, ftp, ntp, audit, console, cron2,
@@ -462,9 +480,10 @@ encode_2_decode_1_test_() ->
                        local6, local7]],
       [?_test(
           ?assertMatch(#{header := #{time_stamp := Timestamp}},
-                       syslog:decode(
-                         syslog:encode(#{header => #{time_stamp => Timestamp}},
-                                       [binary])))) ||
+                       jhn_syslog:decode(
+                         jhn_syslog:encode(
+                           #{header => #{time_stamp => Timestamp}},
+                           [binary])))) ||
           Timestamp <- [{{2016, 4, 1}, {18, 11, 42}},
                         {{2016, 12, 30}, {18, 0, 42}},
                         {{1939, 9, 30}, {0, 11, 42}},
@@ -473,8 +492,8 @@ encode_2_decode_1_test_() ->
           ?assertMatch(
              #{header := #{time_stamp := {{2016, 4, 1}, {18, 11, 42}},
                            fraction := Fraction}},
-             syslog:decode(
-               syslog:encode(#{header =>
+             jhn_syslog:decode(
+               jhn_syslog:encode(#{header =>
                                    #{time_stamp => {{2016, 4, 1}, {18, 11, 42}},
                                      fraction => Fraction}},
                              [binary, milli])))) ||
@@ -484,8 +503,8 @@ encode_2_decode_1_test_() ->
              #{header := #{time_stamp := {{2016, 4, 1}, {18, 11, 42}},
                            offset_sign := Sign,
                            offset := Offset}},
-             syslog:decode(
-               syslog:encode(#{header =>
+             jhn_syslog:decode(
+               jhn_syslog:encode(#{header =>
                                    #{time_stamp => {{2016, 4, 1}, {18, 11, 42}},
                                      offset_sign => Sign,
                                      offset => Offset}},
@@ -496,8 +515,8 @@ encode_2_decode_1_test_() ->
              #{header := #{time_stamp := {{2016, 4, 1}, {18, 11, 42}},
                            offset_sign := '-',
                            offset := {0, 0}}},
-             syslog:decode(
-               syslog:encode(#{header =>
+             jhn_syslog:decode(
+               jhn_syslog:encode(#{header =>
                                    #{time_stamp => {{2016, 4, 1}, {18, 11, 42}},
                                      offset_sign => '-',
                                      offset => {0, 0}}},
@@ -508,8 +527,8 @@ encode_2_decode_1_test_() ->
                            fraction := 123,
                            offset_sign := Sign,
                            offset := {2, 0}}},
-             syslog:decode(
-               syslog:encode(#{header =>
+             jhn_syslog:decode(
+               jhn_syslog:encode(#{header =>
                                    #{time_stamp => {{2016, 4, 1}, {18, 11, 42}},
                                      fraction => 123,
                                      offset_sign => Sign,
@@ -519,8 +538,8 @@ encode_2_decode_1_test_() ->
       ?_test(
          ?assertMatch(
             #{header := #{time_stamp := {{2016, 4, 1}, {18, 11, 42}}}},
-            syslog:decode(
-              syslog:encode(#{header =>
+            jhn_syslog:decode(
+              jhn_syslog:encode(#{header =>
                                   #{time_stamp => {{2016, 4, 1}, {18, 11, 42}},
                                     offset_sign => 'Z'}},
                             [binary])))),
@@ -529,8 +548,8 @@ encode_2_decode_1_test_() ->
                                     app_name := <<"App">>,
                                     proc_id := <<"Proc">>,
                                     msg_id := <<"Msg">>}},
-                      syslog:decode(
-                        syslog:encode(#{header =>
+                      jhn_syslog:decode(
+                        jhn_syslog:encode(#{header =>
                                             #{host_name => <<"Host">>,
                                               app_name => <<"App">>,
                                               proc_id => <<"Proc">>,
@@ -538,15 +557,15 @@ encode_2_decode_1_test_() ->
                                       [binary])))),
       ?_test(
          ?assertMatch(#{structured := [{<<"structured@id">>, []}]},
-                      syslog:decode(
-                        syslog:encode(#{structured =>
+                      jhn_syslog:decode(
+                        jhn_syslog:encode(#{structured =>
                                             [{<<"structured@id">>, []}]},
                                       [binary])))),
       ?_test(
          ?assertMatch(#{structured := [{<<"structured@id">>,
                                         [{<<"a">>, <<"]\"1\\ ">>}]}]},
-                      syslog:decode(
-                        syslog:encode(#{structured =>
+                      jhn_syslog:decode(
+                        jhn_syslog:encode(#{structured =>
                                             [{<<"structured@id">>,
                                               [{<<"a">>, "]\"1\\ "}]}]},
                                       [binary])))),
@@ -554,8 +573,8 @@ encode_2_decode_1_test_() ->
          ?assertMatch(#{structured := [{<<"structured@id">>,
                                         [{<<"a">>, <<"[1]">>},
                                          {<<"b">>, <<"\"2\"">>}]}]},
-                      syslog:decode(
-                        syslog:encode(#{structured =>
+                      jhn_syslog:decode(
+                        jhn_syslog:encode(#{structured =>
                                             [{<<"structured@id">>,
                                               [{<<"a">>, <<"[1]">>},
                                                {<<"b">>, <<"\"2\"">>}]}]},
@@ -567,8 +586,8 @@ encode_2_decode_1_test_() ->
                                        {<<"bar@id">>,
                                         [{<<"a">>, <<"1">>},
                                          {<<"b">>, <<"2">>}]}]},
-                      syslog:decode(
-                        syslog:encode(#{structured =>
+                      jhn_syslog:decode(
+                        jhn_syslog:encode(#{structured =>
                                             [{<<"foo@id">>,
                                               [{<<"a">>, <<"\\1">>},
                                                {<<"b">>, <<"2">>}]},
@@ -578,20 +597,21 @@ encode_2_decode_1_test_() ->
                                       [binary])))),
       ?_test(
          ?assertMatch(#{msg := #{content := <<"foo">>}},
-                      syslog:decode(syslog:encode(#{msg => #{content => "foo"}},
-                                                  [binary])))),
+                      jhn_syslog:decode(
+                        jhn_syslog:encode(#{msg => #{content => "foo"}},
+                                          [binary])))),
       ?_test(
          ?assertMatch(
             #{msg := #{content := <<"foo">>}},
-            syslog:decode(syslog:encode(#{msg =>
+            jhn_syslog:decode(jhn_syslog:encode(#{msg =>
                                               #{type => utf8,
                                                 content => <<"foo">>}},
                                         [binary])))),
       ?_test(
          ?assertMatch(#{structured := [{<<"structured@id">>, []}],
                         msg := #{content := <<"foo">>}},
-                      syslog:decode(
-                        syslog:encode(#{structured =>
+                      jhn_syslog:decode(
+                        jhn_syslog:encode(#{structured =>
                                             [{<<"structured@id">>, []}],
                                         msg =>
                                             #{type => utf8,
@@ -611,7 +631,7 @@ encode_2_decode_1_test_() ->
 %% Bad options
 %% ===================================================================
 bad_option_test_() ->
-    [?_test(?assertError(badarg, syslog:open([oops])))].
+    [?_test(?assertError(badarg, jhn_syslog:open([oops])))].
 
 %% ===================================================================
 %% Internal functions.
@@ -628,28 +648,28 @@ cert(File) -> filename:join([dir(), "certs", File]).
 
 server_start(tls, Port, Parent) ->
     Transport =
-        syslog:open([server,
+        jhn_syslog:open([server,
                      tls,
                      {port, Port},
                      {opts, ?SSL}]),
     Pid = spawn_link(fun() -> server(tls, Parent) end),
-    ok = syslog:controlling_process(Transport, Pid),
+    ok = jhn_syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
     Pid;
 server_start(dtls, Port, Parent) ->
     Transport =
-        syslog:open([server,
+        jhn_syslog:open([server,
                      dtls,
                      {port, Port},
                      {opts, ?SSL}]),
     Pid = spawn_link(fun() -> server(dtls, Parent) end),
-    ok = syslog:controlling_process(Transport, Pid),
+    ok = jhn_syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
     Pid;
 server_start(Type, Port, Parent) ->
-    Transport = syslog:open([server, Type, {port, Port}]),
+    Transport = jhn_syslog:open([server, Type, {port, Port}]),
     Pid = spawn_link(fun() -> server(Type, Parent) end),
-    ok = syslog:controlling_process(Transport, Pid),
+    ok = jhn_syslog:controlling_process(Transport, Pid),
     Pid ! {transport, Transport},
     Pid.
 
@@ -658,21 +678,21 @@ server(udp, Parent) ->
     server_loop(Parent, Transport);
 server(_, Parent) ->
     TransportL = receive {transport, Transport0} -> Transport0 end,
-    Transport = syslog:accept(TransportL),
+    Transport = jhn_syslog:accept(TransportL),
     server_loop(Parent, TransportL, Transport).
 
 server_loop(Parent, Transport) ->
     receive
-        stop -> syslog:close(Transport);
+        stop -> jhn_syslog:close(Transport);
         passify ->
-            syslog:setopts(Transport, [{active, false}]),
+            jhn_syslog:setopts(Transport, [{active, false}]),
             Parent ! passive,
             server_loop(Parent, Transport);
         {udp, _, _, _, Message} ->
             Parent ! {active, Message},
             server_loop(Parent, Transport);
         recv ->
-            Result = syslog:recv(Transport),
+            Result = jhn_syslog:recv(Transport),
             Parent ! {passive, Result},
             server_loop(Parent, Transport)
     end.
@@ -680,10 +700,10 @@ server_loop(Parent, Transport) ->
 server_loop(Parent, TransportL, Transport) ->
     receive
         stop ->
-            syslog:close(TransportL),
-            syslog:close(Transport);
+            jhn_syslog:close(TransportL),
+            jhn_syslog:close(Transport);
         passify ->
-            syslog:setopts(Transport, [{active, false}]),
+            jhn_syslog:setopts(Transport, [{active, false}]),
             Parent ! passive,
             server_loop(Parent, TransportL, Transport);
         {tcp, _, Message} ->
@@ -693,7 +713,7 @@ server_loop(Parent, TransportL, Transport) ->
             Parent ! {active, Message},
             server_loop(Parent, TransportL, Transport);
         recv ->
-            {ok, Result, Transport1} = syslog:recv(Transport),
+            {ok, Result, Transport1} = jhn_syslog:recv(Transport),
             Parent ! {passive, Result},
             server_loop(Parent, TransportL, Transport1)
     end.
@@ -715,4 +735,5 @@ sock(Table, Client) -> element(2, hd(ets:lookup(Table, Client))).
 
 pid(Table, Server) -> element(2, hd(ets:lookup(Table, Server))).
 
-unframe(Type, Frame) -> syslog:decode(element(1, syslog:unframe(Type, Frame))).
+unframe(Type, Frame) ->
+    jhn_syslog:decode(element(1, jhn_syslog:unframe(Type, Frame))).

@@ -77,28 +77,30 @@
 %% new/0
 %%--------------------------------------------------------------------
 new_0_test_() ->
-    [{"Create", [?_test(?assert(r_tree:is_r_tree(r_tree:new())))]}
+    [{"Create", [?_test(?assert(jhn_r_tree:is_r_tree(jhn_r_tree:new())))]}
     ].
 
 %%--------------------------------------------------------------------
 %% is_r_tree/1
 %%--------------------------------------------------------------------
 is_r_tree_1_test_() ->
-    [{"Empty", [?_test(?assertEqual(true, r_tree:is_r_tree(r_tree:new())))]},
-     {"Not", [?_test(?assertEqual(false, r_tree:is_r_tree({foo, bar})))]}
+    [{"Empty",
+      [?_test(?assertEqual(true, jhn_r_tree:is_r_tree(jhn_r_tree:new())))]},
+     {"Not", [?_test(?assertEqual(false, jhn_r_tree:is_r_tree({foo, bar})))]}
     ].
 
 %%--------------------------------------------------------------------
 %% is_empty/1
 %%--------------------------------------------------------------------
 is_empty_1_test_() ->
-    [{"Empty", [?_test(?assertEqual(true, r_tree:is_empty(r_tree:new())))]},
+    [{"Empty",
+      [?_test(?assertEqual(true, jhn_r_tree:is_empty(jhn_r_tree:new())))]},
      {"Not",
       [?_test(
           ?assertEqual(false,
-                       r_tree:is_empty(r_tree:add({1, 5},
+                       jhn_r_tree:is_empty(jhn_r_tree:add({1, 5},
                                                   "US",
-                                                  r_tree:new()))))]}
+                                                  jhn_r_tree:new()))))]}
     ].
 
 %%--------------------------------------------------------------------
@@ -108,55 +110,55 @@ add_3_test_() ->
     [{"Add",
       [?_test(
           ?assert(
-             r_tree:is_r_tree(
-               lists:foldl(fun({R, V}, Acc) -> r_tree:add(R, V, Acc) end,
-                           r_tree:new(),
+             jhn_r_tree:is_r_tree(
+               lists:foldl(fun({R, V}, Acc) -> jhn_r_tree:add(R, V, Acc) end,
+                           jhn_r_tree:new(),
                            ?SHORT))))]},
      {"Add/Delete",
       [?_test(
           ?assert(
-             r_tree:is_empty(
-               lists:foldl(fun(R, Acc) -> r_tree:delete(R, Acc) end,
+             jhn_r_tree:is_empty(
+               lists:foldl(fun(R, Acc) -> jhn_r_tree:delete(R, Acc) end,
                            lists:foldl(
-                             fun({R, V}, Acc) -> r_tree:add(R, V, Acc) end,
-                             r_tree:new(),
+                             fun({R, V}, Acc) -> jhn_r_tree:add(R, V, Acc) end,
+                             jhn_r_tree:new(),
                              ?SHORT),
                            ?SHORT_RANGES))))]},
      {"Add/Delete reverse",
       [?_test(
           ?assert(
-             r_tree:is_empty(
-               lists:foldl(fun(R, Acc) -> r_tree:delete(R, Acc) end,
+             jhn_r_tree:is_empty(
+               lists:foldl(fun(R, Acc) -> jhn_r_tree:delete(R, Acc) end,
                            lists:foldl(
-                             fun({R, V}, Acc) -> r_tree:add(R, V, Acc) end,
-                             r_tree:new(),
+                             fun({R, V}, Acc) -> jhn_r_tree:add(R, V, Acc) end,
+                             jhn_r_tree:new(),
                              ?SHORT),
                            lists:reverse(?SHORT_RANGES)))))]},
      {"Add and check the ranges",
       [?_test(
           ?assertEqual(
              ?SHORT_RANGES,
-             r_tree:ranges(
-               lists:foldl(fun({R, V}, Acc) -> r_tree:add(R, V, Acc) end,
-                           r_tree:new(),
+             jhn_r_tree:ranges(
+               lists:foldl(fun({R, V}, Acc) -> jhn_r_tree:add(R, V, Acc) end,
+                           jhn_r_tree:new(),
                            ?SHORT))))
       ]},
      {"Add reverse and check the ranges",
       [?_test(
           ?assertEqual(
              ?SHORT_RANGES,
-             r_tree:ranges(
-               lists:foldl(fun({R, V}, Acc) -> r_tree:add(R, V, Acc) end,
-                           r_tree:new(),
+             jhn_r_tree:ranges(
+               lists:foldl(fun({R, V}, Acc) -> jhn_r_tree:add(R, V, Acc) end,
+                           jhn_r_tree:new(),
                            lists:reverse(?SHORT)))))
       ]},
      {"Add and check the values",
       [?_test(
           ?assertEqual(
              ?SHORT_VALUES,
-             r_tree:values(
-               lists:foldl(fun({R, V}, Acc) -> r_tree:add(R, V, Acc) end,
-                           r_tree:new(),
+             jhn_r_tree:values(
+               lists:foldl(fun({R, V}, Acc) -> jhn_r_tree:add(R, V, Acc) end,
+                           jhn_r_tree:new(),
                            ?SHORT))))]}
     ].
 
@@ -167,21 +169,25 @@ add_4_test_() ->
     [{"Add and read no check fail",
       [?_test(begin
                   Tree = lists:foldl(fun({R, V}, Acc) ->
-                                             r_tree:add(R, V, Acc, check)
+                                             jhn_r_tree:add(R, V, Acc, check)
                                      end,
-                                     r_tree:new(),
+                                     jhn_r_tree:new(),
                                      ?SHORT),
-                  [?assert(r_tree:is_r_tree(r_tree:add(R, V, Tree, nocheck))) ||
+                  [?assert(
+                      jhn_r_tree:is_r_tree(jhn_r_tree:add(R,
+                                                          V,
+                                                          Tree,
+                                                          nocheck))) ||
                       {R, V} <- ?SHORT]
               end)]},
      {"Add check fail",
       [?_test(begin
                   Tree = lists:foldl(fun({R, V}, Acc) ->
-                                             r_tree:add(R, V, Acc, check)
+                                             jhn_r_tree:add(R, V, Acc, check)
                                      end,
-                                     r_tree:new(),
+                                     jhn_r_tree:new(),
                                      ?SHORT),
-                  [?assertError(_, r_tree:add(R, V, Tree, check)) ||
+                  [?assertError(_, jhn_r_tree:add(R, V, Tree, check)) ||
                       {R, V} <- ?SHORT]
               end)]}
     ].
@@ -194,19 +200,22 @@ adds_2_test_() ->
     Where = get(where),
     Ranges = get(ranges),
     [{"Add",
-      ?_test(?assert(r_tree:is_r_tree(r_tree:adds(Where, r_tree:new()))))},
+      ?_test(
+         ?assert(jhn_r_tree:is_r_tree(jhn_r_tree:adds(Where,
+                                                      jhn_r_tree:new()))))},
      {"Add/Delete",
       ?_test(
           ?assert(
-             r_tree:is_empty(
-               r_tree:deletes(lists:reverse(Ranges),
-                              r_tree:adds(Where, r_tree:new()),
+             jhn_r_tree:is_empty(
+               jhn_r_tree:deletes(lists:reverse(Ranges),
+                              jhn_r_tree:adds(Where, jhn_r_tree:new()),
                               check))))
      },
      {"Add and check the keys",
       ?_test(
           ?assertEqual(Ranges,
-                       r_tree:ranges(r_tree:adds(Where, r_tree:new()))))}
+                       jhn_r_tree:ranges(jhn_r_tree:adds(Where,
+                                                         jhn_r_tree:new()))))}
     ].
 
 %%--------------------------------------------------------------------
@@ -217,14 +226,17 @@ adds_3_test_() ->
     Where = get(where),
     [{"Add with check success",
       ?_test(
-         ?assert(r_tree:is_r_tree(r_tree:adds(Where, r_tree:new(), check))))
+         ?assert(
+            jhn_r_tree:is_r_tree(jhn_r_tree:adds(Where,
+                                                 jhn_r_tree:new(),
+                                                 check))))
      },
      {"Add with check fail",
       ?_test(
          begin
-             Tree = r_tree:from_list(Where),
+             Tree = jhn_r_tree:from_list(Where),
              [?assertError(badarg,
-                           r_tree:adds([{{a, b}, b}, {R, d}, {{e, f}, f}],
+                           jhn_r_tree:adds([{{a, b}, b}, {R, d}, {{e, f}, f}],
                                        Tree,
                                        check)) ||
                  R <- ?SHORT_RANGES]
@@ -237,21 +249,26 @@ adds_3_test_() ->
 delete_3_test_() ->
     [{"Delete empty nocheck",
       ?_test(
-         ?assert(r_tree:is_empty(r_tree:delete({1, 2},r_tree:new(),nocheck))))},
+         ?assert(
+            jhn_r_tree:is_empty(jhn_r_tree:delete({1, 2},
+                                                  jhn_r_tree:new(),nocheck))))},
      {"Delete empty nocheck",
       ?_test(
          ?assert(
-            r_tree:is_r_tree(
-              r_tree:delete({3, 4},
-                            r_tree:from_list([{{1, 2}, a}, {{7, 8}, b}]),
+            jhn_r_tree:is_r_tree(
+              jhn_r_tree:delete({3, 4},
+                            jhn_r_tree:from_list([{{1, 2}, a}, {{7, 8}, b}]),
                             nocheck))))},
-     {"Delete empty check",
-      ?_test(?assertError(badarg, r_tree:delete({1, 2}, r_tree:new(), check)))},
      {"Delete empty check",
       ?_test(
          ?assertError(badarg,
-                      r_tree:delete({3, 4},
-                                    r_tree:from_list([{{1, 2}, a}, {{6,7}, b}]),
+                      jhn_r_tree:delete({1, 2}, jhn_r_tree:new(), check)))},
+     {"Delete empty check",
+      ?_test(
+         ?assertError(badarg,
+                      jhn_r_tree:delete({3, 4},
+                                    jhn_r_tree:from_list([{{1, 2}, a},
+                                                          {{6,7}, b}]),
                                     check)))}
     ].
 
@@ -261,11 +278,12 @@ delete_3_test_() ->
 member_2_test_() ->
     load_plist(),
     Ranges = get(ranges),
-    Tree = r_tree:from_list(get(where)),
+    Tree = jhn_r_tree:from_list(get(where)),
     [{"Member with check success",
-      ?_test(?assert(lists:all(fun(Y) -> r_tree:member(Y, Tree) end, Ranges)))},
+      ?_test(
+         ?assert(lists:all(fun(Y) -> jhn_r_tree:member(Y, Tree) end, Ranges)))},
      {"Member without check success",
-      ?_test(?assert(not lists:any(fun(Y) -> r_tree:member(Y, Tree) end,
+      ?_test(?assert(not lists:any(fun(Y) -> jhn_r_tree:member(Y, Tree) end,
                                    [{a, b}, {0, 1}, {true, false}])))}
     ].
 
@@ -274,12 +292,12 @@ member_2_test_() ->
 %%--------------------------------------------------------------------
 find_2_test_() ->
     load_plist(),
-    Tree = r_tree:from_list(get(where)),
+    Tree = jhn_r_tree:from_list(get(where)),
     [{"Find success",
-      [?_test(?assertEqual(V, r_tree:find(R, Tree))) ||
+      [?_test(?assertEqual(V, jhn_r_tree:find(R, Tree))) ||
           {R, V} <- lists:zip(?SHORT_KEYS, ?SHORT_VALUES)]},
      {"Find failure",
-       [?_test(?assertEqual(undefined, r_tree:find([$a + X], Tree))) ||
+       [?_test(?assertEqual(undefined, jhn_r_tree:find([$a + X], Tree))) ||
            X <- lists:seq(1, 20)]}
     ].
 
@@ -288,12 +306,12 @@ find_2_test_() ->
 %%--------------------------------------------------------------------
 find_3_test_() ->
     load_plist(),
-    Tree = r_tree:from_list(get(where)),
+    Tree = jhn_r_tree:from_list(get(where)),
     [{"Find success",
-      [?_test(?assertEqual(V, r_tree:find(R, Tree, none))) ||
+      [?_test(?assertEqual(V, jhn_r_tree:find(R, Tree, none))) ||
           {R, V} <- lists:zip(?SHORT_KEYS, ?SHORT_VALUES)]},
      {"Find failure",
-      [?_test(?assertEqual(none, r_tree:find([$a + X], Tree, none))) ||
+      [?_test(?assertEqual(none, jhn_r_tree:find([$a + X], Tree, none))) ||
           X <- lists:seq(1, 20)]}
     ].
 
@@ -302,16 +320,17 @@ find_3_test_() ->
 %%--------------------------------------------------------------------
 replace_3_test_() ->
     load_plist(),
-    Tree = r_tree:from_list(get(where)),
+    Tree = jhn_r_tree:from_list(get(where)),
     [{"Replace existing",
       [?_test(?assertEqual(I,
-                           r_tree:find(I, r_tree:replace(R, I, Tree)))) ||
+                           jhn_r_tree:find(I,
+                                           jhn_r_tree:replace(R, I, Tree)))) ||
           {I, R} <- lists:zip(?SHORT_KEYS, ?SHORT_RANGES)]},
      {"Replace not existing",
       [?_test(
           ?assertEqual(I1,
-                       r_tree:find({I1 + 1000, I2 + 1000},
-                                   r_tree:replace({I1 + 1000, I2 + 1000},
+                       jhn_r_tree:find({I1 + 1000, I2 + 1000},
+                                   jhn_r_tree:replace({I1 + 1000, I2 + 1000},
                                                   I1,
                                                   Tree)))) ||
           {I1, I2} <- ?SHORT_KEYS]}
@@ -322,15 +341,21 @@ replace_3_test_() ->
 %%--------------------------------------------------------------------
 replace_4_test_() ->
     load_plist(),
-    Tree = r_tree:from_list(get(where)),
+    Tree = jhn_r_tree:from_list(get(where)),
     [{"Replace existing",
       [?_test(?assertEqual(I,
-                           r_tree:find(I, r_tree:replace(R, I, Tree,check)))) ||
+                           jhn_r_tree:find(I,
+                                           jhn_r_tree:replace(R,
+                                                              I,
+                                                              Tree,check)))) ||
           {I, R} <- lists:zip(?SHORT_KEYS, ?SHORT_RANGES)]},
      {"Replace not existing",
       [?_test(
           ?assertError(badarg,
-                       r_tree:replace({I1 + 1000,I2 + 1000},I1,Tree,check))) ||
+                       jhn_r_tree:replace({I1 + 1000,I2 + 1000},
+                                          I1,
+                                          Tree,
+                                          check))) ||
           {I1, I2} <- ?SHORT_KEYS]}
     ].
 

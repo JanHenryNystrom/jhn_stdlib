@@ -80,9 +80,9 @@
 %%--------------------------------------------------------------------
 encode_1_decode_1_test_() ->
     [?_test(?assertEqual(Term,
-                         msgpack:decode(
+                         jhn_msgpack:decode(
                            iolist_to_binary(
-                             msgpack:encode(Term))))) ||
+                             jhn_msgpack:encode(Term))))) ||
         Term <- ?REVERSIBLE_TERM].
 
 %%--------------------------------------------------------------------
@@ -90,9 +90,9 @@ encode_1_decode_1_test_() ->
 %%--------------------------------------------------------------------
 encode_1_decode_1_iolist_test_() ->
     [?_test(?assertEqual(Term,
-                         msgpack:decode(
+                         jhn_msgpack:decode(
                            iolist_to_binary(
-                             msgpack:encode(Term, [iolist]))))) ||
+                             jhn_msgpack:encode(Term, [iolist]))))) ||
         Term <- ?REVERSIBLE_TERM].
 
 
@@ -101,8 +101,8 @@ encode_1_decode_1_iolist_test_() ->
 %%--------------------------------------------------------------------
 encode_1_decode_2_binary_test_() ->
     [?_test(?assertEqual(Term,
-                         msgpack:decode(
-                             msgpack:encode(Term, [binary])))) ||
+                         jhn_msgpack:decode(
+                           jhn_msgpack:encode(Term, [binary])))) ||
         Term <- ?REVERSIBLE_TERM].
 
 %%--------------------------------------------------------------------
@@ -110,8 +110,8 @@ encode_1_decode_2_binary_test_() ->
 %%--------------------------------------------------------------------
 encode_2_decode_2_test_() ->
     [?_test(?assertEqual(Term,
-                         msgpack:decode(
-                           msgpack:encode(Term, [binary]),
+                         jhn_msgpack:decode(
+                           jhn_msgpack:encode(Term, [binary]),
                            []))) ||
         Term <- ?REVERSIBLE_TERM].
 
@@ -122,11 +122,12 @@ encode_2_decode_2_integer_type_test_() ->
     [[
       ?_test(
          ?assertEqual(Value,
-                      msgpack:decode(msgpack:encode({Type, Value},
+                      jhn_msgpack:decode(jhn_msgpack:encode({Type, Value},
                                                     [binary])))),
       ?_test(
          ?assertEqual({Type, Value},
-                      msgpack:decode(msgpack:encode({Type, Value}, [binary]),
+                      jhn_msgpack:decode(jhn_msgpack:encode({Type, Value},
+                                                            [binary]),
                                      [number_types])))]
      ||
         {Type, Values} <- ?INTEGER_TYPE,

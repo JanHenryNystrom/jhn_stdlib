@@ -48,10 +48,10 @@ encode_1_test_() ->
       ?_test(
          ?assertEqual(
             IP,
-            ip_addr:encode(ip_addr:decode(
-                            ip_addr:encode(
-                              ip_addr:decode(IP))),
-                           [list])))}
+            jhn_ip_addr:encode(jhn_ip_addr:decode(
+                                 jhn_ip_addr:encode(
+                                   jhn_ip_addr:decode(IP))),
+                               [list])))}
      || IP <- ?IPv4 ++ ?IPv6
     ].
 
@@ -60,12 +60,12 @@ encode_1_range_test_() ->
       ?_test(
          ?assertEqual(
             range(IP, Range),
-            ip_addr:encode(ip_addr:decode(
-                            ip_addr:encode(
-                              ip_addr:decode(range(IP, Range),
-                                            [range])),
-                             [range]),
-                           [list])))}
+            jhn_ip_addr:encode(jhn_ip_addr:decode(
+                                 jhn_ip_addr:encode(
+                                   jhn_ip_addr:decode(range(IP, Range),
+                                                      [range])),
+                                 [range]),
+                               [list])))}
      || IP <- ?IPv4 ++ ?IPv6,
         Range <- ?IPv4_RANGES
     ].
@@ -78,7 +78,7 @@ range(IP, Range) -> IP ++ "/" ++ integer_to_list(Range).
 
 bounds_1_test_() ->
     [{range(IP, Range),
-      ?_test(?assertMatch({_, _}, ip_addr:bounds(range(IP, Range))))}
+      ?_test(?assertMatch({_, _}, jhn_ip_addr:bounds(range(IP, Range))))}
      || IP <- ?IPv4 ++ ?IPv6,
         Range <- ?IPv4_RANGES
     ].
@@ -90,9 +90,9 @@ encode_decode_encode_1_decode_1_test_() ->
     [{IP,
       ?_test(
          ?assertEqual(IP,
-                      ip_addr:encode(
-                        ip_addr:decode(
-                          ip_addr:encode(ip_addr:decode(IP))),
+                      jhn_ip_addr:encode(
+                        jhn_ip_addr:decode(
+                          jhn_ip_addr:encode(jhn_ip_addr:decode(IP))),
                         [list])))} || IP <- ?IPv4 ++ ?IPv6
     ].
 
@@ -100,9 +100,9 @@ encode_decode_encode_2_decode_2_test_() ->
     [{IP,
       ?_test(
          ?assertEqual(IP,
-                      ip_addr:encode(
-                        ip_addr:decode(
-                          ip_addr:encode(ip_addr:decode(IP, [Format]),
+                      jhn_ip_addr:encode(
+                        jhn_ip_addr:decode(
+                          jhn_ip_addr:encode(jhn_ip_addr:decode(IP, [Format]),
                                          [Return])),
                         [list])))} || Return <- [iolist, binary, list],
                                       Format <- [integer, tuple],

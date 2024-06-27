@@ -118,13 +118,13 @@ message_queue() ->
 open_close() ->
     Port = start(gen_tcp, [fun head_response/5, fun simple_response/5]),
     URL = url(Port, "/open_close"),
-    Response1 = shttpc:open(URL),
+    Response1 = jhn_shttpc:open(URL),
     ?assertNotMatch({error, _}, Response1),
     ?assertMatch({_, _, _}, Response1),
-    Response2 = shttpc:get(URL, #{connection => Response1}),
+    Response2 = jhn_shttpc:get(URL, #{connection => Response1}),
     ?assertEqual({200, <<"OK">>}, status(Response2)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response2)),
-    ?assertEqual(ok, shttpc:close(Response1)).
+    ?assertEqual(ok, jhn_shttpc:close(Response1)).
 
 simple_get() -> simple(get).
 
@@ -133,7 +133,7 @@ simple_get_ipv6() -> simple(get, inet6).
 empty_get() ->
     Port = start(gen_tcp, [fun empty_body/5]),
     URL = url(Port, "/empty"),
-    Response = shttpc:get(URL),
+    Response = jhn_shttpc:get(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<>>, body(Response)).
 
@@ -142,7 +142,7 @@ basic_auth() ->
     Passwd = "bar",
     Port = start(gen_tcp, [basic_auth_responder(User, Passwd)]),
     URL = url(Port, "/empty", User, Passwd),
-    Response = shttpc:get(URL),
+    Response = jhn_shttpc:get(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<"OK">>, body(Response)).
 
@@ -151,7 +151,7 @@ missing_basic_auth() ->
     Passwd = "bar",
     Port = start(gen_tcp, [basic_auth_responder(User, Passwd)]),
     URL = url(Port, "/empty"),
-    Response = shttpc:get(URL),
+    Response = jhn_shttpc:get(URL),
     ?assertEqual({401, <<"Unauthorized">>}, status(Response)),
     ?assertEqual(<<"missing_auth">>, body(Response)).
 
@@ -160,7 +160,7 @@ wrong_basic_auth() ->
     Passwd = "bar",
     Port = start(gen_tcp, [basic_auth_responder(User, Passwd)]),
     URL = url(Port, "/empty", User, "wrong_password"),
-    Response = shttpc:get(URL),
+    Response = jhn_shttpc:get(URL),
     ?assertEqual({401, <<"Unauthorized">>}, status(Response)),
     ?assertEqual(<<"wrong_auth">>, body(Response)).
 
@@ -170,7 +170,7 @@ post_with_mandatory_hdrs() ->
     Body = <<?DEFAULT_STRING>>,
     Hdrs = #{<<"content-length">> => integer_to_list(size(Body)),
              <<"host">> => "localhost"},
-    Response = shttpc:post(URL, Body, #{headers => Hdrs}),
+    Response = jhn_shttpc:post(URL, Body, #{headers => Hdrs}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
@@ -180,28 +180,29 @@ post_with_mandatory_hdrs_by_atoms() ->
     Body = <<?DEFAULT_STRING>>,
     Hdrs = #{'Content-Length' => integer_to_list(size(Body)),
              'Host' => "localhost"},
-    Response = shttpc:post(URL, Body, #{headers => Hdrs}),
+    Response = jhn_shttpc:post(URL, Body, #{headers => Hdrs}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
 get_with_connect_options() ->
     Port = start(gen_tcp, [fun empty_body/5]),
     URL = url(Port, "/empty"),
-    Response = shttpc:get(URL, #{options => [{ip, {127, 0, 0, 1}}, {port, 0}]}),
+    Response =
+        jhn_shttpc:get(URL, #{options => [{ip, {127, 0, 0, 1}}, {port, 0}]}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<>>, body(Response)).
 
 no_content_length() ->
     Port = start(gen_tcp, [fun no_content_length/5]),
     URL = url(Port, "/no_cl"),
-    Response = shttpc:get(URL),
+    Response = jhn_shttpc:get(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
 no_content_length_1_0() ->
     Port = start(gen_tcp, [fun no_content_length_1_0/5]),
     URL = url(Port, "/no_cl"),
-    Response = shttpc:get(URL),
+    Response = jhn_shttpc:get(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
@@ -211,56 +212,56 @@ no_content_length_1_0() ->
 trailing_space_header() ->
     Port = start(gen_tcp, [fun trailing_space_header/5]),
     URL = url(Port, "/no_cl"),
-    Response = shttpc:get(URL),
+    Response = jhn_shttpc:get(URL),
     ContentLength = maps:get('Content-Length', headers(Response)),
     ?assertEqual(<<"14">>, ContentLength).
 
 get_not_modified() ->
     Port = start(gen_tcp, [fun not_modified_response/5]),
     URL = url(Port, "/not_modified"),
-    Response = shttpc:get(URL),
+    Response = jhn_shttpc:get(URL),
     ?assertEqual({304, <<"Not Modified">>}, status(Response)),
     ?assertEqual(<<>>, body(Response)).
 
 simple_head() ->
     Port = start(gen_tcp, [fun head_response/5]),
     URL = url(Port, "/HEAD"),
-    Response = shttpc:head(URL),
+    Response = jhn_shttpc:head(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<>>, body(Response)).
 
 delete_no_content() ->
     Port = start(gen_tcp, [fun no_content_response/5]),
     URL = url(Port, "/delete_no_content"),
-    Response = shttpc:delete(URL),
+    Response = jhn_shttpc:delete(URL),
     ?assertEqual({204, <<"OK">>}, status(Response)),
     ?assertEqual(<<>>, body(Response)).
 
 delete_content() ->
     Port = start(gen_tcp, [fun simple_response/5]),
     URL = url(Port, "/delete_content"),
-    Response = shttpc:delete(URL),
+    Response = jhn_shttpc:delete(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
 options_no_content() ->
     Port = start(gen_tcp, [fun head_response/5]),
     URL = url(Port, "/options_no_content"),
-    Response = shttpc:options(URL),
+    Response = jhn_shttpc:options(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<>>, body(Response)).
 
 options_content() ->
     Port = start(gen_tcp, [fun simple_response/5]),
     URL = url(Port, "/options_content"),
-    Response = shttpc:options(URL),
+    Response = jhn_shttpc:options(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
 server_connection_close() ->
     Port = start(gen_tcp, [fun respond_and_close/5]),
     URL = url(Port, "/close"),
-    Response = shttpc:put(URL, pid_to_list(self())),
+    Response = jhn_shttpc:put(URL, pid_to_list(self())),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)),
     receive closed -> ok end.
@@ -269,21 +270,21 @@ client_connection_close() ->
     Port = start(gen_tcp, [fun respond_and_wait/5]),
     URL = url(Port, "/close"),
     Headers = #{<<"Connection">> => <<"close">>},
-    #{} = shttpc:put(URL, pid_to_list(self()), #{headers => Headers}),
+    #{} = jhn_shttpc:put(URL, pid_to_list(self()), #{headers => Headers}),
     %% Wait for the server to see that socket has been closed
     receive closed -> ok end.
 
 client_connection_close_opt() ->
     Port = start(gen_tcp, [fun respond_and_wait/5]),
     URL = url(Port, "/close"),
-    #{} = shttpc:put(URL, pid_to_list(self()), #{close => true}),
+    #{} = jhn_shttpc:put(URL, pid_to_list(self()), #{close => true}),
     %% Wait for the server to see that socket has been closed
     receive closed -> ok end.
 
 pre_1_1_server_connection() ->
     Port = start(gen_tcp, [fun pre_1_1_server/5]),
     URL = url(Port, "/close"),
-    #{} = shttpc:put(URL, pid_to_list(self())),
+    #{} = jhn_shttpc:put(URL, pid_to_list(self())),
     %% Wait for the server to see that socket has been closed.
     %% The socket should be closed by us since the server responded with a
     %% 1.0 version, and not the Connection: keep-alive header.
@@ -293,8 +294,8 @@ pre_1_1_server_keep_alive() ->
     Port = start(gen_tcp, [fun pre_1_1_server_keep_alive/5,
                            fun pre_1_1_server/5]),
     URL = url(Port, "/close"),
-    Response1 = #{connection := Con} = shttpc:get(URL),
-    Response2 = shttpc:put(URL, pid_to_list(self()), #{connection => Con}),
+    Response1 = #{connection := Con} = jhn_shttpc:get(URL),
+    Response2 = jhn_shttpc:put(URL, pid_to_list(self()), #{connection => Con}),
     ?assertEqual({200, <<"OK">>}, status(Response1)),
     ?assertEqual({200, <<"OK">>}, status(Response2)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response1)),
@@ -309,7 +310,7 @@ simple_put() -> simple(put).
 patch() ->
     Port = start(gen_tcp, [fun no_content_response/5]),
     URL = url(Port, "/patch"),
-    Response = shttpc:patch(URL, <<"Change">>),
+    Response = jhn_shttpc:patch(URL, <<"Change">>),
     ?assertEqual({204, <<"OK">>}, status(Response)),
     ?assertEqual(<<>>, body(Response)).
 
@@ -321,7 +322,7 @@ post() ->
             integer_to_list(X),
             integer_to_list(Y),
             integer_to_list(Z)],
-    Response = shttpc:post(URL, Body),
+    Response = jhn_shttpc:post(URL, Body),
     {StatusCode, ReasonPhrase} = status(Response),
     ?assertEqual(200, StatusCode),
     ?assertEqual(<<"OK">>, ReasonPhrase),
@@ -330,7 +331,7 @@ post() ->
 trace() ->
     Port = start(gen_tcp, [fun simple_response/5]),
     URL = url(Port, "/trace"),
-    Response = shttpc:trace(URL),
+    Response = jhn_shttpc:trace(URL),
     {StatusCode, ReasonPhrase} = status(Response),
     ?assertEqual(200, StatusCode),
     ?assertEqual(<<"OK">>, ReasonPhrase),
@@ -339,7 +340,7 @@ trace() ->
 connect() ->
     Port = start(gen_tcp, [fun no_content_response/5]),
     URL = url(Port, "/connect"),
-    Response = shttpc:connect(URL),
+    Response = jhn_shttpc:connect(URL),
     {StatusCode, ReasonPhrase} = status(Response),
     ?assertEqual(204, StatusCode),
     ?assertEqual(<<"OK">>, ReasonPhrase),
@@ -350,7 +351,7 @@ connect_auth() ->
     Passwd = "bar",
     Port = start(gen_tcp, [connect_auth_responder(User, Passwd)]),
     URL = url(Port, "/connect_auth", User, Passwd),
-    Response = shttpc:connect(URL),
+    Response = jhn_shttpc:connect(URL),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<>>, body(Response)).
 
@@ -362,24 +363,24 @@ post_100_continue() ->
             integer_to_list(X),
             integer_to_list(Y),
             integer_to_list(Z)],
-    Response = shttpc:post(URL, Body),
+    Response = jhn_shttpc:post(URL, Body),
     {StatusCode, ReasonPhrase} = status(Response),
     ?assertEqual(200, StatusCode),
     ?assertEqual(<<"OK">>, ReasonPhrase),
     ?assertEqual(iolist_to_binary(Body), body(Response)).
 
-bad_url() -> ?assertError(_, shttpc:get(ost)).
+bad_url() -> ?assertError(_, jhn_shttpc:get(ost)).
 
 persistent_connection() ->
     Port = start(gen_tcp, [fun simple_response/5,
                            fun simple_response/5,
                            fun copy_body/5]),
     URL = url(Port, "/persistent"),
-    FirstResponse = #{connection := Con} = shttpc:get(URL),
+    FirstResponse = #{connection := Con} = jhn_shttpc:get(URL),
     Headers = #{<<"KeepAlive">> => <<"300">>}, %% shouldn't be needed
     SecondResponse =
-        shttpc:get(URL, #{connection => Con, headers => Headers}),
-    ThirdResponse = shttpc:post(URL, <<>>, #{connection => Con}),
+        jhn_shttpc:get(URL, #{connection => Con, headers => Headers}),
+    ThirdResponse = jhn_shttpc:post(URL, <<>>, #{connection => Con}),
     ?assertEqual({200, <<"OK">>}, status(FirstResponse)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(FirstResponse)),
     ?assertEqual({200, <<"OK">>}, status(SecondResponse)),
@@ -390,19 +391,19 @@ persistent_connection() ->
 request_timeout() ->
     Port = start(gen_tcp, [fun very_slow_response/5]),
     URL = url(Port, "/slow"),
-    ?assertEqual({error, timeout}, shttpc:get(URL, #{timeout => 50})).
+    ?assertEqual({error, timeout}, jhn_shttpc:get(URL, #{timeout => 50})).
 
 chunked_encoding() ->
     Port = start(gen_tcp,
                  [fun chunked_response/5,
                   fun chunked_response_t/5]),
     URL = url(Port, "/chunked"),
-    FirstResponse = #{connection := Con} = shttpc:get(URL),
+    FirstResponse = #{connection := Con} = jhn_shttpc:get(URL),
     ?assertEqual({200, <<"OK">>}, status(FirstResponse)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(FirstResponse)),
     ?assertEqual(<<"chunked">>,
                  maps:get('Transfer-Encoding', headers(FirstResponse))),
-    SecondResponse = shttpc:get(URL, #{connection => Con}),
+    SecondResponse = jhn_shttpc:get(URL, #{connection => Con}),
     ?assertEqual({200, <<"OK">>}, status(SecondResponse)),
     ?assertEqual(<<"Again, great success!">>, body(SecondResponse)),
     ?assertEqual(<<"ChUnKeD">>,
@@ -415,14 +416,14 @@ redirect() ->
     Port2 = start(gen_tcp, [fun simple_response/5]),
     URL1 = url(Port1, "/redirect"),
     FirstResponse = #{connection := Con} =
-        shttpc:post(URL1, integer_to_binary(Port2)),
-    ?assertEqual(ok, shttpc:close(Con)),
+        jhn_shttpc:post(URL1, integer_to_binary(Port2)),
+    ?assertEqual(ok, jhn_shttpc:close(Con)),
     ?assertEqual({302, <<"Found">>}, status(FirstResponse)),
     ?assertEqual(<<>>, body(FirstResponse)),
     ?assertEqual(iolist_to_binary(url(Port2, "/the_redirect")),
                  maps:get('Location', headers(FirstResponse), <<>>)),
     URL2 = maps:get('Location', headers(FirstResponse)),
-    SecondResponse = shttpc:get(URL2),
+    SecondResponse = jhn_shttpc:get(URL2),
     ?assertEqual({200, <<"OK">>}, status(SecondResponse)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(SecondResponse)).
 
@@ -431,27 +432,27 @@ redirect_allowed() ->
     Port2 = start(gen_tcp, [fun simple_response/5]),
     URL1 = url(Port1, "/redirect"),
     FirstResponse =
-        shttpc:post(URL1, integer_to_binary(Port2), #{redirect => true}),
+        jhn_shttpc:post(URL1, integer_to_binary(Port2), #{redirect => true}),
     ?assertEqual({200, <<"OK">>}, status(FirstResponse)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(FirstResponse)).
 
 close_connection() ->
     Port = start(gen_tcp, [fun close_connection/5]),
     URL = url(Port, "/close"),
-    ?assertEqual({error, connection_closed}, shttpc:get(URL)).
+    ?assertEqual({error, connection_closed}, jhn_shttpc:get(URL)).
 
 ssl_get() ->
     Port = start(ssl, [fun simple_response/5]),
     URL = ssl_url(Port, "/simple"),
     Response =
-        shttpc:get(URL, #{options => [{verify, verify_none}]}),
+        jhn_shttpc:get(URL, #{options => [{verify, verify_none}]}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
 ssl_get_ipv6() ->
     Port = start(ssl, [fun simple_response/5], inet6),
     URL = ssl_url(inet6, Port, "/simple"),
-    Response = shttpc:get(URL, #{options => [{verify, verify_none}]}),
+    Response = jhn_shttpc:get(URL, #{options => [{verify, verify_none}]}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(Response)).
 
@@ -460,7 +461,8 @@ ssl_post() ->
     URL = ssl_url(Port, "/simple"),
     Body = "SSL Test <o/",
     BinaryBody = list_to_binary(Body),
-    Response = shttpc:post(URL, Body, #{options => [{verify, verify_none}]}),
+    Response =
+        jhn_shttpc:post(URL, Body, #{options => [{verify, verify_none}]}),
     ?assertEqual({200, <<"OK">>}, status(Response)),
     ?assertEqual(BinaryBody, body(Response)).
 
@@ -469,12 +471,12 @@ ssl_chunked() ->
                        fun chunked_response_t/5]),
     URL = ssl_url(Port, "/ssl_chunked"),
     FirstResponse = #{connection := Con} =
-        shttpc:get(URL, #{options => [{verify, verify_none}]}),
+        jhn_shttpc:get(URL, #{options => [{verify, verify_none}]}),
     ?assertEqual({200, <<"OK">>}, status(FirstResponse)),
     ?assertEqual(<<?DEFAULT_STRING>>, body(FirstResponse)),
     ?assertEqual(<<"chunked">>,
                  maps:get('Transfer-Encoding', headers(FirstResponse))),
-    SecondResponse = shttpc:get(URL, #{connection => Con}),
+    SecondResponse = jhn_shttpc:get(URL, #{connection => Con}),
     ?assertEqual({200, <<"OK">>}, status(SecondResponse)),
     ?assertEqual(<<"Again, great success!">>, body(SecondResponse)),
     ?assertEqual(<<"ChUnKeD">>,
@@ -486,7 +488,7 @@ ssl_chunked() ->
 
 invalid_options() ->
     ?assertError({bad_option, {bad_option, foo}},
-                 shttpc:get("http://localhost/", #{bad_option => foo})).
+                 jhn_shttpc:get("http://localhost/", #{bad_option => foo})).
 
 %%------------------------------------------------------------------------------
 %% Utility functions
@@ -498,7 +500,7 @@ simple(Method, Family) ->
     Port = start(gen_tcp, [fun simple_response/5], Family),
     URL = url(Family, Port, "/simple"),
     #{status := {StatusCode, ReasonPhrase},
-      body := Body} = shttpc:Method(URL),
+      body := Body} = jhn_shttpc:Method(URL),
     ?assertEqual(200, StatusCode),
     ?assertEqual(<<"OK">>, ReasonPhrase),
     ?assertEqual(<<?DEFAULT_STRING>>, Body).
@@ -657,7 +659,7 @@ close_connection(Module, Socket, _, _, _) ->
 
 not_modified_response(Module, Socket, _Request, _Headers, _Body) ->
     Module:send(Socket,
-		["HTTP/1.1 304 Not Modified\r\n"
+                ["HTTP/1.1 304 Not Modified\r\n"
                  "Date: Tue, 15 Nov 1994 08:12:31 GMT\r\n\r\n"]).
 
 basic_auth_responder(User, Passwd) ->

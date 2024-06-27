@@ -61,7 +61,8 @@ prepend_2_test_() ->
     [?_test(
         ?assertEqual([head | List],
                      exhaust(
-                       lazy:prepend(head, lazy:list_to_data(List)), []))) ||
+                       jhn_lazy:prepend(head,
+                                        jhn_lazy:list_to_data(List)), []))) ||
         List <- ?LISTS].
 
 %%--------------------------------------------------------------------
@@ -71,14 +72,15 @@ append_2_test_() ->
     [?_test(
         ?assertEqual(List ++ [tail],
                      exhaust(
-                       lazy:append(tail, lazy:list_to_data(List)), []))) ||
+                       jhn_lazy:append(tail,
+                                       jhn_lazy:list_to_data(List)), []))) ||
         List <- ?LISTS].
 
 %%--------------------------------------------------------------------
 %% list_to_data/1
 %%--------------------------------------------------------------------
 list_to_data_1_test_() ->
-    [?_test(?assertEqual(List, exhaust(lazy:list_to_data(List), []))) ||
+    [?_test(?assertEqual(List, exhaust(jhn_lazy:list_to_data(List), []))) ||
         List <- ?LISTS].
 
 %%--------------------------------------------------------------------
@@ -88,7 +90,7 @@ iolist_to_data_1_test_() ->
     [?_test(
         ?assertEqual(iolist_to_binary(IOList),
                      iolist_to_binary(
-                       exhaust(lazy:iolist_to_data(IOList), [])))) ||
+                       exhaust(jhn_lazy:iolist_to_data(IOList), [])))) ||
         IOList <- ?IOLISTS].
 
 %%--------------------------------------------------------------------
@@ -99,7 +101,7 @@ file_to_data_1_line_test_() ->
         ?assertEqual(element(2, file:read_file(abs_name(File))),
                      iolist_to_binary(
                        exhaust(
-                         lazy:file_to_data(line, abs_name(File)), [])))) ||
+                         jhn_lazy:file_to_data(line, abs_name(File)), [])))) ||
         File <- ?FILES].
 
 %%--------------------------------------------------------------------
@@ -113,7 +115,8 @@ tcp_to_data_2_test_() ->
       ?_test(
          ?assertEqual(iolist_to_binary(?IOLISTS),
                       iolist_to_binary(
-                        exhaust(lazy:tcp_to_data("127.0.0.1", ?PORT), []))))}
+                        exhaust(jhn_lazy:tcp_to_data("127.0.0.1", ?PORT),
+                                []))))}
      ]
     }.
 
@@ -128,7 +131,7 @@ tcp_reconnect_to_data_3_test_() ->
       ?_test(
          ?assertEqual(iolist_to_binary(?IOLISTS ++ ?IOLISTS),
                       iolist_to_binary(
-                        exhaust(lazy:tcp_reconnect_to_data("127.0.0.1",
+                        exhaust(jhn_lazy:tcp_reconnect_to_data("127.0.0.1",
                                                            ?PORT,
                                                            100),
                                 []))))}
@@ -143,7 +146,7 @@ file_to_data_1_chunk_test_() ->
         ?assertEqual(element(2, file:read_file(abs_name(File))),
                      iolist_to_binary(
                        exhaust(
-                         lazy:file_to_data(Chunk, abs_name(File)), [])))) ||
+                         jhn_lazy:file_to_data(Chunk, abs_name(File)), [])))) ||
         File <- ?FILES,
         Chunk <- [1, 2, 3, 10, 1024]].
 

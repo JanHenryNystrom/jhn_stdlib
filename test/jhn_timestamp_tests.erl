@@ -48,48 +48,57 @@ gen_1_test_() ->
     [{"gen([])",
       ?_test(?assertMatch(
                 #{fraction := 0},
-                timestamp:decode(iolist_to_binary(timestamp:gen()))))},
+                jhn_timestamp:decode(iolist_to_binary(jhn_timestamp:gen()))))},
      {"gen([posix])",
       ?_test(?assertMatch(#{fraction := 0},
-                          timestamp:decode(timestamp:gen([posix]))))},
+                          jhn_timestamp:decode(jhn_timestamp:gen([posix]))))},
      {"gen([posix, seconds])",
       ?_test(?assertMatch(#{fraction := 0},
-                          timestamp:decode(timestamp:gen([posix, seconds]))))},
+                          jhn_timestamp:decode(jhn_timestamp:gen([posix,
+                                                                  seconds]))))},
      {"gen([posix, milli])",
       ?_test(?assertMatch(#{},
-                          timestamp:decode(timestamp:gen([posix, milli]),
+                          jhn_timestamp:decode(jhn_timestamp:gen([posix,
+                                                                  milli]),
                                            [milli])))},
      {"gen([posix, micro])",
       ?_test(?assertMatch(#{},
-                          timestamp:decode(timestamp:gen([posix, micro]),
+                          jhn_timestamp:decode(jhn_timestamp:gen([posix,
+                                                                  micro]),
                                            [micro])))},
      {"gen([posix, nano])",
       ?_test(?assertMatch(#{},
-                          timestamp:decode(timestamp:gen([posix, nano]),
+                          jhn_timestamp:decode(jhn_timestamp:gen([posix, nano]),
                                            [nano])))},
      {"gen([iolist])",
       ?_test(?assertMatch(
                 #{fraction := 0},
-                timestamp:decode(iolist_to_binary(timestamp:gen([iolist])))))},
+                jhn_timestamp:decode(
+                  iolist_to_binary(jhn_timestamp:gen([iolist])))))},
      {"gen([list])",
       ?_test(?assertMatch(
                 #{fraction := 0},
-                timestamp:decode(iolist_to_binary(timestamp:gen([list])))))},
+                jhn_timestamp:decode(
+                  iolist_to_binary(jhn_timestamp:gen([list])))))},
      {"gen([binary])",
       ?_test(?assertMatch(#{fraction := 0},
-                          timestamp:decode(timestamp:gen([binary]))))},
+                          jhn_timestamp:decode(jhn_timestamp:gen([binary]))))},
      {"gen([binary, seconds])",
       ?_test(?assertMatch(#{fraction := 0},
-                          timestamp:decode(timestamp:gen([binary, seconds]))))},
+                          jhn_timestamp:decode(
+                            jhn_timestamp:gen([binary, seconds]))))},
      {"gen([binary, milli])",
       ?_test(?assertMatch(#{},
-                          timestamp:decode(timestamp:gen([binary, milli]))))},
+                          jhn_timestamp:decode(
+                            jhn_timestamp:gen([binary, milli]))))},
      {"gen([binary, micro])",
       ?_test(?assertMatch(#{},
-                          timestamp:decode(timestamp:gen([binary, micro]))))},
+                          jhn_timestamp:decode(
+                            jhn_timestamp:gen([binary, micro]))))},
      {"gen([binary, nano])",
       ?_test(?assertMatch(#{},
-                          timestamp:decode(timestamp:gen([binary, nano]))))}
+                          jhn_timestamp:decode(
+                            jhn_timestamp:gen([binary, nano]))))}
     ].
 
 %%--------------------------------------------------------------------
@@ -98,35 +107,35 @@ gen_1_test_() ->
 encode_2_test_() ->
     [{"2000-01-01T00:00:00Z(946684800)",
       ?_test(?assertEqual(946684800,
-                          timestamp:encode(
+                          jhn_timestamp:encode(
                             #{year => 2000, month => 1, day => 1,
                               hour => 0, minute => 0, second => 0,
                               offset => 'Z'},
                             [posix])))},
      {"2000-01-01T00:00:00Z(946684800000)",
       ?_test(?assertEqual(946684800000,
-                          timestamp:encode(
+                          jhn_timestamp:encode(
                             #{year => 2000, month => 1, day => 1,
                               hour => 0, minute => 0, second => 0,
                               offset => 'Z'},
                             [posix, milli])))},
      {"2000-01-01T00:00:00Z(946684800001)",
       ?_test(?assertEqual(946684800001,
-                          timestamp:encode(
+                          jhn_timestamp:encode(
                             #{year => 2000, month => 1, day => 1,
                               hour => 0, minute => 0, second => 0,
                               offset => 'Z', fraction => 1},
                             [posix, milli])))},
      {"2000-01-01T00:00:00Z(946684800000001)",
       ?_test(?assertEqual(946684800000001,
-                          timestamp:encode(
+                          jhn_timestamp:encode(
                             #{year => 2000, month => 1, day => 1,
                               hour => 0, minute => 0, second => 0,
                               offset => 'Z', fraction => 1},
                             [posix, micro])))},
      {"2000-01-01T00:00:00Z(946684800000000001)",
       ?_test(?assertEqual(946684800000000001,
-                          timestamp:encode(
+                          jhn_timestamp:encode(
                             #{year => 2000, month => 1, day => 1,
                               hour => 0, minute => 0, second => 0,
                               offset => 'Z', fraction => 1},
@@ -135,15 +144,16 @@ encode_2_test_() ->
       ?_test(?assertEqual(#{year => 2000, month => 2, day => 1,
                             hour => 0, minute => 0, second => 0,
                             fraction => 0, offset => 'Z'},
-                          timestamp:decode(
-                            iolist_to_binary(timestamp:encode(949363200)))))},
+                          jhn_timestamp:decode(
+                            iolist_to_binary(
+                              jhn_timestamp:encode(949363200)))))},
      {<<"1977-01-01T10:10:10+00:00">>,
       ?_test(?assertEqual(
                 #{year => 1977, month => 1, day => 1,
                   hour => 10, minute => 10, second => 10,
                   fraction => 0, offset => 'Z'},
-                timestamp:decode(
-                  timestamp:encode(#{year => 1977, month => 1, day => 1,
+                jhn_timestamp:decode(
+                  jhn_timestamp:encode(#{year => 1977, month => 1, day => 1,
                                      hour => 10, minute => 10, second => 10,
                                      offset => #{sign => '+',
                                                  hours => 0,
@@ -154,8 +164,8 @@ encode_2_test_() ->
                   hour => 10, minute => 10, second => 10,
                   fraction => 0,
                   offset => #{sign => '+', hours => 1, minutes => 0}},
-                timestamp:decode(
-                  timestamp:encode(#{year => 1977, month => 1, day => 1,
+                jhn_timestamp:decode(
+                  jhn_timestamp:encode(#{year => 1977, month => 1, day => 1,
                                      hour => 10, minute => 10, second => 10,
                                      offset => #{sign => '+',
                                                  hours => 1,
@@ -166,8 +176,8 @@ encode_2_test_() ->
                   hour => 10, minute => 10, second => 10,
                   fraction => 0,
                   offset => #{sign => '-', hours => 1, minutes => 0}},
-                timestamp:decode(
-                  timestamp:encode(#{year => 1977, month => 1, day => 1,
+                jhn_timestamp:decode(
+                  jhn_timestamp:encode(#{year => 1977, month => 1, day => 1,
                                      hour => 10, minute => 10, second => 10,
                                      offset => #{sign => '-',
                                                  hours => 1,
@@ -180,42 +190,48 @@ encode_2_test_() ->
 
 decode_1_test_() ->
     [[{D,
-       ?_test(?assertEqual(?TENTHZ, timestamp:decode(D)))} || D <- ?TENTHZB],
+       ?_test(
+          ?assertEqual(?TENTHZ, jhn_timestamp:decode(D)))} || D <- ?TENTHZB],
      {<<"1977-01-01T10:10:10.12Z">>,
       ?_test(?assertEqual(#{year => 1977, month => 1, day => 1,
                             hour => 10, minute => 10, second => 10,
                             fraction => 12, offset => 'Z'},
-                          timestamp:decode(<<"1977-01-01T10:10:10.12Z">>)))},
+                          jhn_timestamp:decode
+                            (<<"1977-01-01T10:10:10.12Z">>)))},
      {<<"1977-01-01T10:10:10.12z">>,
       ?_test(?assertEqual(#{year => 1977, month => 1, day => 1,
                             hour => 10, minute => 10, second => 10,
                             fraction => 12, offset => 'Z'},
-                          timestamp:decode(<<"1977-01-01T10:10:10.12z">>)))},
+                          jhn_timestamp:decode(
+                            <<"1977-01-01T10:10:10.12z">>)))},
      {<<"1977-01-01T10:10:10-01:00">>,
       ?_test(?assertEqual(#{year => 1977, month => 1, day => 1,
                             hour => 10, minute => 10, second => 10,
                             fraction => 0,
                             offset => #{sign => '-', hours => 1, minutes => 0}},
-                          timestamp:decode(<<"1977-01-01T10:10:10-01:00">>)))},
+                          jhn_timestamp:decode(
+                            <<"1977-01-01T10:10:10-01:00">>)))},
      {<<"1977-01-01T10:10:10-00:00">>,
       ?_test(?assertEqual(#{year => 1977, month => 1, day => 1,
                             hour => 10, minute => 10, second => 10,
                             fraction => 0,
                             offset => #{sign => '-', hours => 0, minutes => 0}},
-                          timestamp:decode(<<"1977-01-01T10:10:10-00:00">>)))},
+                          jhn_timestamp:decode(
+                            <<"1977-01-01T10:10:10-00:00">>)))},
      {<<"1977-01-01T10:10:10+00:00">>,
       ?_test(?assertEqual(#{year => 1977, month => 1, day => 1,
                             hour => 10, minute => 10, second => 10,
                             fraction => 0,
                             offset => 'Z'},
-                          timestamp:decode(<<"1977-01-01T10:10:10+00:00">>)))},
+                          jhn_timestamp:decode(
+                            <<"1977-01-01T10:10:10+00:00">>)))},
      {<<"1977-01-01T10:10:10.43+00:00">>,
       ?_test(?assertEqual(
                 #{year => 1977, month => 1, day => 1,
                   hour => 10, minute => 10, second => 10,
                   fraction => 43,
                   offset => 'Z'},
-                timestamp:decode(<<"1977-01-01T10:10:10.43+00:00">>)))},
+                jhn_timestamp:decode(<<"1977-01-01T10:10:10.43+00:00">>)))},
      {<<"1977-01-01T10:10:10+10:22">>,
       ?_test(?assertEqual(#{year => 1977, month => 1, day => 1,
                             hour => 10, minute => 10, second => 10,
@@ -223,7 +239,8 @@ decode_1_test_() ->
                             offset => #{sign => '+',
                                         hours => 10,
                                         minutes => 22}},
-                          timestamp:decode(<<"1977-01-01T10:10:10+10:22">>)))},
+                          jhn_timestamp:decode(
+                            <<"1977-01-01T10:10:10+10:22">>)))},
      {<<"1977-01-01T10:10:10.33+10:22">>,
       ?_test(?assertEqual(
                 #{year => 1977, month => 1, day => 1,
@@ -232,7 +249,7 @@ decode_1_test_() ->
                   offset => #{sign => '+',
                               hours => 10,
                               minutes => 22}},
-                timestamp:decode(<<"1977-01-01T10:10:10.33+10:22">>)))},
+                jhn_timestamp:decode(<<"1977-01-01T10:10:10.33+10:22">>)))},
      {<<"1977-01-01T10:10:10.33-10:22">>,
       ?_test(?assertEqual(
                 #{year => 1977, month => 1, day => 1,
@@ -241,12 +258,13 @@ decode_1_test_() ->
                   offset => #{sign => '-',
                               hours => 10,
                               minutes => 22}},
-                timestamp:decode(<<"1977-01-01T10:10:10.33-10:22">>)))}
+                jhn_timestamp:decode(<<"1977-01-01T10:10:10.33-10:22">>)))}
     ].
 
 decode_2_test_() ->
     [{D,
-      ?_test(?assertEqual({?TENTHZ, <<>>}, timestamp:decode(D, [continue])))} ||
+      ?_test(?assertEqual({?TENTHZ, <<>>},
+                          jhn_timestamp:decode(D, [continue])))} ||
         D <- ?TENTHZB].
 
 %%--------------------------------------------------------------------
@@ -255,9 +273,9 @@ decode_2_test_() ->
 rfc7231_test_() ->
     [
      ?_test(?assertMatch([_ | _],
-                         timestamp:encode(
-                           timestamp:decode(
-                             timestamp:gen([binary, rfc7231]),
+                         jhn_timestamp:encode(
+                           jhn_timestamp:decode(
+                             jhn_timestamp:gen([binary, rfc7231]),
                              [rfc7231]))))
      ].
 
