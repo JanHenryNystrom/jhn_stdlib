@@ -2,7 +2,7 @@ jhn_stdlib [(γ)][5]
 ==========
 
 A few thought experiments solidified as code.
-JSON, MessagePack, syslog, URI, IP addresses, Timestamps
+JSON, MessagePack, syslog, URI, IP addresses, Timestamps, UUIDs
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
@@ -50,12 +50,13 @@ Features/Modules
                                                  [rfc5427][14],
                                                  [rfc6012][29]
   * Standards
-    * URI -- encoding/decoding -- jhn_uri [rfc3986][15]
     * IP Addresses -- encoding/decoding -- jhn_ip_addr [rfc4291][16],
                                                        [rfc5952][17],
                                                         [rfc4632][18]
     * Timestamps -- generating/encoding/decoding -- jhn_timestamp [rfc3339][19],
                                                                   [rfc7231][21]
+    * URI -- encoding/decoding -- jhn_uri [rfc3986][15]
+    * UUID -- generating/encoding/decoding -- jhn_uuid [rfc9562][42]
   * Clients
     * HTTP -- client -- jhn_shttpc [rfc7230][20], [rfc7231][21],
                                    [rfc7538][22], [rfc5789][23],
@@ -238,3 +239,5 @@ I know I really should.
         "Range tree"
   [41]: https://en.wikipedia.org/wiki/T-tree
         "T-tree"
+  [42]: http://www.ietf.org/rfc/rfc9562.txt
+        "Universally Unique IDentifiers (UUIDs)"
