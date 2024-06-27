@@ -49,22 +49,26 @@
 %% new/0
 %%--------------------------------------------------------------------
 new_0_test_() ->
-    [{"Create", [?_test(?assert(t_tree:is_t_tree(t_tree:new())))]}
+    [{"Create", [?_test(?assert(jhn_t_tree:is_t_tree(jhn_t_tree:new())))]}
     ].
 
 %%--------------------------------------------------------------------
 %% new/1
 %%--------------------------------------------------------------------
 new_1_test_() ->
-    [{"Empty", [?_test(?assert(t_tree:is_t_tree(t_tree:new([]))))]},
-     {"Min", [?_test(?assert(t_tree:is_t_tree(t_tree:new([{min, 6}]))))]},
-     {"Max", [?_test(?assert(t_tree:is_t_tree(t_tree:new([{max, 12}]))))]},
+    [{"Empty", [?_test(?assert(jhn_t_tree:is_t_tree(jhn_t_tree:new([]))))]},
+     {"Min",
+      [?_test(?assert(jhn_t_tree:is_t_tree(jhn_t_tree:new([{min, 6}]))))]},
+     {"Max",
+      [?_test(?assert(jhn_t_tree:is_t_tree(jhn_t_tree:new([{max, 12}]))))]},
      {"Min Max",
-      [?_test(?assert(t_tree:is_t_tree(t_tree:new([{min, 10}, {max, 11}]))))]},
+      [?_test(
+          ?assert(
+             jhn_t_tree:is_t_tree(jhn_t_tree:new([{min, 10}, {max, 11}]))))]},
      {"Broken",
-      [?_test(?assertError(badarg, t_tree:new([{min, 5}, {max, 5}]))),
-       ?_test(?assertError(badarg, t_tree:new([{max, 5}]))),
-       ?_test(?assertError(badarg, t_tree:new([{min, 12}])))
+      [?_test(?assertError(badarg, jhn_t_tree:new([{min, 5}, {max, 5}]))),
+       ?_test(?assertError(badarg, jhn_t_tree:new([{max, 5}]))),
+       ?_test(?assertError(badarg, jhn_t_tree:new([{min, 12}])))
       ]}
     ].
 
@@ -72,19 +76,22 @@ new_1_test_() ->
 %% is_t_tree/1
 %%--------------------------------------------------------------------
 is_t_tree_1_test_() ->
-    [{"Empty", [?_test(?assertEqual(true, t_tree:is_t_tree(t_tree:new([]))))]},
-     {"Not", [?_test(?assertEqual(false, t_tree:is_t_tree({foo, bar})))]}
+    [{"Empty",
+      [?_test(?assertEqual(true, jhn_t_tree:is_t_tree(jhn_t_tree:new([]))))]},
+     {"Not", [?_test(?assertEqual(false, jhn_t_tree:is_t_tree({foo, bar})))]}
     ].
 
 %%--------------------------------------------------------------------
 %% is_empty/1
 %%--------------------------------------------------------------------
 is_empty_1_test_() ->
-    [{"Empty", [?_test(?assertEqual(true, t_tree:is_empty(t_tree:new([]))))]},
+    [{"Empty",
+      [?_test(?assertEqual(true, jhn_t_tree:is_empty(jhn_t_tree:new([]))))]},
      {"Not",
       [?_test(
           ?assertEqual(false,
-                       t_tree:is_empty(t_tree:add(1, 1, t_tree:new([])))))]}
+                       jhn_t_tree:is_empty(
+                         jhn_t_tree:add(1, 1, jhn_t_tree:new([])))))]}
     ].
 
 %%--------------------------------------------------------------------
@@ -94,45 +101,45 @@ add_3_test_() ->
     [{"Add",
       [?_test(
           ?assert(
-             t_tree:is_t_tree(
+             jhn_t_tree:is_t_tree(
                lists:foldl(fun(X, Acc) ->
-                                   t_tree:add(X, integer_to_list(X), Acc)
+                                   jhn_t_tree:add(X, integer_to_list(X), Acc)
                            end,
-                           t_tree:new(),
+                           jhn_t_tree:new(),
                            Seq)))) || Seq <- ?SEUQENCES]},
      {"Add/Delete",
       [?_test(
           ?assert(
-             t_tree:is_empty(
+             jhn_t_tree:is_empty(
                lists:foldl(fun(X, Acc) ->
-                                   t_tree:delete(X, Acc)
+                                   jhn_t_tree:delete(X, Acc)
                            end,
                            lists:foldl(
                              fun(X, Acc) ->
-                                     t_tree:add(X, integer_to_list(X), Acc)
+                                     jhn_t_tree:add(X, integer_to_list(X), Acc)
                              end,
-                             t_tree:new(),
+                             jhn_t_tree:new(),
                              Seq),
                            Seq)))) || Seq <- ?SEUQENCES]},
      {"Add and check the indices",
       [?_test(
           ?assertEqual(
              lists:sort(Seq),
-             t_tree:indices(
+             jhn_t_tree:indices(
                lists:foldl(fun(X, Acc) ->
-                                   t_tree:add(X, integer_to_list(X), Acc)
+                                   jhn_t_tree:add(X, integer_to_list(X), Acc)
                            end,
-                           t_tree:new(),
+                           jhn_t_tree:new(),
                            Seq)))) || Seq <- ?SEUQENCES]},
      {"Add and check the values",
       [?_test(
           ?assertEqual(
              [integer_to_list(X) || X <- lists:sort(Seq)],
-             t_tree:values(
+             jhn_t_tree:values(
                lists:foldl(fun(X, Acc) ->
-                                   t_tree:add(X, integer_to_list(X), Acc)
+                                   jhn_t_tree:add(X, integer_to_list(X), Acc)
                            end,
-                           t_tree:new(),
+                           jhn_t_tree:new(),
                            Seq)))) || Seq <- ?SEUQENCES]}
     ].
 
@@ -144,37 +151,42 @@ add_4_test_() ->
       [?_test(
           begin
               Tree = lists:foldl(fun(X, Acc) ->
-                                         t_tree:add(X,
+                                         jhn_t_tree:add(X,
                                                     integer_to_list(X),
                                                     Acc,
                                                     check)
                                  end,
-                                 t_tree:new(),
+                                 jhn_t_tree:new(),
                                  Seq),
-              [?assert(t_tree:is_t_tree(t_tree:add(X, 1, Tree, nocheck))) ||
+              [?assert(
+                  jhn_t_tree:is_t_tree(jhn_t_tree:add(X, 1, Tree, nocheck))) ||
                   X <- Seq]
           end) || Seq <- ?SEUQENCES]},
      {"Add check success",
       [?_test(
           ?assert(
-             t_tree:is_t_tree(
+             jhn_t_tree:is_t_tree(
                lists:foldl(fun(X, Acc) ->
-                                   t_tree:add(X, integer_to_list(X), Acc, check)
+                                   jhn_t_tree:add(X,
+                                                  integer_to_list(X),
+                                                  Acc,
+                                                  check)
                            end,
-                           t_tree:new(),
+                           jhn_t_tree:new(),
                            Seq)))) || Seq <- ?SEUQENCES]},
      {"Add check fail",
       [?_test(
           begin
               Tree = lists:foldl(fun(X, Acc) ->
-                                         t_tree:add(X,
+                                         jhn_t_tree:add(X,
                                                     integer_to_list(X),
                                                     Acc,
                                                     check)
                                  end,
-                                 t_tree:new(),
+                                 jhn_t_tree:new(),
                                  Seq),
-              [?assertError(badarg, t_tree:add(X, 1, Tree, check)) || X <- Seq]
+              [?assertError(badarg,
+                            jhn_t_tree:add(X, 1, Tree, check)) || X <- Seq]
           end) || Seq <- ?SEUQENCES]}
     ].
 
@@ -185,25 +197,26 @@ adds_2_test_() ->
     [{"Add",
       [?_test(
           ?assert(
-             t_tree:is_t_tree(
-               t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                           t_tree:new()))))
+             jhn_t_tree:is_t_tree(
+               jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                           jhn_t_tree:new()))))
              || Seq <- ?SEUQENCES]},
      {"Add/Delete",
       [?_test(
           ?assert(
-             t_tree:is_empty(
-               t_tree:deletes([X || X <- Seq],
-                              t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                          t_tree:new())))))
+             jhn_t_tree:is_empty(
+               jhn_t_tree:deletes([X || X <- Seq],
+                              jhn_t_tree:adds([{X, integer_to_list(X)} ||
+                                                  X <- Seq],
+                                          jhn_t_tree:new())))))
              || Seq <- ?SEUQENCES]},
      {"Add and check the indices",
       [?_test(
           ?assertEqual(
              lists:sort(Seq),
-             t_tree:indices(
-               t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                           t_tree:new()))))
+             jhn_t_tree:indices(
+               jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                           jhn_t_tree:new()))))
              || Seq <- ?SEUQENCES]}
     ].
 
@@ -214,18 +227,20 @@ adds_3_test_() ->
     [{"Add with check success",
       [?_test(
           ?assert(
-             t_tree:is_t_tree(
-               t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                           t_tree:new(),
+             jhn_t_tree:is_t_tree(
+               jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                           jhn_t_tree:new(),
                            check))))
              || Seq <- ?SEUQENCES]},
      {"Add with check fail",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertError(badarg,
-                            t_tree:adds([{a, b}, {X, d}, {e, f}], Tree, check))
+                            jhn_t_tree:adds([{a, b}, {X, d}, {e, f}],
+                                            Tree,
+                                            check))
                || X <- Seq]
           end
          ) || Seq <- ?SEUQENCES]}
@@ -237,23 +252,26 @@ adds_3_test_() ->
 delete_3_test_() ->
     [{"Delete empty nocheck",
       ?_test(
-         ?assert(t_tree:is_empty(t_tree:delete(1, t_tree:new(), nocheck))))},
+         ?assert(
+            jhn_t_tree:is_empty(
+              jhn_t_tree:delete(1, jhn_t_tree:new(), nocheck))))},
      {"Delete empty nocheck",
       ?_test(
          ?assert(
-            t_tree:is_t_tree(
-              t_tree:delete(3,
-                            t_tree:adds([{1, a}, {5, b}],
-                                        t_tree:new()),
+            jhn_t_tree:is_t_tree(
+              jhn_t_tree:delete(3,
+                            jhn_t_tree:adds([{1, a}, {5, b}],
+                                        jhn_t_tree:new()),
                             nocheck))))},
      {"Delete empty check",
-      ?_test(?assertError(badarg, t_tree:delete(1, t_tree:new(), check)))},
+      ?_test(
+         ?assertError(badarg, jhn_t_tree:delete(1, jhn_t_tree:new(), check)))},
      {"Delete empty check",
       ?_test(
          ?assertError(badarg,
-                      t_tree:delete(3,
-                                    t_tree:adds([{1, a}, {5, b}],
-                                                t_tree:new()),
+                      jhn_t_tree:delete(3,
+                                    jhn_t_tree:adds([{1, a}, {5, b}],
+                                                jhn_t_tree:new()),
                                     check)))}
     ].
 
@@ -266,10 +284,10 @@ member_2_test_() ->
           ?assert(
             lists:all(
               fun(Y) ->
-                      t_tree:member(
+                      jhn_t_tree:member(
                         Y,
-                        t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                    t_tree:new(),
+                        jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                    jhn_t_tree:new(),
                                     check))
               end,
               Seq)))
@@ -279,10 +297,11 @@ member_2_test_() ->
           ?assert(
              not lists:any(
                    fun(Y) ->
-                           t_tree:member(
+                           jhn_t_tree:member(
                              Y,
-                             t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                         t_tree:new(),
+                             jhn_t_tree:adds([{X, integer_to_list(X)} ||
+                                                 X <- Seq],
+                                         jhn_t_tree:new(),
                                          check))
                    end,
                    [-1, 50.5, 1000])))
@@ -296,18 +315,18 @@ find_2_test_() ->
     [{"Find success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
-              [?assertEqual(integer_to_list(X), t_tree:find(X, Tree)) ||
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
+              [?assertEqual(integer_to_list(X), jhn_t_tree:find(X, Tree)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Find failure",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
-              [?assertEqual(undefined, t_tree:find(X - 0.5, Tree)) ||
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
+              [?assertEqual(undefined, jhn_t_tree:find(X - 0.5, Tree)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]}
@@ -320,18 +339,19 @@ find_3_test_() ->
     [{"Find success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
-              [?assertEqual(integer_to_list(X), t_tree:find(X, Tree, none)) ||
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
+              [?assertEqual(integer_to_list(X),
+                            jhn_t_tree:find(X, Tree, none)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Find failure",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
-              [?assertEqual(none, t_tree:find(X - 0.5, Tree, none)) ||
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
+              [?assertEqual(none, jhn_t_tree:find(X - 0.5, Tree, none)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]}
@@ -344,29 +364,29 @@ least_upper_bound_2_test_() ->
     [{"Least_Upper_Bound success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertEqual(integer_to_list(X),
-                            t_tree:least_upper_bound(X, Tree)) ||
+                            jhn_t_tree:least_upper_bound(X, Tree)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Least_Upper_Bound success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertEqual(integer_to_list(X),
-                            t_tree:least_upper_bound(X - 0.5, Tree)) ||
+                            jhn_t_tree:least_upper_bound(X - 0.5, Tree)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Least_Upper_Bound failure",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
-              [?assertEqual(undefined, t_tree:least_upper_bound(X, Tree)) ||
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
+              [?assertEqual(undefined, jhn_t_tree:least_upper_bound(X, Tree)) ||
                   X <- [1000, 100000]]
           end)
        || Seq <- ?SEUQENCES]}
@@ -379,29 +399,33 @@ least_upper_bound_3_test_() ->
     [{"Least_Upper_Bound success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertEqual(integer_to_list(X),
-                            t_tree:least_upper_bound(X, Tree, none)) ||
+                            jhn_t_tree:least_upper_bound(X, Tree, none)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Least_Upper_Bound success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertEqual(integer_to_list(X),
-                            t_tree:least_upper_bound(X - 0.5, Tree, none)) ||
+                            jhn_t_tree:least_upper_bound(X - 0.5,
+                                                         Tree,
+                                                         none)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Least_Upper_Bound failure",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
-              [?assertEqual(none, t_tree:least_upper_bound(X, Tree, none)) ||
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
+              [?assertEqual(none, jhn_t_tree:least_upper_bound(X,
+                                                               Tree,
+                                                               none)) ||
                   X <- [1000, 100000]]
           end)
        || Seq <- ?SEUQENCES]}
@@ -415,29 +439,30 @@ greatest_lower_bound_2_test_() ->
      {"Greatest_Lower_Bound success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertEqual(integer_to_list(X),
-                            t_tree:greatest_lower_bound(X, Tree)) ||
+                            jhn_t_tree:greatest_lower_bound(X, Tree)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Greatest_Lower_Bound success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertEqual(integer_to_list(X),
-                            t_tree:greatest_lower_bound(X + 0.5, Tree)) ||
+                            jhn_t_tree:greatest_lower_bound(X + 0.5, Tree)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Greatest_Lower_Bound failure",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
-              [?assertEqual(undefined, t_tree:greatest_lower_bound(X, Tree)) ||
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
+              [?assertEqual(undefined,
+                            jhn_t_tree:greatest_lower_bound(X, Tree)) ||
                   X <- [-1, -100]]
           end)
        || Seq <- ?SEUQENCES]}
@@ -451,29 +476,33 @@ greatest_lower_bound_3_test_() ->
      {"Greatest_Lower_Bound success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertEqual(integer_to_list(X),
-                            t_tree:greatest_lower_bound(X, Tree, none)) ||
+                            jhn_t_tree:greatest_lower_bound(X, Tree, none)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Greatest_Lower_Bound success",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
               [?assertEqual(integer_to_list(X),
-                            t_tree:greatest_lower_bound(X + 0.5, Tree, none)) ||
+                            jhn_t_tree:greatest_lower_bound(X + 0.5,
+                                                            Tree,
+                                                            none)) ||
                   X <- Seq]
           end)
        || Seq <- ?SEUQENCES]},
      {"Greatest_Lower_Bound failure",
       [?_test(
           begin
-              Tree = t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                 t_tree:new()),
-              [?assertEqual(none, t_tree:greatest_lower_bound(X, Tree, none)) ||
+              Tree = jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                 jhn_t_tree:new()),
+              [?assertEqual(none, jhn_t_tree:greatest_lower_bound(X,
+                                                                  Tree,
+                                                                  none)) ||
                   X <- [-1, -100]]
           end)
        || Seq <- ?SEUQENCES]}
@@ -486,13 +515,13 @@ first_1_test_() ->
     [{"first sucess",
       [?_test(
           ?assertEqual("1",
-                       t_tree:first(
-                         t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                     t_tree:new())))) ||
+                       jhn_t_tree:first(
+                         jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                     jhn_t_tree:new())))) ||
           Seq <- ?SEUQENCES
       ]},
      {"First fail",
-      [?_test(?assertEqual(undefined, t_tree:first(t_tree:new())))]}
+      [?_test(?assertEqual(undefined, jhn_t_tree:first(jhn_t_tree:new())))]}
     ].
 
 
@@ -503,14 +532,14 @@ first_2_test_() ->
     [{"first sucess",
       [?_test(
           ?assertEqual("1",
-                       t_tree:first(
-                         t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                     t_tree:new()),
+                       jhn_t_tree:first(
+                         jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                     jhn_t_tree:new()),
                          none)))||
           Seq <- ?SEUQENCES
       ]},
      {"First fail",
-      [?_test(?assertEqual(none, t_tree:first(t_tree:new(), none)))]}
+      [?_test(?assertEqual(none, jhn_t_tree:first(jhn_t_tree:new(), none)))]}
     ].
 
 %%--------------------------------------------------------------------
@@ -520,13 +549,13 @@ last_1_test_() ->
     [{"last sucess",
       [?_test(
           ?assertEqual("100",
-                       t_tree:last(
-                         t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                     t_tree:new())))) ||
+                       jhn_t_tree:last(
+                         jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                     jhn_t_tree:new())))) ||
           Seq <- ?SEUQENCES
       ]},
      {"Last fail",
-      [?_test(?assertEqual(undefined, t_tree:last(t_tree:new())))]}
+      [?_test(?assertEqual(undefined, jhn_t_tree:last(jhn_t_tree:new())))]}
     ].
 
 %%--------------------------------------------------------------------
@@ -536,14 +565,14 @@ last_2_test_() ->
     [{"last sucess",
       [?_test(
           ?assertEqual("100",
-                       t_tree:last(
-                         t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
-                                     t_tree:new()),
+                       jhn_t_tree:last(
+                         jhn_t_tree:adds([{X, integer_to_list(X)} || X <- Seq],
+                                     jhn_t_tree:new()),
                          none)))||
           Seq <- ?SEUQENCES
       ]},
      {"Last fail",
-      [?_test(?assertEqual(none, t_tree:last(t_tree:new(), none)))]}
+      [?_test(?assertEqual(none, jhn_t_tree:last(jhn_t_tree:new(), none)))]}
     ].
 
 %%--------------------------------------------------------------------
@@ -553,25 +582,25 @@ replace_3_test_() ->
     [{"Replace existing",
       [?_test([?assertEqual(
                   X + 1,
-                  t_tree:find(X,
-                              t_tree:replace(
+                  jhn_t_tree:find(X,
+                              jhn_t_tree:replace(
                                 X,
                                 X + 1,
-                                t_tree:adds([{Y, integer_to_list(Y)}
+                                jhn_t_tree:adds([{Y, integer_to_list(Y)}
                                              || Y <- Seq],
-                                            t_tree:new()))))
+                                            jhn_t_tree:new()))))
                || X <- Seq])
        || Seq <- ?SEUQENCES]},
      {"Replace not existing",
       [?_test([?assertEqual(
                   X,
-                  t_tree:find(X + 1000,
-                              t_tree:replace(
+                  jhn_t_tree:find(X + 1000,
+                              jhn_t_tree:replace(
                                 X + 1000,
                                 X,
-                                t_tree:adds([{Y, integer_to_list(Y)}
+                                jhn_t_tree:adds([{Y, integer_to_list(Y)}
                                              || Y <- Seq],
-                                            t_tree:new()))))
+                                            jhn_t_tree:new()))))
                || X <- Seq])
        || Seq <- ?SEUQENCES]}
     ].
@@ -583,35 +612,35 @@ replace_4_test_() ->
     [{"Replace existing sucess",
       [?_test([?assertEqual(
                   X + 1,
-                  t_tree:find(X,
-                              t_tree:replace(
+                  jhn_t_tree:find(X,
+                              jhn_t_tree:replace(
                                 X,
                                 X + 1,
-                                t_tree:adds([{Y, integer_to_list(Y)}
+                                jhn_t_tree:adds([{Y, integer_to_list(Y)}
                                              || Y <- Seq],
-                                            t_tree:new()),
+                                            jhn_t_tree:new()),
                                 check)))
                || X <- Seq])
        || Seq <- ?SEUQENCES]},
      {"Replace not existing fail",
       [?_test([?assertError(badarg,
-                              t_tree:replace(
+                              jhn_t_tree:replace(
                                 X + 1000,
                                 X,
-                                t_tree:adds([{Y, integer_to_list(Y)}
+                                jhn_t_tree:adds([{Y, integer_to_list(Y)}
                                              || Y <- Seq],
-                                            t_tree:new()),
+                                            jhn_t_tree:new()),
                                 check))
                || X <- Seq])
        || Seq <- ?SEUQENCES]},
      {"Replace not existing fail inner",
       [?_test([?assertError(badarg,
-                              t_tree:replace(
+                              jhn_t_tree:replace(
                                 X,
                                 X,
-                                t_tree:adds([{Y, integer_to_list(Y)}
+                                jhn_t_tree:adds([{Y, integer_to_list(Y)}
                                              || Y <- lists:delete(X, Seq)],
-                                            t_tree:new()),
+                                            jhn_t_tree:new()),
                                 check))
                || X <- Seq])
        || Seq <- ?SEUQENCES]}

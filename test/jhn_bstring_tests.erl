@@ -36,7 +36,7 @@
 %% strip/1
 %%--------------------------------------------------------------------
 strip_1_test_() ->
-    [?_test(?assertEqual(<<"foo">>, bstring:strip(<<"  foo  ">>)))].
+    [?_test(?assertEqual(<<"foo">>, jhn_bstring:strip(<<"  foo  ">>)))].
 
 %% ===================================================================
 %% Internal functions.
