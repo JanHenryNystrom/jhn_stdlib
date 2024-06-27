@@ -43,7 +43,7 @@
 %% new/0
 %%--------------------------------------------------------------------
 new_0_test_() ->
-    [{"Create", [?_test(?assert(pb_tree:is_pb_tree(pb_tree:new())))]}
+    [{"Create", [?_test(?assert(jhn_pb_tree:is_pb_tree(jhn_pb_tree:new())))]}
     ].
 
 %%--------------------------------------------------------------------
@@ -51,21 +51,22 @@ new_0_test_() ->
 %%--------------------------------------------------------------------
 is_pb_tree_1_test_() ->
     [{"Empty",
-      [?_test(?assertEqual(true, pb_tree:is_pb_tree(pb_tree:new())))]},
-     {"Not", [?_test(?assertEqual(false, pb_tree:is_pb_tree({foo, bar})))]}
+      [?_test(?assertEqual(true, jhn_pb_tree:is_pb_tree(jhn_pb_tree:new())))]},
+     {"Not", [?_test(?assertEqual(false, jhn_pb_tree:is_pb_tree({foo, bar})))]}
     ].
 
 %%--------------------------------------------------------------------
 %% is_empty/1
 %%--------------------------------------------------------------------
 is_empty_1_test_() ->
-    [{"Empty", [?_test(?assertEqual(true, pb_tree:is_empty(pb_tree:new())))]},
+    [{"Empty",
+      [?_test(?assertEqual(true, jhn_pb_tree:is_empty(jhn_pb_tree:new())))]},
      {"Not",
       [?_test(
           ?assertEqual(false,
-                       pb_tree:is_empty(pb_tree:add(<<"1">>,
+                       jhn_pb_tree:is_empty(jhn_pb_tree:add(<<"1">>,
                                                   "US",
-                                                  pb_tree:new()))))]}
+                                                  jhn_pb_tree:new()))))]}
     ].
 
 %%--------------------------------------------------------------------
@@ -79,55 +80,55 @@ add_3_test_() ->
     [{"Add",
       [?_test(
           ?assert(
-             pb_tree:is_pb_tree(
-               lists:foldl(fun({I, V}, Acc) -> pb_tree:add(I, V, Acc) end,
-                           pb_tree:new(),
+             jhn_pb_tree:is_pb_tree(
+               lists:foldl(fun({I, V}, Acc) -> jhn_pb_tree:add(I, V, Acc) end,
+                           jhn_pb_tree:new(),
                            Countries))))]},
      {"Add/Delete",
       [?_test(
           ?assert(
-             pb_tree:is_empty(
-               lists:foldl(fun(I, Acc) -> pb_tree:delete(I, Acc) end,
+             jhn_pb_tree:is_empty(
+               lists:foldl(fun(I, Acc) -> jhn_pb_tree:delete(I, Acc) end,
                            lists:foldl(
-                             fun({I, V}, Acc) -> pb_tree:add(I, V, Acc) end,
-                             pb_tree:new(),
+                             fun({I, V}, Acc) -> jhn_pb_tree:add(I, V, Acc) end,
+                             jhn_pb_tree:new(),
                              Countries),
                            Keys))))]},
      {"Add/Delete reverse",
       [?_test(
           ?assert(
-             pb_tree:is_empty(
-               lists:foldl(fun(I, Acc) -> pb_tree:delete(I, Acc) end,
+             jhn_pb_tree:is_empty(
+               lists:foldl(fun(I, Acc) -> jhn_pb_tree:delete(I, Acc) end,
                            lists:foldl(
-                             fun({I, V}, Acc) -> pb_tree:add(I, V, Acc) end,
-                             pb_tree:new(),
+                             fun({I, V}, Acc) -> jhn_pb_tree:add(I, V, Acc) end,
+                             jhn_pb_tree:new(),
                              Countries),
                            lists:reverse(Keys)))))]},
      {"Add and check the keys",
       [?_test(
           ?assertEqual(
              Keys,
-             pb_tree:keys(
-               lists:foldl(fun({I, V}, Acc) -> pb_tree:add(I, V, Acc) end,
-                           pb_tree:new(),
+             jhn_pb_tree:keys(
+               lists:foldl(fun({I, V}, Acc) -> jhn_pb_tree:add(I, V, Acc) end,
+                           jhn_pb_tree:new(),
                            Countries))))
       ]},
      {"Add reverse and check the keys",
       [?_test(
           ?assertEqual(
              Keys,
-             pb_tree:keys(
-               lists:foldl(fun({I, V}, Acc) -> pb_tree:add(I, V, Acc) end,
-                           pb_tree:new(),
+             jhn_pb_tree:keys(
+               lists:foldl(fun({I, V}, Acc) -> jhn_pb_tree:add(I, V, Acc) end,
+                           jhn_pb_tree:new(),
                            lists:reverse(Countries)))))
       ]},
      {"Add and check the values",
       [?_test(
           ?assertEqual(
              Values,
-             pb_tree:values(
-               lists:foldl(fun({I, V}, Acc) -> pb_tree:add(I, V, Acc) end,
-                           pb_tree:new(),
+             jhn_pb_tree:values(
+               lists:foldl(fun({I, V}, Acc) -> jhn_pb_tree:add(I, V, Acc) end,
+                           jhn_pb_tree:new(),
                            Countries))))]}
     ].
 
@@ -140,22 +141,22 @@ add_4_test_() ->
     [{"Add and read no check fail",
       [?_test(begin
                   Tree = lists:foldl(fun({I, V}, Acc) ->
-                                             pb_tree:add(I, V, Acc, check)
+                                             jhn_pb_tree:add(I, V, Acc, check)
                                      end,
-                                     pb_tree:new(),
+                                     jhn_pb_tree:new(),
                                      Countries),
-                  [?assert(pb_tree:is_pb_tree(
-                             pb_tree:add(I, V, Tree, nocheck))) ||
+                  [?assert(jhn_pb_tree:is_pb_tree(
+                             jhn_pb_tree:add(I, V, Tree, nocheck))) ||
                       {I, V} <- Countries]
               end)]},
      {"Add check fail",
       [?_test(begin
                   Tree = lists:foldl(fun({I, V}, Acc) ->
-                                             pb_tree:add(I, V, Acc, check)
+                                             jhn_pb_tree:add(I, V, Acc, check)
                                      end,
-                                     pb_tree:new(),
+                                     jhn_pb_tree:new(),
                                      Countries),
-                  [?assertError(_, pb_tree:add(I, V, Tree, check)) ||
+                  [?assertError(_, jhn_pb_tree:add(I, V, Tree, check)) ||
                       {I, V} <- Countries]
               end)]}
     ].
@@ -168,21 +169,21 @@ adds_2_test_() ->
     Countries = get(pb_countries),
     Keys = get(pb_keys),
     [{"Add",
-      ?_test(?assert(pb_tree:is_pb_tree(
-                       pb_tree:adds(Countries, pb_tree:new()))))},
+      ?_test(?assert(jhn_pb_tree:is_pb_tree(
+                       jhn_pb_tree:adds(Countries, jhn_pb_tree:new()))))},
      {"Add/Delete",
       ?_test(
           ?assert(
-             pb_tree:is_empty(
-               pb_tree:deletes(lists:reverse(Keys),
-                              pb_tree:adds(Countries, pb_tree:new()),
+             jhn_pb_tree:is_empty(
+               jhn_pb_tree:deletes(lists:reverse(Keys),
+                              jhn_pb_tree:adds(Countries, jhn_pb_tree:new()),
                               check))))
      },
      {"Add and check the keys",
       ?_test(
           ?assertEqual(Keys,
-                       pb_tree:keys
-                         (pb_tree:adds(Countries, pb_tree:new()))))}
+                       jhn_pb_tree:keys
+                         (jhn_pb_tree:adds(Countries, jhn_pb_tree:new()))))}
     ].
 
 %%--------------------------------------------------------------------
@@ -194,15 +195,15 @@ adds_3_test_() ->
     Keys = get(pb_keys),
     [{"Add with check success",
       ?_test(
-         ?assert(pb_tree:is_pb_tree(
-                   pb_tree:adds(Countries, pb_tree:new(), check))))
+         ?assert(jhn_pb_tree:is_pb_tree(
+                   jhn_pb_tree:adds(Countries, jhn_pb_tree:new(), check))))
      },
      {"Add with check fail",
       ?_test(
          begin
-             Tree = pb_tree:from_list(Countries),
+             Tree = jhn_pb_tree:from_list(Countries),
              [?assertError(badarg,
-                           pb_tree:adds([{"a", b}, {I, d}, {"e", f}],
+                           jhn_pb_tree:adds([{"a", b}, {I, d}, {"e", f}],
                                        Tree,
                                        check)) ||
                  I <- Keys]
@@ -215,23 +216,23 @@ adds_3_test_() ->
 delete_3_test_() ->
     [{"Delete empty nocheck",
       ?_test(
-         ?assert(pb_tree:is_empty(
-                   pb_tree:delete("1", pb_tree:new(), nocheck))))},
+         ?assert(jhn_pb_tree:is_empty(
+                   jhn_pb_tree:delete("1", jhn_pb_tree:new(), nocheck))))},
      {"Delete empty nocheck",
       ?_test(
          ?assert(
-            pb_tree:is_pb_tree(
-              pb_tree:delete("3",
-                            pb_tree:from_list([{<<"1">>, a}, {<<"5">>, b}]),
+            jhn_pb_tree:is_pb_tree(
+              jhn_pb_tree:delete("3",
+                            jhn_pb_tree:from_list([{<<"1">>, a}, {<<"5">>, b}]),
                             nocheck))))},
      {"Delete empty check",
       ?_test(?assertError(badarg,
-                          pb_tree:delete('1', pb_tree:new(), check)))},
+                          jhn_pb_tree:delete('1', jhn_pb_tree:new(), check)))},
      {"Delete empty check",
       ?_test(
          ?assertError(badarg,
-                      pb_tree:delete(<<"3">>,
-                                    pb_tree:from_list([{<<"1">>, a},
+                      jhn_pb_tree:delete(<<"3">>,
+                                    jhn_pb_tree:from_list([{<<"1">>, a},
                                                         {<<"5">>, b}]),
                                     check)))}
     ].
@@ -243,15 +244,15 @@ member_2_test_() ->
     load_plist(),
     Countries = get(pb_countries),
     Keys = get(pb_keys),
-    Tree = pb_tree:from_list(Countries),
+    Tree = jhn_pb_tree:from_list(Countries),
     [{"Member with check success",
       ?_test(
          ?assert(
-            lists:all(fun(Y) -> pb_tree:member(Y, Tree) end, Keys)))},
+            lists:all(fun(Y) -> jhn_pb_tree:member(Y, Tree) end, Keys)))},
      {"Member without check success",
       ?_test(
          ?assert(
-            not lists:any(fun(Y) -> pb_tree:member( Y, Tree) end,
+            not lists:any(fun(Y) -> jhn_pb_tree:member( Y, Tree) end,
                           ["a", "001", "0"])))}
     ].
 
@@ -260,12 +261,12 @@ member_2_test_() ->
 %%--------------------------------------------------------------------
 find_2_test_() ->
     load_plist(),
-    Tree = pb_tree:from_list(get(pb_countries)),
+    Tree = jhn_pb_tree:from_list(get(pb_countries)),
     [{"Find success",
-      [?_test(?assertEqual(V, pb_tree:find(I, Tree))) ||
+      [?_test(?assertEqual(V, jhn_pb_tree:find(I, Tree))) ||
           {I, V} <- lists:zip(?NUMBERS, ?COUNTRIES)]},
      {"Find failure",
-       [?_test(?assertEqual(undefined, pb_tree:find(<<($a + X)>>, Tree))) ||
+       [?_test(?assertEqual(undefined, jhn_pb_tree:find(<<($a + X)>>, Tree))) ||
            X <- lists:seq(1, 20)]}
     ].
 
@@ -274,12 +275,12 @@ find_2_test_() ->
 %%--------------------------------------------------------------------
 find_3_test_() ->
     load_plist(),
-    Tree = pb_tree:from_list(get(pb_countries)),
+    Tree = jhn_pb_tree:from_list(get(pb_countries)),
     [{"Find success",
-      [?_test(?assertEqual(V, pb_tree:find(I, Tree, none))) ||
+      [?_test(?assertEqual(V, jhn_pb_tree:find(I, Tree, none))) ||
           {I, V} <- lists:zip(?NUMBERS, ?COUNTRIES)]},
      {"Find failure",
-      [?_test(?assertEqual(none, pb_tree:find(<<($a + X)>>, Tree, none))) ||
+      [?_test(?assertEqual(none, jhn_pb_tree:find(<<($a + X)>>, Tree, none))) ||
           X <- lists:seq(1, 20)]}
     ].
 
@@ -288,15 +289,18 @@ find_3_test_() ->
 %%--------------------------------------------------------------------
 replace_3_test_() ->
     load_plist(),
-    Tree = pb_tree:from_list(get(pb_countries)),
+    Tree = jhn_pb_tree:from_list(get(pb_countries)),
     [{"Replace existing",
       [?_test(?assertEqual(I,
-                           pb_tree:find(I, pb_tree:replace(I, I, Tree)))) ||
+                           jhn_pb_tree:find(I,
+                                            jhn_pb_tree:replace(I,
+                                                                I,
+                                                                Tree)))) ||
           I <- ?KEYS]},
      {"Replace not existing",
       [?_test(?assertEqual(I,
-                           pb_tree:find(<<I/binary, "a">>,
-                                       pb_tree:replace(<<I/binary, "a">>,
+                           jhn_pb_tree:find(<<I/binary, "a">>,
+                                       jhn_pb_tree:replace(<<I/binary, "a">>,
                                                         I,
                                                         Tree)))) ||
           I <- ?KEYS]}
@@ -307,18 +311,20 @@ replace_3_test_() ->
 %%--------------------------------------------------------------------
 replace_4_test_() ->
     load_plist(),
-    Tree = pb_tree:from_list(get(pb_countries)),
+    Tree = jhn_pb_tree:from_list(get(pb_countries)),
     [{"Replace existing success",
       [?_test(?assertEqual(I,
-                           pb_tree:find(I,
-                                         pb_tree:replace(I,I,Tree,check)))) ||
+                           jhn_pb_tree:find(I,
+                                         jhn_pb_tree:replace(I,
+                                                             I,
+                                                             Tree,check)))) ||
           I <- ?KEYS]},
      {"Replace not existing",
        [?_test(?assertError(badarg,
-                            pb_tree:replace(<<I/binary, "a">>,
-                                             I,
-                                             Tree,
-                                             check))) ||
+                            jhn_pb_tree:replace(<<I/binary, "a">>,
+                                                I,
+                                                Tree,
+                                                check))) ||
           I <- ?KEYS]}
     ].
 

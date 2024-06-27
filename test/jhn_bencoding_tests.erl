@@ -58,27 +58,28 @@
 %%--------------------------------------------------------------------
 encode_1_test_() ->
     [{format(D),
-      ?_test(?assertMatch([_ | _], bencoding:encode(D)))} ||
+      ?_test(?assertMatch([_ | _], jhn_bencoding:encode(D)))} ||
         D <- ?DECODED].
 
 encode_2_test_() ->
     [{format(D),
-      ?_test(?assertMatch(<<_/binary>>, bencoding:encode(D, [binary])))} ||
+      ?_test(?assertMatch(<<_/binary>>, jhn_bencoding:encode(D, [binary])))} ||
         D <- ?DECODED].
 
 %%--------------------------------------------------------------------
 %% Decode
 %%--------------------------------------------------------------------
 decode_1_test_() ->
-    [{D, ?_test(bencoding:decode(D))} ||
+    [{D, ?_test(jhn_bencoding:decode(D))} ||
         D <- ?ENCODED].
 
 decode_2_test_() ->
-    [[{D, ?_test(?assertMatch({_, <<>>}, bencoding:decode(D, [continue])))} ||
+    [[{D,
+       ?_test(?assertMatch({_, <<>>}, jhn_bencoding:decode(D, [continue])))} ||
         D <- ?ENCODED],
      [{<<D/binary, "cr">>,
        ?_test(?assertMatch({_, <<"cr">>},
-                           bencoding:decode(<<D/binary, "cr">>,
+                           jhn_bencoding:decode(<<D/binary, "cr">>,
                                             [continue])))} ||
          D <- ?ENCODED]
     ].
@@ -88,8 +89,9 @@ decode_2_test_() ->
 %%--------------------------------------------------------------------
 encode_2_decode_1_test_() ->
     [{format(D),
-      ?_test(?assertMatch(D,
-                          bencoding:decode(bencoding:encode(D, [binary]))))} ||
+      ?_test(
+         ?assertMatch(D,
+                      jhn_bencoding:decode(bencoding:encode(D, [binary]))))} ||
         D <- ?DECODED].
 
 %% ===================================================================

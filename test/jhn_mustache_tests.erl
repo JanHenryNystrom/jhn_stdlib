@@ -99,7 +99,7 @@ render_2_test_() ->
                      renderf(<<"{{#person}}{{name}}{{/person}}">>,
                              [{person,
                                fun(T, C) ->
-                                       ["That ", mustache:render(T, C)]
+                                       ["That ", jhn_mustache:render(T, C)]
                                end},
                               {name, <<"Olle">>}]))),
      ?_test(
@@ -171,7 +171,7 @@ render_2_test_() ->
                      renderf(<<"{{#person}}{{name}}{{/person}}">>,
                              #{person =>
                                    fun(T, C) ->
-                                           ["That ", mustache:render(T, C)]
+                                           ["That ", jhn_mustache:render(T, C)]
                                    end,
                                name => <<"Olle">>}))),
      ?_test(
@@ -181,7 +181,7 @@ render_2_test_() ->
                                name => [<<"kalle">>, <<"olle">>]}))),
      ?_test(
         ?assertEqual(<<"&lt;FOO&gt;">>,
-                     mustache:render(<<"{{foo}}">>,
+                     jhn_mustache:render(<<"{{foo}}">>,
                                      [{foo, <<"<FOO>">>}],
                                      binary))),
      ?_test(
@@ -196,12 +196,12 @@ render_2_test_() ->
                      renderf(<<"{{foo}}{{! f} }}BAR">>, #{foo => <<"FOO">>}))),
      ?_test(
         ?assertEqual(<<"&gt;FOO&gt;">>,
-                     mustache:render(<<"{{foo}}">>,
+                     jhn_mustache:render(<<"{{foo}}">>,
                                      [{foo, <<">FOO>">>}],
                                      binary))),
      ?_test(
         ?assertEqual(<<"&amp;FOO">>,
-                     mustache:render(<<"{{foo}}">>,
+                     jhn_mustache:render(<<"{{foo}}">>,
                                      [{foo, <<"&FOO">>}],
                                      binary))),
      ?_test(
@@ -226,11 +226,6 @@ render_2_test_() ->
                              #{'user}' => <<"User:{{name}}">>,
                                name => [<<"kalle">>, <<"olle">>]})))
 
-    %% ,
-    %%  ?_test(
-    %%     ?assertEqual(<<"kalle olle ">>,
-    %%                  renderf(<<"{{#person} }}{{person} }} {{/person} }}">>,
-    %%                          [{'person}', [<<"kalle">>, <<"olle">>]}])))
     ].
 
 %% ===================================================================
@@ -238,4 +233,4 @@ render_2_test_() ->
 %% ===================================================================
 
 renderf(Template, Context) ->
-    iolist_to_binary(mustache:render(Template, Context)).
+    iolist_to_binary(jhn_mustache:render(Template, Context)).
