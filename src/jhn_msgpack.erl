@@ -22,7 +22,7 @@
 %%%  MessagePack is represented as follows:
 %%%
 %%%  msgpack  : map | array | integers | floats | boolean | raw
-%%%  map      : {[{msgpack, msgpack}*]}
+%%%  map      : #{msgpack => msgpack}
 %%%  array    : [msgpack*]
 %%%  integers : integer | {pos_fixnum, integer} | {neg_fixnum, integer} |
 %%%             {uint8, integer} | {uint16, integer} | {uint32, integer} |
@@ -51,7 +51,7 @@
 
 -type msgpack()       :: msgpack_map() | msgpack_array() |
                          integers() | floats() | boolean() | raw().
--type msgpack_map()   :: {[msgpack()]}.
+-type msgpack_map()   :: #{msgpack() => msgpack()}.
 -type msgpack_array() :: [msgpack()].
 -type integers()      :: integer() | {integer_type(), integer()}.
 -type integer_type()  :: pos_fixnum | neg_fixnum |
@@ -191,7 +191,7 @@ decode(Binary, Opts) ->
 %% Encoding
 %% ===================================================================
 
-encode_msgpack({Map}, Opts) when is_list(Map) -> encode_map(Map, Opts);
+encode_msgpack(Map = #{}, Opts) -> encode_map(Map, Opts);
 encode_msgpack(Array, Opts) when is_list(Array) -> encode_array(Array, Opts);
 encode_msgpack(Integer, Opts) when is_integer(Integer) ->
     encode_integer(Integer, Opts);
@@ -279,7 +279,7 @@ encode_array(Array, Opts) ->
     [Tag | [encode_msgpack(Elt, Opts) || Elt <- Array]].
 
 encode_map(Map, Opts) ->
-    Tag = case length(Map) of
+    Tag = case maps:size(Map) of
               L  when L < 16 -> <<?FIX_MAP, L:4>>;
               L when L =< ?UINT16_MAX -> <<?MAP16, L:16>>;
               L when L =< ?UINT32_MAX -> <<?MAP32, L:32>>;
@@ -287,7 +287,7 @@ encode_map(Map, Opts) ->
           end,
     [Tag |
      [[encode_msgpack(Key, Opts), encode_msgpack(Value, Opts)] ||
-         {Key, Value} <- Map]].
+         {Key, Value} <- maps:to_list(Map)]].
 
 %% ===================================================================
 %% Decoding
@@ -357,11 +357,11 @@ decode_msgpack(<<?ARRAY16, L:16, T/binary>>, Opts) ->
 decode_msgpack(<<?ARRAY32, L:32, T/binary>>, Opts) ->
     decode_array(L, T, [], Opts);
 decode_msgpack(<<?FIX_MAP, L:4, T/binary>>, Opts) ->
-    decode_map(L, T, [], Opts);
+    decode_map(L, T, #{}, Opts);
 decode_msgpack(<<?MAP16, L:16, T/binary>>, Opts) ->
-    decode_map(L, T, [], Opts);
+    decode_map(L, T, #{}, Opts);
 decode_msgpack(<<?MAP32, L:32, T/binary>>, Opts) ->
-    decode_map(L, T, [], Opts);
+    decode_map(L, T, #{}, Opts);
 decode_msgpack(_, _) ->
     erlang:error(badarg).
 
@@ -371,11 +371,11 @@ decode_array(N, Binary, Acc, Opts) ->
     {H, T} = decode_msgpack(Binary, Opts),
     decode_array(N - 1, T, [H | Acc], Opts).
 
-decode_map(0, T, Acc, _) -> {{lists:reverse(Acc)}, T};
+decode_map(0, T, Acc, _) -> {Acc, T};
 decode_map(N, Binary, Acc, Opts) ->
     {Key, T} = decode_msgpack(Binary, Opts),
     {Value, T1} = decode_msgpack(T, Opts),
-    decode_map(N - 1, T1, [{Key, Value} | Acc], Opts).
+    decode_map(N - 1, T1, Acc#{Key => Value}, Opts).
 
 
 %% ===================================================================
