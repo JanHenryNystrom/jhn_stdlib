@@ -16,7 +16,7 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%  A JSON stream library based on:
+%%%  A CBOR library based on:
 %%%
 %%%  Concise Binary Object Representation (CBOR)                       (rfc8949)
 %%%
@@ -31,7 +31,75 @@
 %%%
 %%%  Tags unlikely to ever be supported: 21, 22, 23
 %%%
+%%%  CBOR cbor() values are represented as follows:
 %%%
+%%%  Simple values:
+%%%
+%%%  False(20)     : false
+%%%
+%%%  True(21)      : true
+%%%
+%%%  Null(22)      : null
+%%%
+%%%  Undefined(23) : undefined
+%%%
+%%%  (Integer)     : {simple, integer()}
+%%%
+%%%  Numbers:
+%%%
+%%%  Integer : integer()
+%%%
+%%%  Float   : float() | {float16, float()} |
+%%%            {float32, float()} | {float64, float()} |
+%%%            inf | neg_inf | nan.
+%%%
+%%%  Bistrings:
+%%%
+%%%  String                   : {string, binary()}
+%%%
+%%%  indefinite length String : {strings, [{string, binary()}]}
+%%%
+%%%  Text                     : binary()
+%%%
+%%%  indefinite length Texts  : {texts, [binary()]}
+%%%
+%%%  Collections:
+%%%
+%%%  Map                   : #{cbor() => cbor()}
+%%%
+%%%  indefinite length Map : {map, [#{cbor() => cbor()}]}
+%%%
+%%%  Array                 : [cbor()]
+%%%
+%%%  Arrays                : {arrays, [cbor()]}
+%%%
+%%%  Tags:
+%%%
+%%%  timestamp(0)        : {tag, timestamp, integer() | binary()}
+%%%
+%%%  posix(1)            : {tag, posix, integer() | float() | null | undefined}
+%%%
+%%%  bignum(2)           : {tag, bignum, non_neg_integer()}
+%%%
+%%%  bignum(3)           : {tag, bignum, neg_integer()}
+%%%
+%%%  decimal_fraction(4) : {tag, decimal_fraction, {integer(), integer()}}
+%%%
+%%%  bigfloat(5)         : {tag, bigfloat, {integer(), integer()}
+%%%
+%%%  embedded(24)        : {tag, embedded, binary()}
+%%%
+%%%  uri(32)             : {tag, uri, #uri{} | binary()}
+%%%
+%%%  base64url(33)       : {tag, base64url, binary()}
+%%%
+%%%  base64(34)          : {tag, based, binary()}
+%%%
+%%%  mac(48)             : {tag, mac, binary()}
+%%%
+%%%  cbor(55799)         : {tag, cbor, cbor()}
+%%%
+%%%  (Integer)           : {tag, integer(), _}
 %%%
 %%% @end
 %%%
@@ -64,8 +132,7 @@
                        cmap() | array() | tag().
 
 -type simple()      :: true | false | null | undefined | {simple, integer()}.
--type cfloat()      :: float() |
-                       {float16, float()} |
+-type cfloat()      :: {float16, float()} |
                        {float32, float()} |
                        {float64, float()}|
                        inf | neg_inf | nan.
@@ -126,7 +193,7 @@
 %% Function: encode(Term) -> CBOR.
 %% @doc
 %%   Encodes the structured Erlang term as an iolist.
-%%   Equivalent of encode(Term, iolist) -> CBOR.
+%%   Equivalent of encode(Term, []) -> CBOR.
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(cbor()) -> iodata().
@@ -141,6 +208,9 @@ encode(CBOR) -> encode(CBOR, []).
 %%   Options are:
 %%     binary -> a binary is returned
 %%     iolist -> an iolist is returned (default)
+%%     {tag_callbacks, [{integer(), nodule()}]} specifies
+%%     a module with a cbor_encode_tag callback function to decode tags
+%%     not supporrted in this module.
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(cbor(), opts()) -> binary().
@@ -155,10 +225,7 @@ encode(T, Opts) ->
 %%--------------------------------------------------------------------
 %% Function: decode(CBOR) -> {Term, Binary}
 %% @doc
-%%   Decodes the binary into a tuple of structured Erlang term and the
-%%   remaining binary or a continuation if the binary did not contain
-%%   a complete CBOR value. The continuation can be used by decode/2 with
-%%   a binary containing the rest of the CBOR value to decode.
+%%   Decodes the binary into a tuple of structured Erlang term.
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> {cbor(), binary()}.
@@ -168,10 +235,12 @@ decode(Binary) -> decode(Binary, []).
 %%--------------------------------------------------------------------
 %% Function: decode(CBOR) -> {Term, Binary}
 %% @doc
-%%   Decodes the binary into a tuple of structured Erlang term and the
-%%   remaining binary or a continuation if the binary did not contain
-%%   a complete CBOR value. The continuation can be used by decode/2 with
-%%   a binary containing the rest of the CBOR value to decode.
+%%   Decodes the binary into a structured Erlang term or a tuple of a
+%%   structured Erlang term and the rest of the binary if the continue
+%%   option is given.
+%%   A {tag_callbacks, [{integer(), nodule()}]} can supplied to specify
+%%   a module with a cbor_decode_tag callback function to decode tags
+%%   not supporrted in this module.
 %% @end
 %%--------------------------------------------------------------------
 -spec decode(binary(), opts()) -> {cbor(), binary()}.
