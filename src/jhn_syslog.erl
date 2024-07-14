@@ -1027,22 +1027,22 @@ encode_time_stamp('-', _, _) -> "-";
 encode_time_stamp(Bin, _, _) when is_binary(Bin) -> Bin;
 encode_time_stamp(Map = #{}, Header, Precision) ->
     case maps:get(offset_sign, Header, 'Z') of
-        'Z' -> timestamp:encode(Map, [Precision]);
+        'Z' -> jhn_timestamp:encode(Map, [Precision]);
         Sign ->
             {HO, MiO} = maps:get(offset, Header),
             T = Map#{offset => #{sign => Sign, hours => HO, minutes => MiO}},
-            timestamp:encode(T, [Precision])
+            jhn_timestamp:encode(T, [Precision])
     end;
 encode_time_stamp({{Y, M , D}, {H, Mi, S}}, Header, Precision) ->
     T = #{year => Y, month => M, day => D,
           hour => H, minute => Mi,second => S,
           fraction => maps:get(fraction, Header, 0)},
     case maps:get(offset_sign, Header, 'Z') of
-        'Z' -> timestamp:encode(T, [Precision]);
+        'Z' -> jhn_timestamp:encode(T, [Precision]);
         Sign ->
             {HO, MiO} = maps:get(offset, Header),
             T1 = T#{offset => #{sign => Sign, hours => HO, minutes => MiO}},
-            timestamp:encode(T1, [Precision])
+            jhn_timestamp:encode(T1, [Precision])
     end.
 
 encode_structured_data(#{structured := Structured}) ->
@@ -1115,7 +1115,7 @@ decode_timestamp(T, Header) ->
     {#{year := Y, month := M, day := D, hour := H, minute := Mi, second := S,
        fraction := Fraction, offset := Offset},
      <<_, T1/binary>>} =
-        timestamp:decode(T, [continue]),
+        jhn_timestamp:decode(T, [continue]),
     Header1 = Header#{time_stamp => {{Y, M, D}, {H,Mi,S}},fraction => Fraction},
     case Offset of
         'Z' -> decode_hostname(T1, Header1);
@@ -1259,12 +1259,12 @@ parse_opt({destination, IP = {_, _, _, _}}, Opts) -> Opts#opts{dest = IP};
 parse_opt({destination, IP = {_, _, _, _, _, _, _, _}}, Opts) ->
     Opts#opts{dest = IP};
 parse_opt({destination, Dest = [C | _]}, Opts) when C >= $0, C =< $: ->
-    try ip_addr:decode(Dest, [tuple]) of
+    try jhn_ip_addr:decode(Dest, [tuple]) of
         Dest1 -> Opts#opts{dest = Dest1}
     catch _:_ -> Opts#opts{dest = Dest}
     end;
 parse_opt({destination, Dest = <<C,_/binary>>},Opts) when C >= $0,C =< $: ->
-    try ip_addr:decode(Dest, [tuple]) of
+    try jhn_ip_addr:decode(Dest, [tuple]) of
         Dest1 -> Opts#opts{dest = Dest1}
     catch _:_ -> Opts#opts{dest = binary_to_list(Dest)}
     end;

@@ -620,13 +620,13 @@ decode(URI, Req = #{method := Method}) ->
         U  = #uri{userinfo = []} -> Req#{uri => U};
         U  = #uri{userinfo = UserInfo} when Method == 'CONNECT' ->
             Headers = maps:get(headers, Req, #{}),
-            Basic = base64:encode(bstring:join(UserInfo, <<$:>>)),
+            Basic = base64:encode(jhn_bstring:join(UserInfo, <<$:>>)),
             Authorization = <<"Basic ", Basic/binary>>,
             Req#{uri => U,
                  headers => Headers#{'Proxy-Authorization' => Authorization}};
         U  = #uri{userinfo = UserInfo} ->
             Headers = maps:get(headers, Req, #{}),
-            Basic = base64:encode(bstring:join(UserInfo, <<$:>>)),
+            Basic = base64:encode(jhn_bstring:join(UserInfo, <<$:>>)),
             Authorization = <<"Basic ", Basic/binary>>,
             Req#{uri => U,
                  headers => Headers#{'Authorization' => Authorization}}
@@ -639,8 +639,8 @@ port(https, _) -> 443.
 normalize_headers(Map) -> maps:fold(fun normalize_header/3, [], Map).
 
 normalize_header(Key, Value, Acc) ->
-    [{bstring:to_lower(to_bin(Key)),
-      bstring:strip(to_bin(Value), right)} | Acc].
+    [{jhn_bstring:to_lower(to_bin(Key)),
+      jhn_bstring:strip(to_bin(Value), right)} | Acc].
 
 to_bin(Atom) when is_atom(Atom) -> atom_to_binary(Atom, utf8);
 to_bin(List) when is_list(List) -> list_to_binary(List);
@@ -681,7 +681,7 @@ ipv6_host(_) -> false.
 header_normalized(Header, Headers) ->  header_normalized(Header, Headers, <<>>).
 
 header_normalized(Header, Headers, Default) ->
-    bstring:to_lower(plist:find(Header, Headers, Default)).
+    jhn_bstring:to_lower(jhn_plist:find(Header, Headers, Default)).
 
 %%------------------------------------------------------------------------------
 %% Transport
@@ -824,14 +824,14 @@ format_request(State) ->
     Headers1 = case lists:member(Method, ['POST', 'PUT', 'PATCH']) of
                    false -> Headers;
                    true ->
-                       case plist:member(<<"content-length">>, Headers) of
+                       case jhn_plist:member(<<"content-length">>, Headers) of
                            true -> Headers;
                            false ->
                                Size = integer_to_binary(iolist_size(Body)),
                                [{<<"content-length">>, Size} | Headers]
                        end
                end,
-    Headers2 = case plist:member(<<"host">>, Headers) of
+    Headers2 = case jhn_plist:member(<<"host">>, Headers) of
                    true -> Headers1;
                    false -> [{<<"host">>, format_host(Host, Port)} | Headers1]
 
@@ -856,11 +856,13 @@ format_path(Parts) -> [["/", Part] || Part <- Parts].
 
 format_host(Host = {_, _, _, _, _, _, _, _}, Port) ->
     [$[,
-     [bstring:join([integer_to_binary(I) || I <- tuple_to_list(Host)], <<$:>>),
+     [jhn_bstring:join([integer_to_binary(I) ||
+                           I <- tuple_to_list(Host)], <<$:>>),
       $:, integer_to_binary(Port)],
      $]];
 format_host(Host = {_, _, _, _}, Port) ->
-    [bstring:join([integer_to_binary(I) || I <- tuple_to_list(Host)], <<$.>>),
+    [jhn_bstring:join([integer_to_binary(I) || I <- tuple_to_list(Host)],
+                      <<$.>>),
      $:, integer_to_binary(Port)];
 format_host(Host, Port) ->
     [Host, $:, integer_to_binary(Port)].
@@ -930,8 +932,8 @@ response_body(#state{method = 'CONNECT'}, _, _, _) -> {<<>>, []};
 response_body(_, _, {204, _}, _) ->  {<<>>, []};
 response_body(_, _, {304, _}, _) ->  {<<>>, []};
 response_body(State = #state{method = 'OPTIONS'}, Vsn, _, Headers) ->
-    ContentLength = plist:member(<<"content-length">>, Headers),
-    TransferEncoding = plist:member(<<"transfer-encoding">>, Headers),
+    ContentLength = jhn_plist:member(<<"content-length">>, Headers),
+    TransferEncoding = jhn_plist:member(<<"transfer-encoding">>, Headers),
     case {ContentLength, TransferEncoding} of
         {false, false} -> {<<>>, []};
         {_, _} -> read_body(Vsn, Headers, State, body_type(Headers))
@@ -940,7 +942,7 @@ response_body(State, Vsn, _, Headers) ->
     read_body(Vsn, Headers, State, body_type(Headers)).
 
 body_type(Headers) ->
-    case plist:find(<<"content-length">>, Headers) of
+    case jhn_plist:find(<<"content-length">>, Headers) of
         undefined ->
             case header_normalized(<<"transfer-encoding">>, Headers) of
                 <<"chunked">> -> chunked;
@@ -1042,7 +1044,7 @@ denormalize_headers(Headers) ->
 %%------------------------------------------------------------------------------
 redirect(State = #state{redirections = Redirections}, Headers) ->
     do_close(State),
-    case plist:find(<<"location">>, Headers) of
+    case jhn_plist:find(<<"location">>, Headers) of
         undefined -> erlang:error(missing_redirect);
         URI ->
             #uri{scheme = Scheme,
@@ -1084,7 +1086,7 @@ uri(IoData) -> uri(jhn_uri:decode(IoData)).
 host_to_address(T = {_, _, _, _}) -> T;
 host_to_address(T = {_, _, _, _, _, _, _, _}) -> T;
 host_to_address(Binary) ->
-    try ip_addr:decode(Binary, [tuple])
+    try jhn_ip_addr:decode(Binary, [tuple])
     catch _:_ -> binary_to_list(Binary)
     end.
 

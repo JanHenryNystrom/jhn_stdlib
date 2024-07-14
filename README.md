@@ -1,4 +1,4 @@
-hn_stdlib [(γ)][5]
+jhn_stdlib [(γ)][5]
 ==========
 
 A few thought experiments solidified as code: CBOR, JSON, MessagePack, syslog,
@@ -26,8 +26,8 @@ since the road to enlightenment is one without terminus.
 Behaviours
 --------
 
-  * jhn_server -- A generic server
-  * jhn_fsm -- A FSM with the ability to defer acting on events until
+  * ```jhn_server``` -- A generic server
+  * ```jhn_fsm``` -- A FSM with the ability to defer acting on events until
     a later state
 
 <a name='features'/>
@@ -36,40 +36,40 @@ Features/Modules
 --------
 
   * String Processing Functions for binary encoded strings
-    * jhn_blist -- drop in replacement for the lists module in stdlib
-    * jhn_bstring -- drop in replacement for the string module in stdlib
-    * jhn_mustache -- [Mustache (template system)][37]
+    * ```jhn_blist``` -- drop in replacement for the lists module in stdlib
+    * ```jhn_bstring``` -- drop in replacement for the string module in stdlib
+    * ```jhn_mustache``` -- [Mustache (template system)][37]
   * Protocols
-    * Bencoding -- encoding/decoding -- jhn_bencoding
-    * CBOR -- encoding/decoding -- jhn_cbor [rfc8949][43], [rfc9542][44]
-    * JSON  -- encoding/decoding -- jhn_json [rfc8259][30]
-    * JSON Pointer -- encoding/decoding/evaluation -- jhn_json [rfc6901][8]
-    * JSON Patch -- evaluation -- jhn_json [rfc6902][31]
-    * JSON Merge Patch  -- evaluation -- jhn_json [rfc7396][32]
-    * MessagePack -- encoding/decoding -- jhn_msgpack [MessagePack][12]/Erlang
-    * Syslog -- encoding/decoding  -- jhn_syslog [rfc5424][13], [rfc5427][14], [rfc6012][29]
+    * Bencoding -- encoding/decoding -- ```jhn_bencoding```
+    * CBOR -- encoding/decoding -- ```jhn_cbor``` [rfc8949][43], [rfc9542][44]
+    * JSON  -- encoding/decoding -- ```jhn_json``` [rfc8259][30]
+    * JSON Pointer -- encoding/decoding/evaluation -- ```jhn_json``` [rfc6901][8]
+    * JSON Patch -- evaluation -- ```jhn_json``` [rfc6902][31]
+    * JSON Merge Patch  -- evaluation -- ```jhn_json``` [rfc7396][32]
+    * MessagePack -- encoding/decoding -- ```jhn_msgpack``` [MessagePack][12]/Erlang
+    * Syslog -- encoding/decoding  -- ```jhn_syslog``` [rfc5424][13], [rfc5427][14], [rfc6012][29]
   * Standards
-    * IP Addresses -- encoding/decoding -- jhn_ip_addr [rfc4291][16], [rfc5952][17], [rfc4632][18]
-    * Timestamps -- generating/encoding/decoding -- jhn_timestamp [rfc3339][19], [rfc7231][21]
-    * URI -- encoding/decoding -- jhn_uri [rfc3986][15]
-    * UUID -- generating/encoding/decoding -- jhn_uuid [rfc9562][42]
+    * IP Addresses -- encoding/decoding -- ```jhn_ip_addr``` [rfc4291][16], [rfc5952][17], [rfc4632][18]
+    * Timestamps -- generating/encoding/decoding -- ```jhn_timestamp``` [rfc3339][19], [rfc7231][21]
+    * URI -- encoding/decoding -- ```jhn_uri``` [rfc3986][15]
+    * UUID -- generating/encoding/decoding -- ```jhn_uuid``` [rfc9562][42]
   * Clients
-    * HTTP -- client -- jhn_shttpc [rfc7230][20], [rfc7231][21], [rfc7538][22], [rfc5789][23], [rfc2818][24]
-    * Syslog -- server/client -- jhn_syslog [rfc5425][25], [rfc5426][26], [rfc6587][27]
+    * HTTP -- client -- ```jhn_shttpc``` [rfc7230][20], [rfc7231][21], [rfc7538][22], [rfc5789][23], [rfc2818][24]
+    * Syslog -- server/client -- ```jhn_syslog``` [rfc5425][25], [rfc5426][26], [rfc6587][27]
   * Pull oriented data source abstraction
-    * lazy -- jhn_lazy abstracts different data sources as uniform lazy data
+    * lazy -- ```jhn_lazy``` abstracts different data sources as uniform lazy data
   * Data structures
-    * Bloom filters -- jhn_bloom [Bloom Filters][36]
-    * Property lists -- jhn_plist
-    * Prefix trees -- jhn_p_tree [Prefix Tree][38]
-    * Binary(UTF-8) Prefix trees -- jhn_pb_tree [Prefix Tree][38], [UTF-8][39]
-    * Range trees -- jhn_r_tree [Range Tree][40]
-    * T-trees -- t_tree [T-tree][41]
+    * Bloom filters -- ```jhn_bloom``` [Bloom Filters][36]
+    * Property lists -- ```jhn_plist```
+    * Prefix trees -- ```jhn_p_tree``` [Prefix Tree][38]
+    * Binary(UTF-8) Prefix trees -- ```jhn_pb_tree``` [Prefix Tree][38], [UTF-8][39]
+    * Range trees -- ```jhn_r_tree``` [Range Tree][40]
+    * T-trees -- ```jhn_t_tree``` [T-tree][41]
   * Algorithms
-    * Levenshtein distance -- jhn_math:levenshtein/2 [Levenshtein][35]
-    * CRC32-C checksum -- jhn_hash:crc32c/1 [rfc9260][33]
-    * xxHash-32 checksum -- jhn_hash:xxh32/1/2 [xxHash][34]
-    * Consistent Hashing -- jhn_chash [J. Lamping, Eric Veach][28]
+    * Levenshtein distance -- ```jhn_math:levenshtein/2``` [Levenshtein][35]
+    * CRC32-C checksum -- ```jhn_hash:crc32c/1``` [rfc9260][33]
+    * xxHash-32 checksum -- ```jhn_hash:xxh32/1```, ```jhn_hash:xxh32/2``` [xxHash][34]
+    * Consistent Hashing -- ```jhn_chash:jump/2``` [J. Lamping, Eric Veach][28]
 
 <a name='deprecated'/>
 

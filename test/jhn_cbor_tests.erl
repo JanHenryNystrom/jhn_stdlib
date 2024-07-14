@@ -98,10 +98,10 @@
 %% jhn_cbor callbacks
 %% ===================================================================
 cbor_encode_tag(43, {string, <<"enc:", Binary/binary>>}, _) ->
-    jhn_cbor:encode({string, blist:reverse(Binary)}).
+    jhn_cbor:encode({string, jhn_blist:reverse(Binary)}).
 
 cbor_decode_tag(43, {string, Binary}, _) ->
-    {string, <<"dec:", (blist:reverse(Binary))/binary>>}.
+    {string, <<"dec:", (jhn_blist:reverse(Binary))/binary>>}.
 
 %% ===================================================================
 %% Tests.
@@ -209,7 +209,7 @@ encode_2_decode_1_embedded_test_() ->
 
 encode_2_decode_1_uri_test_() ->
     URL = <<"https://foo.bar">>,
-    [?_test(?assertEqual({tag, uri, uri:decode(URL)},
+    [?_test(?assertEqual({tag, uri, jhn_uri:decode(URL)},
                          jhn_cbor:decode(
                            jhn_cbor:encode({tag, uri, URL}, [binary]))))].
 

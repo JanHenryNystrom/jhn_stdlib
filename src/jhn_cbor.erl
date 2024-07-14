@@ -371,7 +371,7 @@ encode_tag({tag, I, Val}, Opts) when I >= 0 ->
     [<<?MAJOR6:3, I:5>>, encode_content(I, Val, Opts)].
 
 encode_content(N, Val, Opts = #opts{tag_callbacks = TCBMs}) ->
-    case plist:find(N, TCBMs) of
+    case jhn_plist:find(N, TCBMs) of
         undefined -> do_encode(Val, Opts);
         CBM ->
             CBM:cbor_encode_tag(N, Val, Opts)
@@ -576,7 +576,7 @@ decode_tag(34, T, Opts) ->
 %% MAC
 decode_tag(48, T, Opts) ->
     {{string, MAC}, T1} = do_decode(T, Opts),
-    {{tag, mac, bstring:join([<<N:16>> || <<N:16>> <= MAC], <<$->>)}, T1};
+    {{tag, mac, jhn_bstring:join([<<N:16>> || <<N:16>> <= MAC], <<$->>)}, T1};
 %% Marked as CBOR
 decode_tag(55799, T, Opts) ->
     {CBOR, T1} = do_decode(T, Opts),
@@ -584,7 +584,7 @@ decode_tag(55799, T, Opts) ->
 %%
 decode_tag(N, T, Opts = #opts{tag_callbacks = TCBMs}) ->
     {Val, T1} = do_decode(T, Opts),
-    case plist:find(N, TCBMs) of
+    case jhn_plist:find(N, TCBMs) of
         undefined -> {{tag, N, Val}, T1};
         CBM ->
             {{tag, N, CBM:cbor_decode_tag(N, Val, Opts)}, T1}

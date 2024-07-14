@@ -212,7 +212,7 @@ do_encode(URI = #uri{}, Opts) ->
 encode_host(Bin, _) when is_binary(Bin) -> Bin;
 encode_host(IP, #opts{format = Format, ipv6ipv4 = IPv6IPv4, compact=Compact}) ->
     Opts1 = flags([{ipv6ipv4, IPv6IPv4}, {compact, Compact}], [Format]),
-    ip_addr:encode(IP, Opts1).
+    jhn_ip_addr:encode(IP, Opts1).
 
 flags([], Acc) -> Acc;
 flags([{Flag, true} | T], Acc) -> flags(T, [Flag | Acc]);
@@ -386,7 +386,7 @@ decode_port(I, Acc, URI, Opts) ->
     end.
 
 decode_ipv6(I, URI, Opts) ->
-    {IPv6, T0} = ip_addr:decode(I, [tuple, continue]),
+    {IPv6, T0} = jhn_ip_addr:decode(I, [tuple, continue]),
     URI1 = URI#uri{host = IPv6},
     case next(T0) of
         {$], T} ->
