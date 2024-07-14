@@ -11,3 +11,5 @@ doc/*.html
 doc/*.png
 doc/*.css
 doc/edoc-info
+doc/dist
+doc/*.epub

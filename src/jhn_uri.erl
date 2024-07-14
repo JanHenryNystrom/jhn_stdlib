@@ -45,9 +45,10 @@
                return_type = iolist :: iolist | list | binary}).
 
 %% Types
--type uri() :: #uri{}.
+-type uri()  :: #uri{}.
 
--type opt() :: none.
+-type opt()  :: ipv4 | ipv6 | ipv6ipv4 | compact | iolist | list | binary.
+-type opts() :: [opt()].
 
 
 %% Defines
@@ -95,7 +96,7 @@
 %%--------------------------------------------------------------------
 -spec encode(uri()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Term) -> encode(Term, #opts{}).
+encode(Term) -> encode(Term, []).
 
 %%--------------------------------------------------------------------
 %% Function: encode(Term, Options) -> URI
@@ -113,9 +114,8 @@ encode(Term) -> encode(Term, #opts{}).
 %%     compact -> the most compact encoding of IPv6 used (collapsed zeros)
 %% @end
 %%--------------------------------------------------------------------
--spec encode(uri(), [opt()] | #opts{}) -> iolist() | binary().
+-spec encode(uri(), opts()) -> iolist() | binary().
 %%--------------------------------------------------------------------
-encode(Term, Opts = #opts{}) -> do_encode(Term, Opts);
 encode(Term, Opts) ->
     ParsedOpts = parse_opts(Opts, #opts{}),
     case ParsedOpts#opts.return_type of
@@ -133,7 +133,7 @@ encode(Term, Opts) ->
 %%--------------------------------------------------------------------
 -spec decode(binary()) -> uri().
 %%--------------------------------------------------------------------
-decode(Binary) -> decode(Binary, #opts{}).
+decode(Binary) -> decode(Binary, []).
 
 %%--------------------------------------------------------------------
 %% Function: decode(Binary, Options) -> URI.
@@ -143,12 +143,9 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%   Options are:
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary(), [opt()] | #opts{}) -> uri().
+-spec decode(binary(), opts()) -> uri().
 %%--------------------------------------------------------------------
-decode(Binary, Opts = #opts{}) -> do_decode(Binary, Opts);
-decode(Binary, Opts) ->
-    ParsedOpts = parse_opts(Opts, #opts{}),
-    do_decode(Binary, ParsedOpts).
+decode(Binary, Opts) -> do_decode(Binary, parse_opts(Opts, #opts{})).
 
 %% ===================================================================
 %% Internal functions.
@@ -462,7 +459,7 @@ next({<<H, T/binary>>, Stack}) -> {H, {T, Stack}};
 next({[L | T], Stack}) when is_list(L) -> next({L, [T | Stack]});
 next({[B | T], Stack}) when is_binary(B) -> next({B, [T | Stack]}).
 
-to_scheme([], Acc) -> list_to_atom(Acc);
+to_scheme([], Acc) -> list_to_existing_atom(Acc);
 to_scheme([C | T], Acc) when C >= $A, C =< $Z ->  to_scheme(T, [C + 32 | Acc]);
 to_scheme([C | T], Acc) -> to_scheme(T, [C | Acc]).
 
