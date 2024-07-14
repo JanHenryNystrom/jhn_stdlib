@@ -29,7 +29,7 @@
    "CBOR, JSON, MessagePack, Syslog, URI, IP address, Timestamp, UUID,"
    "prefix/range/T-trees, Bloom filters, HTTP client, Mustache rendering,"
    " and Server and FSM behaviours"},
-  {vsn, "5.0.2"},
+  {vsn, git},
   {registered, []},
   {applications, [kernel, stdlib]},
   {env, []},
