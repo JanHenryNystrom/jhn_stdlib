@@ -230,7 +230,7 @@ drop_zeros([], false) -> [$:];
 drop_zeros([0 | T], IPv6IPv4) -> drop_zeros(T, IPv6IPv4);
 drop_zeros(T, _) -> [$: | join([hex(I) || I <- T], $:)].
 
-hex(I) -> bstring:to_lower(integer_to_binary(I, 16)).
+hex(I) -> jhn_bstring:to_lower(integer_to_binary(I, 16)).
 
 join([], _) -> [];
 join([H | T], Sep) -> [H | [[Sep, E] || E <- T]].

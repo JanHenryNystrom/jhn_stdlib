@@ -239,7 +239,7 @@ create(Mod) -> create(Mod, []).
 -spec create(atom(),  opts()) -> {ok, pid()} | ignore | {error, _}.
 %%--------------------------------------------------------------------
 create(Mod, Opts) ->
-    Opts1 = plist:replace(arg, {Mod, Opts}, Opts),
+    Opts1 = jhn_plist:replace(arg, {Mod, Opts}, Opts),
     jhn_server:create(?MODULE, Opts1).
 
 %%--------------------------------------------------------------------
@@ -377,14 +377,14 @@ type() -> jhn_server:type().
 %%--------------------------------------------------------------------
 init({Mod, Opts}) ->
     State =
-        #state{name = plist:find(name, Opts, undefined),
+        #state{name = jhn_plist:find(name, Opts, undefined),
                mod = Mod,
                event = erlang:function_exported(Mod, event, 3),
                message = erlang:function_exported(Mod, message, 3),
                terminate = erlang:function_exported(Mod, terminate, 3),
                code_change = erlang:function_exported(Mod, code_change, 4),
                format_status = erlang:function_exported(Mod, format_status, 2)},
-    case Mod:init(plist:find(arg, Opts, no_arg)) of
+    case Mod:init(jhn_plist:find(arg, Opts, no_arg)) of
         {ok, StateName, Data} ->
             {ok, State#state{state_name = StateName, data = Data}};
         {hibernate, StateName, Data} ->

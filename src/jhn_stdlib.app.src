@@ -25,8 +25,11 @@
 %% @copyright (C) 2013-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 {application, jhn_stdlib,
- [{description, "Jan Henry Nystrom's standard library"},
-  {vsn, "4.1.1"},
+ [{description, "Jan Henry Nystrom's standard library,"
+   "CBOR, JSON, MessagePack, Syslog, URI, IP address, Timestamp, UUID,"
+   "prefix/range/T-trees, Bloom filters, HTTP client, Mustache rendering,"
+   " and Server and FSM behaviours"},
+  {vsn, "5.0.0"},
   {registered, []},
   {applications, [kernel, stdlib]},
   {env, []},

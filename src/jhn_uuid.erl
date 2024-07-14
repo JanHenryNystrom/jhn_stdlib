@@ -345,11 +345,11 @@ gen_node(undefined) ->
         undefined ->
             {ok, IFs} = inet:getifaddrs(),
             HWAddrs =
-                [plist:find(hwaddr, PList) ||
+                [jhn_plist:find(hwaddr, PList) ||
                     {_,  PList} <- IFs,
-                    plist:member(hwaddr, PList),
+                    jhn_plist:member(hwaddr, PList),
                     lists:member(multicast,
-                                 plist:find(flags, PList))],
+                                 jhn_plist:find(flags, PList))],
             case HWAddrs of
                 [] ->
                     N = random_node(),
@@ -422,8 +422,8 @@ do_encode(#{version := 8, custom := <<High:48, Mid:12, Low:62>>}) ->
     encode_binary(<<High:48, 8:4, Mid:12, 2:2, Low:62>>).
 
 encode_binary(<<N:128>>) ->
-    Lower = bstring:to_lower(integer_to_binary(N, 16)),
-    Padding = blist:duplicate(32 - byte_size(Lower), $0),
+    Lower = jhn_bstring:to_lower(integer_to_binary(N, 16)),
+    Padding = jhn_blist:duplicate(32 - byte_size(Lower), $0),
     <<A:64, B:32, C:32, D:32, E:96>> = <<Padding/binary, Lower/binary>>,
     [<<A:64>>, $-, <<B:32>>, $-, <<C:32>>, $-, <<D:32>>, $-, <<E:96>>].
 
@@ -461,7 +461,7 @@ decode_bits(<<340282366920938463463374607431768211455:128>>, _) -> max;
 decode_bits(<<TLow:32, TMid:16, 1:4, THigh:12, 2:2, CSeq:14, Node:48>>, H) ->
     <<TS0:60>> = <<THigh:12, TMid:16, TLow:32>>,
     TS = decode_ts(TS0, H),
-    Mac = bstring:join([pad(N) || <<N:8>> <= <<Node:48>>], <<$->>),
+    Mac = jhn_bstring:join([pad(N) || <<N:8>> <= <<Node:48>>], <<$->>),
     #{version => 1, timestamp => TS, clock_sequence => CSeq, node => Mac};
 decode_bits(<<A:48, 3:4, B:12, 2:2, C:62>>, _) ->
     #{version => 3, hash => <<A:48, B:12, C:62>>};
@@ -473,7 +473,7 @@ decode_bits(<<A:48, 5:4, B:12, 2:2, C:62>>, _) ->
 decode_bits(<<THighMid:48, 6:4, TLow:12, 2:2, CSeq:14, Node:48>>, H) ->
     <<TS0:60>> = <<THighMid:48, TLow:12>>,
     TS = decode_ts(TS0, H),
-    Mac = bstring:join([pad(N) || <<N:8>> <= <<Node:48>>], <<$->>),
+    Mac = jhn_bstring:join([pad(N) || <<N:8>> <= <<Node:48>>], <<$->>),
     #{version => 6, timestamp => TS, clock_sequence => CSeq, node => Mac};
 decode_bits(<<TS:48, 7:4, A:12, 2:2, B:62>>, H) ->
     <<Random:74>> = <<A:12, B:62>>,

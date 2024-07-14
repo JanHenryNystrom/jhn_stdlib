@@ -34,7 +34,7 @@
 
 %% Types
 -type template() :: binary().
--type context() :: plist:plist() | map().
+-type context() :: jhn_plist:plist() | map().
 -type option() :: binary | iolist.
 
 %% Exported Types
@@ -233,7 +233,9 @@ is_stop_tag(T, _, Acc) ->
     {T, Acc}.
 
 find(Key, Context = #{}, Default) ->
-    maps:get(binary_to_atom(bstring:strip(Key), utf8), Context, Default);
+    maps:get(binary_to_atom(jhn_bstring:strip(Key), utf8), Context, Default);
 find(Key, Context, Default) ->
-    plist:find(binary_to_atom(bstring:strip(Key), utf8), Context, Default).
+    jhn_plist:find(binary_to_atom(jhn_bstring:strip(Key), utf8),
+                   Context,
+                   Default).
 

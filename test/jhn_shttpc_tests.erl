@@ -664,7 +664,7 @@ not_modified_response(Module, Socket, _Request, _Headers, _Body) ->
 
 basic_auth_responder(User, Passwd) ->
     fun(Module, Socket, _, Headers, _) ->
-            case plist:find("Authorization", Headers) of
+            case jhn_plist:find("Authorization", Headers) of
                 undefined ->
                     Module:send(Socket,
                                 ["HTTP/1.1 401 Unauthorized\r\n",
@@ -673,7 +673,7 @@ basic_auth_responder(User, Passwd) ->
                                  "missing_auth"]);
                 "Basic " ++ Auth ->
                     [U, P] =
-                        bstring:tokens(base64:decode(list_to_binary(Auth)),
+                        jhn_bstring:tokens(base64:decode(list_to_binary(Auth)),
                                        <<":">>),
                     case {binary_to_list(U), binary_to_list(P)} of
                         {User, Passwd} ->
@@ -695,9 +695,10 @@ basic_auth_responder(User, Passwd) ->
 
 connect_auth_responder(User, Passwd) ->
     fun(Module, Socket, _, Headers, _) ->
-            "Basic " ++ Auth = plist:find("Proxy-Authorization", Headers),
+            "Basic " ++ Auth = jhn_plist:find("Proxy-Authorization", Headers),
             [U, P] =
-                bstring:tokens(base64:decode(list_to_binary(Auth)), <<":">>),
+                jhn_bstring:tokens(base64:decode(list_to_binary(Auth)),
+                                   <<":">>),
             {User, Passwd} = {binary_to_list(U), binary_to_list(P)},
             Module:send(Socket,
                         ["HTTP/1.1 200 OK\r\n",
@@ -758,7 +759,7 @@ server_loop(Mod, Socket, Request, Headers, Responders) ->
             server_loop(Mod, Socket, Request, NewHeaders, Responders);
         {ok, http_eoh} ->
             Body =
-                case plist:find("Content-Length", Headers) of
+                case jhn_plist:find("Content-Length", Headers) of
                     undefined -> <<>>;
                     "0" -> <<>>;
                     SLength ->

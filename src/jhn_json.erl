@@ -17,24 +17,38 @@
 %%%-------------------------------------------------------------------
 %%% @doc
 %%%  A JSON stream library based on:
+%%%
 %%%    The JavaScript Object Notation (JSON) Data Interchange Format   (rfc8259)
+%%%
 %%%    JavaScript Object Notation (JSON) Pointer                       (rfc6901)
+%%%
 %%%    JavaScript Object Notation (JSON) Patch                         (rfc6902)
+%%%
 %%%    JSON Merge Patch                                                (rfc7396)
 %%%
 %%%  JSON is represented as follows:
 %%%
 %%%  value         : true | false | null | object | array | number | string
+%%%
 %%%  pointer       : top | [integer | string | '-']
+%%%
 %%%  patch         : [object]
+%%%
 %%%  merge         : object
 %%%
+%%%
 %%%  object        : map
+%%%
 %%%  array         : [value]
+%%%
 %%%  string        : UTF-8 binary
+%%%
 %%%  number        : integer() | float()
+%%%
 %%%  true          : atom(true)
+%%%
 %%%  false         : atom(false)
+%%%
 %%%  null          : atom(null)
 %%%
 %%%  Strings can be represented by atoms when generating JSON, but will not
@@ -336,6 +350,15 @@ eval({decode, Path, Cont}, T) ->
 eval(Pointer, J) ->
     eval(Pointer, J, []).
 
+%%--------------------------------------------------------------------
+%% Function: eval(JSONPointer | Continuation, Binary | JSON, Options) -> JSON.
+%% @doc
+%%   Selects and decodes a Fragment of a JSON document based on the Pointer.
+%%   Both the pointer and the JSON can be either a binary or the Erlang
+%%   representation. If the JSON is a binary and not the complete JSON fragment
+%%   eval/3 returns {more, Continuation} and eval is called again with
+%%   Continuation and more of the stream as eval(Continuation, Binary).
+%% @end
 %%--------------------------------------------------------------------
 -spec eval(binary() | pointer(), binary() | json(), opts()) ->
                   json() | {json(), binary()} | {more, cont()} | {error, _}.

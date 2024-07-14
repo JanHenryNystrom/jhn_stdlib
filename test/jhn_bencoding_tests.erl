@@ -91,7 +91,8 @@ encode_2_decode_1_test_() ->
     [{format(D),
       ?_test(
          ?assertMatch(D,
-                      jhn_bencoding:decode(bencoding:encode(D, [binary]))))} ||
+                      jhn_bencoding:decode(jhn_bencoding:encode(D,
+                                                                [binary]))))} ||
         D <- ?DECODED].
 
 %% ===================================================================
@@ -102,9 +103,9 @@ format(B = <<_/binary>>) -> <<$", B/binary, $">>;
 format(I) when is_integer(I) -> integer_to_binary(I);
 format([]) -> <<"[]">>;
 format(L = [_ | _]) ->
-    <<$[, (bstring:join([format(E) || E <- L], <<", ">>))/binary, $]>>;
+    <<$[, (jhn_bstring:join([format(E) || E <- L], <<", ">>))/binary, $]>>;
 format(M = #{}) ->
     <<${,
-      (bstring:join([<<$", K/binary, "\" => ", (format(V))/binary>> ||
-                        {K, V} <- maps:to_list(M)], <<", ">>))/binary,
+      (jhn_bstring:join([<<$", K/binary, "\" => ", (format(V))/binary>> ||
+                            {K, V} <- maps:to_list(M)], <<", ">>))/binary,
       $}>>.

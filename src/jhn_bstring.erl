@@ -179,7 +179,7 @@ rstr(<<>>, _, _, L) -> L.
 span(B, Cs) when is_binary(B), is_binary(Cs) -> span(B, Cs, 0).
 
 span(<<C, B/binary>>, Cs, I) ->
-    case blist:member(C, Cs) of
+    case jhn_blist:member(C, Cs) of
         true -> span(B, Cs,  I + 1);
         false -> I
     end;
@@ -197,7 +197,7 @@ span(<<>>, _, I) -> I.
 cspan(B, Cs) when is_binary(B), is_binary(Cs) -> cspan(B, Cs, 0).
 
 cspan(<<C, B/binary>>, Cs, I) ->
-    case blist:member(C, Cs) of
+    case jhn_blist:member(C, Cs) of
         true -> I;
         false -> cspan(B, Cs,  I + 1)
     end;
