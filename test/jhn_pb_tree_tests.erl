@@ -332,9 +332,7 @@ replace_4_test_() ->
 %% Internal functions.
 %% ===================================================================
 
-dir() -> code:lib_dir(jhn_stdlib, test).
-
-file(File) -> filename:join([dir(), File]).
+file(File) -> filename:join([code:lib_dir(jhn_stdlib), test, File]).
 
 plist(File) -> {ok, L} = file:consult(file(File)), L.
 

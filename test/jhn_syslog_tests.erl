@@ -637,9 +637,7 @@ bad_option_test_() ->
 %% Internal functions.
 %% ===================================================================
 
-dir() -> code:lib_dir(jhn_stdlib, test).
-
-cert(File) -> filename:join([dir(), "certs", File]).
+cert(File) -> filename:join([code:lib_dir(jhn_stdlib), test, certs, File]).
 
 -define(SSL, [{verify, verify_none},
               {cacertfile, cert("ca_certificate.pem")},

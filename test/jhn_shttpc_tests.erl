@@ -724,9 +724,7 @@ redirect_response(Module, Socket, _, _, Body) ->
 %% Webserver
 %%------------------------------------------------------------------------------
 
-dir() -> code:lib_dir(jhn_stdlib, test).
-
-cert(File) -> filename:join([dir(), "certs", File]).
+cert(File) -> filename:join([code:lib_dir(jhn_stdlib), test, certs, File]).
 
 -define(TCP, [{packet, http}, binary, {active, false}]).
 -define(SSL, [{verify, verify_none},
