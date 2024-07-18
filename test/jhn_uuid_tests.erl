@@ -57,10 +57,14 @@ gen_2_test_() ->
       ?_test(?assertMatch([_ | _], jhn_uuid:gen(v1, [list])))},
      {"gen(v1, [list, urn])",
       ?_test(?assertMatch([_ | _], jhn_uuid:gen(v1, [list, urn])))},
+     {"gen(v1, [list, hex])",
+      ?_test(?assertMatch([_ | _], jhn_uuid:gen(v1, [list, hex])))},
      {"gen(v4, [list])",
       ?_test(?assertMatch([_ | _], jhn_uuid:gen(v4, [list])))},
-     {"gen(v4, [list])",
+     {"gen(v4, [list, urn])",
       ?_test(?assertMatch([_ | _], jhn_uuid:gen(v4, [list, urn])))},
+     {"gen(v4, [list, hex])",
+      ?_test(?assertMatch([_ | _], jhn_uuid:gen(v4, [list, hex])))},
      {"gen(v6, [list])",
       ?_test(?assertMatch([_ | _], jhn_uuid:gen(v6, [list])))},
      {"gen(v6, [list])",
@@ -90,6 +94,8 @@ gen_2_test_() ->
       ?_test(?assertMatch([_ | _], jhn_uuid:gen(v6, [iolist])))},
      {"gen(v6, [iolist, urn])",
       ?_test(?assertMatch([_ | _], jhn_uuid:gen(v6, [iolist, urn])))},
+     {"gen(v6, [iolist, hex])",
+      ?_test(?assertMatch([_ | _], jhn_uuid:gen(v6, [iolist, hex])))},
      {"gen(v7, [iolist])",
       ?_test(?assertMatch([_ | _], jhn_uuid:gen(v7, [iolist])))},
      {"gen(v7, [iolist, urn])",
@@ -119,6 +125,8 @@ gen_2_test_() ->
       ?_test(?assertMatch(<<_/binary>>, jhn_uuid:gen(v7, [binary])))},
      {"gen(v7, [binary, urn])",
       ?_test(?assertMatch(<<_/binary>>, jhn_uuid:gen(v7, [binary, urn])))},
+     {"gen(v7, [binary, hex])",
+      ?_test(?assertMatch(<<_/binary>>, jhn_uuid:gen(v7, [binary, hex])))},
      {"gen(nil, [binary])",
       ?_test(?assertMatch(<<_/binary>>, jhn_uuid:gen(nil, [binary])))},
      {"gen(nil, [binary, urn])",
@@ -315,8 +323,9 @@ gen_2_test_() ->
                           jhn_uuid:gen(v8, [{custom, custom(integer)}])))},
      {"gen(v8, [{custom, Binary}])",
       ?_test(?assertMatch([_ | _],
-                          jhn_uuid:gen(v8, [{custom, custom(binary)}])))}
-
+                          jhn_uuid:gen(v8, [{custom, custom(binary)}])))},
+     {"gen(v2, [binary])",
+      ?_test(?assertError(badarg, jhn_uuid:gen(v2, [binary])))}
     ].
 
 %%--------------------------------------------------------------------
@@ -366,7 +375,11 @@ decode_2_test_() ->
      {"decode(gen(v7, [binary], human)",
       ?_test(?assertMatch(#{version := 7},
                           jhn_uuid:decode(
-                            jhn_uuid:gen(v7, [binary]), [human])))}
+                            jhn_uuid:gen(v7, [binary]), [human])))},
+     {"decode(gen(v7, [binary, hex], human)",
+      ?_test(?assertMatch(#{version := 7},
+                          jhn_uuid:decode(
+                            jhn_uuid:gen(v7, [binary, hex]), [human])))}
     ].
 
 %%--------------------------------------------------------------------
