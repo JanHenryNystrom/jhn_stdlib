@@ -41,7 +41,7 @@ Features/Modules
     * ```jhn_mustache``` -- [Mustache (template system)][37]
   * Protocols
     * Bencoding -- encoding/decoding -- ```jhn_bencoding```
-    * CBOR -- encoding/decoding -- ```jhn_cbor``` [rfc8949][43], [rfc9542][44]
+    * CBOR -- encoding/decoding -- ```jhn_cbor``` [rfc8949][43], [rfc9542][45]
     * JSON  -- encoding/decoding -- ```jhn_json``` [rfc8259][30]
     * JSON Pointer -- encoding/decoding/evaluation -- ```jhn_json``` [rfc6901][8]
     * JSON Patch -- evaluation -- ```jhn_json``` [rfc6902][31]
@@ -52,7 +52,7 @@ Features/Modules
     * IP Addresses -- encoding/decoding -- ```jhn_ip_addr``` [rfc4291][16], [rfc5952][17], [rfc4632][18]
     * Timestamps -- generating/encoding/decoding -- ```jhn_timestamp``` [rfc3339][19], [rfc7231][21]
     * URI -- encoding/decoding -- ```jhn_uri``` [rfc3986][15]
-    * UUID -- generating/encoding/decoding -- ```jhn_uuid``` [rfc9562][42]
+    * UUID -- generating/encoding/decoding -- ```jhn_uuid``` [rfc9562][42][rfc8144]
   * Clients
     * HTTP -- client -- ```jhn_shttpc``` [rfc7230][20], [rfc7231][21], [rfc7538][22], [rfc5789][23], [rfc2818][24]
     * Syslog -- server/client -- ```jhn_syslog``` [rfc5425][25], [rfc5426][26], [rfc6587][27]
@@ -163,3 +163,4 @@ I know I really should.
   [42]: http://www.ietf.org/rfc/rfc9562.txt "Universally Unique IDentifiers (UUIDs)"
   [43]: http://www.ietf.org/rfc/rfc8949.txt "Concise Binary Object Representation (CBOR)"
   [44]: http://www.ietf.org/rfc/rfc9542.txt "IANA Considerations and IETF Protocol and Documentation Usage for IEEE 802 Parameters"
+  [45]: http://www.ietf.org/rfc/rfc8141.txt "Uniform Resource Names (URNs)"

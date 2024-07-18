@@ -18,6 +18,7 @@
 %%% @doc
 %%%  A UUID library based on:
 %%%    Universally Unique IDentifiers (UUIDs)                         (rfc9562)
+%%%    Uniform Resource Names (URNs)                                  (rfc8141)
 %%%
 %%%  A library for generating UUIDs of all versions defined in rfc9562.
 %%%
@@ -25,6 +26,8 @@
 %%   testing purposes and the select few occations they are actually needed.
 %%%
 %%%  N.B. Does not support Version 2, no support currently planned.
+%%%
+%%%  Support for non-standard UUIDs with no dashes are provided using hex option
 %%%
 %%% @end
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -52,9 +55,10 @@
          %% v8
          custom                  :: non_neg_integer() | bitstring() | undefined,
          %% format
+         hex            = false  :: boolean(),
          human          = false  :: boolean(),
          urn            = false  :: boolean(),
-         return_type    = iolist :: iolist | binary | list | uuid}).
+         return_type    = iolist :: iolist | binary | list | hex | uuid}).
 
 %% Types
 -type uuid() :: #{version => 1,
@@ -84,7 +88,7 @@
 
 -type type()       :: v1 | v3 | v4 | v5 | v6 | v7 | v8.
 
--type format_opt() :: iolist | binary | list | uuid | urn | human.
+-type format_opt() :: iolist | binary | list | hex | uuid | urn | human.
 -type v1_opt()     :: {node, node_type()} | {clock_sequence, non_neg_integer()}.
 -type name_opt()   :: {name_space, iodata()} | {name, iodata()}.
 -type custom_opt() :: {custom, non_neg_integer() | binary()}.
@@ -150,6 +154,8 @@ gen(X) -> erlang:error(badarg, [X]).
 %%     binary -> a binary is returned
 %%
 %%     list -> a flat list is returned
+%%
+%%     hex -> the raw hex format without the dashes (this is outside the spec).
 %%
 %%     uuid -> a map representing the UUID is generated that can be passed to
 %%             encode but can differ from the one generated from decode since
@@ -229,19 +235,25 @@ encode(UUID) -> encode(UUID, #opts{}).
 %%
 %%     list -> a flat list is returned
 %%
+%%     hex -> the raw hex format without the dashes (this is outside the spec).
+%%
 %%     urn -> the URN is returned  (can be combined with  binary, iolist, list)
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(uuid(), opts() | #opts{}) -> iolist() | binary() | list().
 %%--------------------------------------------------------------------
-encode(UUID, #opts{return_type = Type, urn = URN}) ->
-    case {Type, URN} of
-        {iolist, false} -> do_encode(UUID);
-        {iolist, true} -> [<<"urn:uuid:">>, do_encode(UUID)];
-        {binary, false} -> iolist_to_binary(do_encode(UUID));
-        {binary, true} -> iolist_to_binary([<<"urn:uuid:">>, do_encode(UUID)]);
-        {list, false} -> binary_to_list(iolist_to_binary(do_encode(UUID)));
-        {list, true} ->
+encode(UUID, #opts{return_type = Type, urn = URN, hex = Hex}) ->
+    case {Type, URN, Hex} of
+        {iolist, false, true} -> hex(do_encode(UUID));
+        {iolist, false, _} -> do_encode(UUID);
+        {iolist, true, _} -> [<<"urn:uuid:">>, do_encode(UUID)];
+        {binary, false, true} -> iolist_to_binary(hex(do_encode(UUID)));
+        {binary, false, _} -> iolist_to_binary(do_encode(UUID));
+        {binary, true,_} -> iolist_to_binary([<<"urn:uuid:">>,do_encode(UUID)]);
+        {list, false, true} ->
+            binary_to_list(iolist_to_binary(hex(do_encode(UUID))));
+        {list, false, _} -> binary_to_list(iolist_to_binary(do_encode(UUID)));
+        {list, true, _} ->
           binary_to_list(iolist_to_binary([<<"urn:uuid:">>, do_encode(UUID)]));
          _->
             erlang:error(badarg, [UUID, Type])
@@ -446,9 +458,14 @@ encode_node(<<M1:16, $-, M2:16, $-, M3:16, $-, M4:16, $-, M5:16,$-,M6:16>>) ->
 encode_node(Mac) when is_integer(Mac) ->
     Mac.
 
+hex(L) -> [E || E <- L, E /= 45].
+
 %% ===================================================================
 %% Decoding
 %% ===================================================================
+do_decode(<<A:64, B:32, C:32, D:32, E:96>>, H) ->
+    Bits = <<(binary_to_integer(<<A:64, B:32, C:32, D:32, E:96>>, 16)):128>>,
+    decode_bits(Bits, H);
 do_decode(<<"urn:uuid:", A:64, $-, B:32, $-, C:32, $-, D:32, $-, E:96>>, H) ->
     Bits = <<(binary_to_integer(<<A:64, B:32, C:32, D:32, E:96>>, 16)):128>>,
     decode_bits(Bits, H);
@@ -502,10 +519,12 @@ decode_ts(TS, true) -> jhn_timestamp:encode(from_timestamp(TS), [binary, nano]).
 parse_opts(Type, Opts, Rec) ->
     lists:foldl(fun(Elt, Acc) -> parse_opt(Type, Elt, Acc) end, Rec, Opts).
 
+parse_opt(v2, Opt, _) -> erlang:error(badarg, [v2, Opt]);
 parse_opt(_, binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(_, list, Opts) -> Opts#opts{return_type = list};
 parse_opt(_, iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(_, uuid, Opts) -> Opts#opts{return_type = uuid};
+parse_opt(_, hex, Opts) -> Opts#opts{hex = true};
 parse_opt(_, urn, Opts) -> Opts#opts{urn = true};
 parse_opt(format, human, Opts) -> Opts#opts{human = true};
 parse_opt(v1, human, Opts) -> Opts#opts{human = true};
