@@ -67,8 +67,13 @@ Features/Modules
     * T-trees -- ```jhn_t_tree``` [T-tree][41]
   * Algorithms
     * Levenshtein distance -- ```jhn_math:levenshtein/2``` [Levenshtein][35]
-    * CRC32-C checksum -- ```jhn_hash:crc32c/1``` [rfc9260][33]
-    * xxHash-32 checksum -- ```jhn_hash:xxh32/1```, ```jhn_hash:xxh32/2``` [xxHash][34]
+    * Check digit
+       * Luhn algorithm -- ```jhn_math:levenshtein/2``` [Luhn][46]
+       * Verhoeff algorithm -- ```jhn_math:verhoeff/2``` [Verhoeff][47]
+       * Damm check algorithm -- ```jhn_math:damm/2``` [Damm][48]
+    * Checksums
+       * CRC32-C checksum -- ```jhn_hash:crc32c/1``` [rfc9260][33]
+       * xxHash-32 checksum -- ```jhn_hash:xxh32/1```, ```jhn_hash:xxh32/2``` [xxHash][34]
     * Consistent Hashing -- ```jhn_chash:jump/2``` [J. Lamping, Eric Veach][28]
 
 <a name='deprecated'/>
@@ -164,3 +169,6 @@ I know I really should.
   [43]: http://www.ietf.org/rfc/rfc8949.txt "Concise Binary Object Representation (CBOR)"
   [44]: http://www.ietf.org/rfc/rfc9542.txt "IANA Considerations and IETF Protocol and Documentation Usage for IEEE 802 Parameters"
   [45]: http://www.ietf.org/rfc/rfc8141.txt "Uniform Resource Names (URNs)"
+  [46]: https://en.wikipedia.org/wiki/Luhn_algorithm "Luhn algorithm"
+  [47]: https://en.wikipedia.org/wiki/Verhoeff_algorithm "Verhoeff algorithm"
+  [48]: https://en.wikipedia.org/wiki/Damm_algorithm "Damm algorithm"

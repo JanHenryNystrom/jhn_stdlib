@@ -56,6 +56,66 @@ levenshtein_test_() ->
       ?_test(?assertEqual(3, jhn_math:levenshtein("kitten", "sitting")))}
     ].
 
+%%--------------------------------------------------------------------
+%% luhn
+%%--------------------------------------------------------------------
+
+luhn_test_() ->
+    [?_test(?assertEqual(true, jhn_math:luhn(check, Check))) ||
+        N <- [17893729974,
+              49927398716, 1234567812345670],
+        Check <- [N, integer_to_list(N), integer_to_binary(N)]
+    ]
+        ++
+        [?_test(?assertEqual(false, jhn_math:luhn(check, Check))) ||
+            N <- [49927398717, 1234567812345678],
+            Check <- [N, integer_to_list(N), integer_to_binary(N)]
+        ]
+        ++
+        [?_test(?assertEqual(D, jhn_math:luhn(gen, Gen))) ||
+            {N, D} <- [{1789372997, 4}, {4992739871, 6}, {123456781234567, 0}],
+            Gen <- [N, integer_to_list(N), integer_to_binary(N)]
+        ].
+
+%%--------------------------------------------------------------------
+%% Verhoeff
+%%--------------------------------------------------------------------
+
+verhoeff_test_() ->
+    [?_test(?assertEqual(true, jhn_math:verhoeff(check, Check))) ||
+        N <- [2363, 123451],
+        Check <- [N, integer_to_list(N), integer_to_binary(N)]
+    ]
+        ++
+        [?_test(?assertEqual(false, jhn_math:verhoeff(check, Check))) ||
+            N <- [12345],
+            Check <- [N, integer_to_list(N), integer_to_binary(N)]
+        ]
+        ++
+        [?_test(?assertEqual(D, jhn_math:verhoeff(gen, Gen))) ||
+            {N, D} <- [{236, 3}, {12345, 1}],
+            Gen <- [N, integer_to_list(N), integer_to_binary(N)]
+        ].
+
+%%--------------------------------------------------------------------
+%% Damm
+%%--------------------------------------------------------------------
+
+damm_test_() ->
+    [?_test(?assertEqual(true, jhn_math:damm(check, Check))) ||
+        N <- [5724, 112946],
+        Check <- [N, integer_to_list(N), integer_to_binary(N)]
+    ]
+        ++
+        [?_test(?assertEqual(false, jhn_math:damm(check, Check))) ||
+            N <- [5727, 112949],
+            Check <- [N, integer_to_list(N), integer_to_binary(N)]
+        ]
+        ++
+        [?_test(?assertEqual(D, jhn_math:damm(gen, Gen))) ||
+            {N, D} <- [{572, 4}, {11294, 6}],
+            Gen <- [N, integer_to_list(N), integer_to_binary(N)]
+        ].
 
 %% ===================================================================
 %% Internal functions.
