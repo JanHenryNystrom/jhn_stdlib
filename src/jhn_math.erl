@@ -30,13 +30,53 @@
 
 %% Library functions.
 -export([rotl32/2, rotr32/2,
-         levenshtein/2
+         levenshtein/2,
+         luhn/2, verhoeff/2, damm/2
         ]).
 
 %% Defines.
 
 %% rotx32
 -define(MAX32, 16#FFFFFFFF).
+
+%% verhoeff
+-define(VERHOEFF_D,
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+         1, 2, 3, 4, 0, 6, 7, 8, 9, 5,
+         2, 3, 4, 0, 1, 7, 8, 9, 5, 6,
+         3, 4, 0, 1, 2, 8, 9, 5, 6, 7,
+         4, 0, 1, 2, 3, 9, 5, 6, 7, 8,
+         5, 9, 8, 7, 6, 0, 4, 3, 2, 1,
+         6, 5, 9, 8, 7, 1, 0, 4, 3, 2,
+         7, 6, 5, 9, 8, 2, 1, 0, 4, 3,
+         8, 7, 6, 5, 9, 3, 2, 1, 0, 4,
+         9, 8, 7, 6, 5, 4, 3, 2, 1, 0}).
+
+-define(VERHOEFF_P,
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+         1, 5, 7, 6, 2, 8, 3, 0, 9, 4,
+         5, 8, 0, 3, 7, 9, 6, 1, 4, 2,
+         8, 9, 1, 6, 0, 4, 3, 5, 2, 7,
+         9, 4, 5, 3, 1, 2, 6, 8, 7, 0,
+         4, 2, 8, 6, 5, 7, 3, 9, 0, 1,
+         2, 7, 9, 3, 8, 0, 6, 4, 1, 5,
+         7, 0, 4, 6, 9, 1, 3, 2, 5, 8}).
+
+-define(VERHOEFF_INV, {0, 4, 3, 2, 1, 5, 6, 7, 8, 9}).
+
+%% damm
+-define(DAMM,
+        {0, 3, 1, 7, 5, 9, 8, 6, 4, 2,
+         7, 0, 9, 2, 1, 5, 4, 8, 6, 3,
+         4, 2, 0, 6, 8, 7, 1, 3, 5, 9,
+         1, 7, 5, 0, 9, 8, 3, 4, 2, 6,
+         6, 1, 2, 3, 0, 4, 5, 9, 7, 8,
+         3, 6, 7, 4, 2, 0, 9, 5, 8, 1,
+         5, 8, 6, 9, 7, 2, 0, 1, 3, 4,
+         8, 9, 4, 5, 3, 6, 2, 0, 1, 7,
+         9, 4, 3, 8, 6, 1, 7, 2, 0, 5,
+         2, 5, 8, 1, 4, 3, 6, 7, 9, 0
+        }).
 
 %% ===================================================================
 %% Library functions.
@@ -78,6 +118,55 @@ levenshtein(S, T) ->
         TLen ->
             V0 = lists:seq(0, TLen),
             i(V0, 0, S, T)
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: luhn(check | gen, String | Binary ) -> Digit | boolean().
+%% @doc
+%%   Either generates a Luhn check digit or checks a number with one.
+%%   The luhn check digit is assumed to last.
+%% @end
+%%--------------------------------------------------------------------
+-spec luhn(gen | check, string() | binary() | integer()) -> integer().
+%%--------------------------------------------------------------------
+luhn(gen, Number) -> luhn_sum(luhn_to_digits(Number), even, 0);
+luhn(check, Number) ->
+    [Check | T] = luhn_to_digits(Number),
+    case luhn_sum(T, even, 0) of
+        Check -> true;
+        _ -> false
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: verhoeff(check | gen, String | Binary ) -> Digit | boolean().
+%% @doc
+%%   Either generates a Verhoeff check digit or checks a number with one.
+%%   The verhoeff check digit is assumed to last.
+%% @end
+%%--------------------------------------------------------------------
+-spec verhoeff(gen | check, string() | binary() | integer()) -> integer().
+%%--------------------------------------------------------------------
+verhoeff(gen, Number) -> verhoeff_sum(0, [0 | verhoeff_to_digits(Number)], 0);
+verhoeff(check, Number) ->
+    case verhoeff_sum(0, verhoeff_to_digits(Number), 0) of
+        0 -> true;
+        _ -> false
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: damm(check | gen, String | Binary ) -> Digit | boolean().
+%% @doc
+%%   Either generates a Damm check digit or checks a number with one.
+%%   The damm check digit is assumed to last.
+%% @end
+%%--------------------------------------------------------------------
+-spec damm(gen | check, string() | binary() | integer()) -> integer().
+%%--------------------------------------------------------------------
+damm(gen, Number) -> damm_traverse(damm_to_digits(Number), 0);
+damm(check, Number) ->
+    case damm_traverse(damm_to_digits(Number), 0) of
+        0 -> true;
+        _ -> false
     end.
 
 %% ===================================================================
@@ -144,3 +233,52 @@ j(Si, [_ | T], [V0j | V0 =  [V0j1 | _]], V1j) ->
 min(A, B, C) when A < B, A < C -> A;
 min(A, B, C) when B < A, B < C -> B;
 min(_, _, C) -> C.
+
+%% --------------------------------------------------------------------
+%% luhn
+%% --------------------------------------------------------------------
+
+luhn_to_digits(String) when is_list(String) ->
+    [C - $0 || C <- lists:reverse(String)];
+luhn_to_digits(Binary) when is_binary(Binary) ->
+    [C - $0 || <<C>> <= jhn_blist:reverse(Binary)];
+luhn_to_digits(Integer) ->
+    luhn_to_digits(integer_to_list(Integer)).
+
+luhn_sum([], _, Acc) -> 9 - ((Acc + 9) rem 10);
+luhn_sum([H | T], even, Acc) when H >= 5 -> luhn_sum(T, odd, (H * 2) - 9 + Acc);
+luhn_sum([H | T], even, Acc) -> luhn_sum(T, odd, (H * 2) + Acc);
+luhn_sum([H | T], odd, Acc) -> luhn_sum(T, even, H + Acc).
+
+%% --------------------------------------------------------------------
+%% verhoeff
+%% --------------------------------------------------------------------
+
+verhoeff_to_digits(String) when is_list(String) ->
+    [C - $0 || C <- lists:reverse(String)];
+verhoeff_to_digits(Binary) when is_binary(Binary) ->
+    [C - $0 || <<C>> <= jhn_blist:reverse(Binary)];
+verhoeff_to_digits(Integer) ->
+    verhoeff_to_digits(integer_to_list(Integer)).
+
+verhoeff_sum(_, [], C) -> element(C + 1, ?VERHOEFF_INV);
+verhoeff_sum(I, [N | T], C) ->
+    P = element((I rem 8) * 10 + N + 1, ?VERHOEFF_P),
+    D = element(C * 10 + P + 1, ?VERHOEFF_D),
+    verhoeff_sum(I + 1, T, D).
+
+%% --------------------------------------------------------------------
+%% damm
+%% --------------------------------------------------------------------
+
+damm_to_digits(String) when is_list(String) ->
+    [C - $0 || C <- String];
+damm_to_digits(Binary) when is_binary(Binary) ->
+    [C - $0 || <<C>> <= Binary];
+damm_to_digits(Integer) ->
+    damm_to_digits(integer_to_list(Integer)).
+
+damm_traverse([], Interim) -> Interim;
+damm_traverse([H | T], Interim) ->
+    damm_traverse(T, element((Interim * 10) + H + 1, ?DAMM)).
+
