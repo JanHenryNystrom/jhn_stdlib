@@ -37,7 +37,7 @@
 %% Library functions
 -export([all/2, any/2,
          append/1, append/2,
-         concat/1, delete/2, dropwhile/2, duplicate/2, filter/2,
+         concat/1, delete/2, droplast/1, dropwhile/2, duplicate/2, filter/2,
          flatlength/1, flatmap/2, flatten/1, flatten/2,
          foldl/3, foldr/3, foreach/2,
          keydelete/4, keyfind/4, keymap/4, keymember/4, keymerge/4,
@@ -159,6 +159,17 @@ delete(Elt, Binary) -> delete(Elt, Binary, <<>>).
 delete(_, <<>>, Acc) -> Acc;
 delete(Elt, <<Elt, T/binary>>, Acc) -> <<Acc/binary, T/binary>>;
 delete(Elt, <<H, T/binary>>, Acc) -> delete(Elt, T, <<Acc/binary, H>>).
+
+%%--------------------------------------------------------------------
+%% Function: droplast(String1) -> String2.
+%% @doc
+%%   Drops the last element String1 from a non-empty string, otherwise
+%%   function crashes.
+%% @end
+%%--------------------------------------------------------------------
+-spec droplast(binary()) -> binary().
+%%--------------------------------------------------------------------
+droplast(Binary) -> binary:part(Binary, 0, byte_size(Binary) - 1).
 
 %%--------------------------------------------------------------------
 %% Function: dropwhile(Pred, String1) -> String2.
