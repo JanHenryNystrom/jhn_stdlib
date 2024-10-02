@@ -29,17 +29,18 @@
 %%%
 %%%   * human (default for decode): UUID format with human readbable timestamp
 %%%
-%%%   #{prefix => <<"oid">>,
+%%%   `#{prefix => <<"oid">>,
 %%%     uuid => #{timestamp => <<"2024-09-30T08:15:06.266Z">>,
 %%%               version => 7,
-%%%               random => 486766668076239088766}}
+%%%               random => 486766668076239088766}}'
 %%%   * uuid: Standard encoded UUIDv7 format
 %%%
-%%%   #{prefix => <<"oid">>, uuid => <<"019241ff-581a-7069-a33e-999d70b4ec7e">>}
+%%%   `#{prefix => <<"oid">>,
+%%%      uuid => <<"019241ff-581a-7069-a33e-999d70b4ec7e">>}'
 %%%
 %%%   * hex: Non-standard encoded UUIDv7 hex format without dashes
 %%%
-%%%   #{prefix => <<"oid">>, uuid => <<"019241ff581a7069a33e999d70b4ec7e">>}
+%%%   `#{prefix => <<"oid">>, uuid => <<"019241ff581a7069a33e999d70b4ec7e">>}'
 %%%
 %%% @end
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -84,7 +85,7 @@
 %% @doc
 %%   Generates the an TypeId as a binary.
 %%
-%%   Equivalent of gen(<<>>).
+%%   Equivalent of `gen(<<>>)'.
 %% @end
 %%--------------------------------------------------------------------
 -spec gen() -> binary().
