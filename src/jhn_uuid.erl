@@ -23,7 +23,7 @@
 %%%  A library for generating UUIDs of all versions defined in rfc9562.
 %%%
 %%%  Functions for encoding/decoding UUIDs are provided for completness and
-%%   testing purposes and the select few occations they are actually needed.
+%%%  testing purposes and the select few occations they are actually needed.
 %%%
 %%%  N.B. Does not support Version 2, no support currently planned.
 %%%
@@ -267,7 +267,7 @@ encode(Special, Opts) when is_atom(special) ->
 %%--------------------------------------------------------------------
 %% Function: decode(Binary) -> UUID.
 %% @doc
-%%   Decodes the binary into a map representing an UUID.
+%%   Decodes the binary or integer into a map representing an UUID.
 %%
 %%   Decode will raise an exception if the binary is not well formed UUID.
 %%
@@ -282,7 +282,7 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%--------------------------------------------------------------------
 %% Function: decode(Binary, Options) -> UUID.
 %% @doc
-%%   Decodes the binary into a map representing an UUID.
+%%   Decodes the binary or integer into a map representing an UUID.
 %%
 %%   Decode will raise an exception if the binary is not well formed UUID.
 %%
@@ -471,7 +471,9 @@ do_decode(<<"urn:uuid:", A:64, $-, B:32, $-, C:32, $-, D:32, $-, E:96>>, H) ->
     decode_bits(Bits, H);
 do_decode(<<A:64, $-, B:32, $-, C:32, $-, D:32, $-, E:96>>, H) ->
     Bits = <<(binary_to_integer(<<A:64, B:32, C:32, D:32, E:96>>, 16)):128>>,
-    decode_bits(Bits, H).
+    decode_bits(Bits, H);
+do_decode(Integer, H) when is_integer(Integer) ->
+    decode_bits(<<Integer:128>>, H).
 
 decode_bits(<<0:128>>, _) -> nil;
 decode_bits(<<340282366920938463463374607431768211455:128>>, _) -> max;

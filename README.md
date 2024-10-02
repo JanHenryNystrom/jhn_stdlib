@@ -2,7 +2,7 @@ jhn_stdlib [(γ)][5]
 ==========
 
 A few thought experiments solidified as code: CBOR, JSON, MessagePack, syslog,
-URI, IP addresses, Timestamps, UUIDs
+URI, IP addresses, Timestamp, UUID, TypeID
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
@@ -51,8 +51,9 @@ Features/Modules
   * Standards
     * IP Addresses -- encoding/decoding -- ```jhn_ip_addr``` [rfc4291][16], [rfc5952][17], [rfc4632][18]
     * Timestamps -- generating/encoding/decoding -- ```jhn_timestamp``` [rfc3339][19], [rfc7231][21]
+    * TypeID --  generating/encoding/decoding -- ```jhn_typeid``` [TypeID][49]
     * URI -- encoding/decoding -- ```jhn_uri``` [rfc3986][15]
-    * UUID -- generating/encoding/decoding -- ```jhn_uuid``` [rfc9562][42][rfc8144]
+    * UUID -- generating/encoding/decoding -- ```jhn_uuid``` [rfc9562][42][rfc8141][45]
   * Clients
     * HTTP -- client -- ```jhn_shttpc``` [rfc7230][20], [rfc7231][21], [rfc7538][22], [rfc5789][23], [rfc2818][24]
     * Syslog -- server/client -- ```jhn_syslog``` [rfc5425][25], [rfc5426][26], [rfc6587][27]
@@ -172,3 +173,4 @@ I know I really should.
   [46]: https://en.wikipedia.org/wiki/Luhn_algorithm "Luhn algorithm"
   [47]: https://en.wikipedia.org/wiki/Verhoeff_algorithm "Verhoeff algorithm"
   [48]: https://en.wikipedia.org/wiki/Damm_algorithm "Damm algorithm"
+  [49]: https://github.com/jetify-com/typeid/tree/main/spec "TypeID Specification (Version 0.3.0)"
