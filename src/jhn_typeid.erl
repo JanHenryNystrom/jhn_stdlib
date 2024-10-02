@@ -33,6 +33,7 @@
 %%%     uuid => #{timestamp => <<"2024-09-30T08:15:06.266Z">>,
 %%%               version => 7,
 %%%               random => 486766668076239088766}}'
+%%%
 %%%   * uuid: Standard encoded UUIDv7 format
 %%%
 %%%   `#{prefix => <<"oid">>,
