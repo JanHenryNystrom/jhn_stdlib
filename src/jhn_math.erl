@@ -127,7 +127,7 @@ levenshtein(S, T) ->
 %%   The luhn check digit is assumed to last.
 %% @end
 %%--------------------------------------------------------------------
--spec luhn(gen | check, string() | binary() | integer()) -> integer().
+-spec luhn(gen | check, string() | binary() | integer()) -> integer()|boolean().
 %%--------------------------------------------------------------------
 luhn(gen, Number) -> luhn_sum(luhn_to_digits(Number), even, 0);
 luhn(check, Number) ->
