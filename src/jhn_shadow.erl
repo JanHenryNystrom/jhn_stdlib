@@ -99,8 +99,7 @@ reveal(Mod) ->
 -spec load_module(string()) -> ok.
 %%--------------------------------------------------------------------
 load_module(S) ->
-    Forms = forms(string:tokens(S, [$.]), []),
-    {ok, Mod, Bin} = compile:forms(Forms, [return_errors, binary]),
+    {ok, Mod, Bin} = compile:forms(forms(S), [return_errors, binary]),
     {module, _} = code:load_binary(Mod, "", Bin),
     ok.
 
@@ -215,8 +214,25 @@ rename(Mod, Name) ->
     {ok, B1} = beam_lib:build_module([{?ATOM_KEY, AtomsChunk} | Cs1]),
     B1.
 
+
+forms(S) -> forms(split(S, [], []), []).
+
 forms([], Acc) -> lists:reverse(Acc);
 forms([H | T], Acc) ->
-    {ok, Tokens, _} = erl_scan:string(H ++ "."),
+    {ok, Tokens, _} = erl_scan:string(H),
     {ok, Parsed} = erl_parse:parse_form(Tokens),
     forms(T, [Parsed | Acc]).
+
+split([], [], Forms) -> lists:reverse(Forms);
+split([], Acc, Forms) -> lists:reverse([Acc | Forms]);
+split([$\n | T], Acc, Forms) -> split(T, Acc, Forms);
+split([$. | T], Acc, Forms) -> split(T, [], [lists:reverse([$.|Acc]) | Forms]);
+split([$" | T], Acc, Forms) -> split_string(T, [$" | Acc], Forms);
+split([H | T], Acc, Forms) -> split(T, [H | Acc], Forms).
+
+split_string([$\\, $" | T], Acc, Forms) ->
+    split_string(T, [$", $\\ | Acc], Forms);
+split_string([$" | T], Acc, Forms) ->
+    split(T, [$" | Acc], Forms);
+split_string([H | T], Acc, Forms) ->
+    split_string(T, [H | Acc], Forms).
