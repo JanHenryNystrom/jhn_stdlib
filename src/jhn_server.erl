@@ -477,21 +477,12 @@ system_code_change(State = #state{data = Data, mod = Mod}, _, OldVsn, Extra) ->
 -spec format_status(_, _) -> [{atom(), _}].
 %%--------------------------------------------------------------------
 format_status(Opt, [PDict, SysState, Parent, _, State]) ->
-    #state{mod = Mod, data = Data} = State,
-    NameTag = case State#state.name of
-                  Name when is_pid(Name) -> pid_to_list(Name);
-                  Name when is_atom(Name) -> Name
-              end,
-    Header = lists:concat(["Status for jhn server ", NameTag]),
-    Specfic =
-        case State#state.format_status of
-            false -> [{data, [{"State", State}]}];
-            true ->
-                try Mod:format_status(Opt, [PDict, Data])
-                catch _:_ -> [{data, [{"State", Data}]}] end
-        end,
-    [{header, Header},
-     {data, [{"Status", SysState}, {"Parent", Parent}]} | Specfic].
+    case State#state.format_status of
+        false -> format_status(Parent, SysState, State);
+        true ->
+            try (State#state.mod):format_status(Opt, [PDict, State#state.data])
+            catch _:_ -> format_status(Parent, SysState, State) end
+    end.
 
 %%====================================================================
 %% proc_lib callbacks
@@ -745,6 +736,16 @@ next_loop(State = #state{hibernated = true}) ->
     proc_lib:hibernate(?MODULE, loop, [State]);
 next_loop(State) ->
     loop(State).
+
+%%--------------------------------------------------------------------
+format_status(Parent, SysState, State = #state{data = Data}) ->
+    NameTag = case State#state.name of
+                  Name when is_pid(Name) -> pid_to_list(Name);
+                  Name when is_atom(Name) -> Name
+              end,
+    Header = lists:concat(["Status for jhn server ", NameTag]),
+    [{header, Header},
+     {data, [{"Status", SysState}, {"Parent", Parent}, {"State", Data}]}].
 
 %%--------------------------------------------------------------------
 %% Logging
