@@ -53,9 +53,9 @@ log(Event, _) ->
 hide_3_module_test_() ->
     {setup,
      fun() ->
-             ok = jhn_shadow:load_module(dark, ["hide(M, F, A) -> {M, F, A}."])
+             ok = jhn_shadow:load_mod(dark, ["hide(M, F, A) -> {M, F, A}."])
      end,
-     fun(_) -> ok = jhn_shadow:unload_module(dark) end,
+     fun(_) -> ok = jhn_shadow:unload_mod(dark) end,
     [?_test(?assertMatch(ok, jhn_shadow:hide(jhn_blist, dark, [{all, 2}]))),
      ?_test(?assertMatch(ok, jhn_shadow:hide(jhn_bloom, dark, [{filter, 0},
                                                                {filter, 1}]))),
@@ -83,7 +83,7 @@ hide_3_process_test_() ->
                         formatter => {?MODULE, #{}}
                        },
              logger:add_handler(default, ?MODULE, Config),
-             ok = jhn_shadow:load_module(
+             ok = jhn_shadow:load_mod(
                     dark,
                     ["init(State) -> {ok, State}.",
                      "hide(M, F, A, S) -> {ok, true, [{M, F, A} | S]}.",
@@ -95,7 +95,7 @@ hide_3_process_test_() ->
      fun(Pid) ->
              true = persistent_term:erase(the_shadow),
              ok = jhn_shadow:destroy(Pid),
-             ok = jhn_shadow:unload_module(dark) end,
+             ok = jhn_shadow:unload_mod(dark) end,
     [?_test(?assertMatch({links, [_]},
                          process_info(persistent_term:get(the_shadow), links))),
      ?_test(?assertMatch({status, _, _, _},
@@ -128,7 +128,7 @@ hide_3_named_process_test_() ->
                         formatter => {?MODULE, #{}}
                        },
              logger:add_handler(default, ?MODULE, Config),
-             ok = jhn_shadow:load_module(
+             ok = jhn_shadow:load_mod(
                     dark,
                     ["hide(M, F, A, _) -> {ok, true, {M, F, A}}.",
                      "peek(take, State) -> {ok, State, undefined}."]),
@@ -136,7 +136,7 @@ hide_3_named_process_test_() ->
      end,
      fun(_) ->
              ok = jhn_shadow:destroy(shadow),
-             ok = jhn_shadow:unload_module(dark) end,
+             ok = jhn_shadow:unload_mod(dark) end,
     [?_test(?assertMatch({links, []}, process_info(whereis(shadow), links))),
      ?_test(?assertMatch(ok, jhn_server:cast(shadow, foo))),
      ?_test(?assertMatch({status, _, _, _}, sys:get_status(shadow))),
@@ -156,41 +156,41 @@ hide_3_named_process_test_() ->
 %% Load/Unload module
 %% ===================================================================
 
-load_module_1_test_() ->
+load_mod_1_test_() ->
     {setup,
      fun() ->
              M = "-module(loaded).\n"
                  "-export([ok/0, atom/1]).\n"
                  "ok() -> <<\"OK.\">>.\n"
                  "atom(S) -> list_to_atom(S).\n",
-             ok = jhn_shadow:load_module(M)
+             ok = jhn_shadow:load_mod(M)
      end,
-     fun(_) -> ok = jhn_shadow:unload_module(loaded) end,
+     fun(_) -> ok = jhn_shadow:unload_mod(loaded) end,
     [?_test(?assertMatch(<<"OK.">>, loaded:ok())),
      ?_test(?assertMatch(foo, loaded:atom("foo")))    ]}.
 
-load_module_2_test_() ->
+load_mod_2_test_() ->
     {setup,
      fun() ->
              Fs = ["ok() -> <<\"OK.\">>.", <<"atom(S) -> list_to_atom(S).">>],
-             ok = jhn_shadow:load_module(loaded, Fs)
+             ok = jhn_shadow:load_mod(loaded, Fs)
      end,
-     fun(_) -> ok = jhn_shadow:unload_module(loaded) end,
+     fun(_) -> ok = jhn_shadow:unload_mod(loaded) end,
     [?_test(?assertMatch(<<"OK.">>, loaded:ok())),
      ?_test(?assertMatch(foo, loaded:atom("foo")))
     ]}.
 
-unload_module_1_test_() ->
+unload_mod_1_test_() ->
     {setup,
      fun() ->
              M = <<"-module(loaded)."
                    "-export([ok/0, atom/1])."
                    "ok() -> <<\"OK.\">>."
                    "atom(S) -> list_to_atom(S).">>,
-             ok = jhn_shadow:load_module(M)
+             ok = jhn_shadow:load_mod(M)
      end,
      fun(_) -> ok end,
-    [?_test(?assertMatch(ok, jhn_shadow:unload_module(loaded))),
+    [?_test(?assertMatch(ok, jhn_shadow:unload_mod(loaded))),
      ?_test(?assertError(undef, loaded:ok()))
     ]}.
 
@@ -198,11 +198,11 @@ unload_module_1_test_() ->
 %% Load/Start/Unload application
 %% ===================================================================
 
-load_application_2_test_() ->
+load_app_2_test_() ->
     {setup,
      fun() -> ok end,
      fun(_) -> ok end,
-    [?_test(?assertMatch(ok, jhn_shadow:load_application(foo, [{one, 1}]))),
+    [?_test(?assertMatch(ok, jhn_shadow:load_app(foo, [{one, 1}]))),
      ?_test(?assertMatch(true,
                          lists:keymember(foo,
                                          1,
@@ -212,7 +212,7 @@ load_application_2_test_() ->
      ?_test(?assertMatch([], application:get_all_env(foo)))
     ]}.
 
-start_application_2_test_() ->
+start_app_2_test_() ->
     {setup,
      fun() ->
              logger:remove_handler(default),
@@ -228,7 +228,7 @@ start_application_2_test_() ->
      end,
      fun(_) -> ok end,
     [?_test(?assertMatch(true, register(tester, self()))),
-     ?_test(?assertMatch(ok, jhn_shadow:start_application(foo, [{one, 1}]))),
+     ?_test(?assertMatch(ok, jhn_shadow:start_app(foo, [{one, 1}]))),
      ?_test(?assertMatch(true,
                          lists:keymember(foo,
                                          1,

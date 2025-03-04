@@ -226,7 +226,7 @@ create(Mod) -> create(Mod, []).
 %%         default is 'no_arg'.
 %% @end
 %%--------------------------------------------------------------------
--spec create(atom(),  opts()) -> {ok, pid()} | ignore | {error, _}.
+-spec create(atom(), opts()) -> {ok, pid()} | ignore | {error, _}.
 %%--------------------------------------------------------------------
 create(Mod, Options) ->
     case opts(Options, #opts{}) of
