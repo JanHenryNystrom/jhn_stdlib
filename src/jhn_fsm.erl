@@ -23,7 +23,7 @@
 %%%  for, e.g., dynamic upgrades. The FSM can defer acting on incoming events
 %%%  messages to a later state, the defered events/messages are processed when a
 %%%  state-transition happen.
-%%%  The order of deferred events/messages are preserved. En event/messages
+%%%  The order of deferred events/messages are preserved. An event/message
 %%%  is only deferred when a callback function returns deferred.
 %%%
 %%%  A jhn_fsm process assumes all specific parts to be located in a
@@ -84,8 +84,8 @@
 %%%   a call or cast, or the state function is undefined.
 %%%
 %%%   jhn_fsm supports hibernation. Any call, cast or plain message sent
-%%%   to the process that has not a matching clause in the appropriate
-%%%   StateName/2 event/3or messsage/2 call back function will be
+%%%   to the process that does not have a matching clause in the appropriate
+%%%   StateName/2 event/3 or messsage/2 call back function will be
 %%%   discarded and logged as unexpected. If the optional callback funtion
 %%%   message/2 is not defined there are no matching function clauses at all.
 %%%
@@ -180,8 +180,7 @@
 -define(DEFAULT_TIMEOUT, 5000).
 
 %% Types
--type opt()              :: {atom(), _}.
--type opts()             :: [opt()].
+-type opts()             :: jhn_server:opts().
 -type fsm_ref()          :: atom() | {atom(), node()} | pid().
 -type event()            :: _.
 -type from()             :: jhn_server:from().
@@ -192,7 +191,7 @@
                             {stop, atom()}.
 
 %% Exported Types
--export_type([from/0, init_return/1, return/1]).
+-export_type([from/0, init_return/1, return/1, opts/0]).
 
 %%====================================================================
 %% Behaviour callbacks

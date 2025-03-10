@@ -29,7 +29,7 @@
 -export([create/2, destroy/1,
          hide/3, reveal/1, peek/2,
          load_mod/1, load_mod/2, unload_mod/1,
-         load_app/2, unload_app/1, start_app/2
+         load_app/2, unload_app/1, start_app/2, start_all_app/2, stop_app/1
         ]).
 
 %% jhn_server callbacks
@@ -60,11 +60,11 @@
 
 %% Types
 -type name() :: atom().
--type app() :: atom().
--type env() :: [{atom(), _}].
+-type fa()   :: {name(), arity()}.
+-type app()  :: atom().
+-type env()  :: [{atom(), _}].
 
--type module_opt() :: jhn_server:opt().
--type module_opts() :: [module_opt()].
+-type module_opts() :: jhn_server:opts().
 
 -type application_opt() :: env() | #{env => env(),
                                      applications => [atom()],
@@ -114,18 +114,23 @@ destroy(Shadow) -> jhn_server:cast(Shadow, stop).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec hide(module(), module() | pid() | {name, name()}, [{name(), arity()}]) ->
-          ok | {error, already_hidden}.
+-spec hide(module(), module() | pid() | {name, name()}, [fa()]) ->
+          ok | {error, _} | {error, _, _}.
 %%--------------------------------------------------------------------
 hide(Mod, CB, Funcs) ->
     Hid = hidden_name(Mod),
     case code:is_loaded(Hid) of
         false ->
             Forms = gen(Mod, Hid, CB, exported(Mod), Funcs),
-            {ok, _, Bin} = compile:forms(Forms, [return_errors, binary]),
-            {module, _} = code:load_binary(Mod, ?SHADOW_MODULE, Bin),
-            {module, _} = code:load_binary(Hid,?HIDDEN_MODULE,rename(Mod, Hid)),
-            ok;
+            case compile:forms(Forms, [return_errors, binary]) of
+                {ok, _, Bin} ->
+                    {module, _} = code:load_binary(Mod, ?SHADOW_MODULE, Bin),
+                    {module, _} =
+                        code:load_binary(Hid,?HIDDEN_MODULE,rename(Mod, Hid)),
+                    ok;
+                Error ->
+                    Error
+            end;
         _ ->
             {error, already_hidden}
     end.
@@ -167,82 +172,21 @@ peek(Shadow, Arg) -> jhn_server:call(Shadow, {peek, Arg}) .
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec load_mod(binary() | string()) -> ok.
+-spec load_mod(binary() | string()) -> ok | {error, _} | {error, _, _}.
 %%--------------------------------------------------------------------
 load_mod(B) when is_binary(B) -> load_mod(binary_to_list(B));
 load_mod(S) ->
-    {ok, Mod, Bin} = compile:forms(forms(S), [return_errors, binary]),
-    {module, _} = code:load_binary(Mod, ?LOADED_MODULE, Bin),
-    ok.
-
-%%--------------------------------------------------------------------
-%% Function: 
-%% @doc
-%%   
-%% @end
-%%--------------------------------------------------------------------
--spec load_mod(module(), [binary() | string()]) -> ok.
-%%--------------------------------------------------------------------
-load_mod(Mod, Funs) ->
-    Forms = forms_mod_funs(Mod, Funs),
-    {ok, Mod, Bin} = compile:forms(Forms, [return_errors, binary]),
-    {module, _} = code:load_binary(Mod, ?LOADED_MODULE, Bin),
-    ok.
-
-%%--------------------------------------------------------------------
-%% Function: 
-%% @doc
-%%   
-%% @end
-%%--------------------------------------------------------------------
--spec unload_mod(module()) -> ok.
-%%--------------------------------------------------------------------
-unload_mod(Mod) ->
-    true = is_boolean(code:purge(Mod)),
-    true = code:delete(Mod),
-    ok.
-
-%%--------------------------------------------------------------------
-%% Function: 
-%% @doc
-%%   
-%% @end
-%%--------------------------------------------------------------------
--spec load_app(app(), application_opts()) -> ok.
-%%--------------------------------------------------------------------
-load_app(Name, Opts) ->
-    ApplicationOpts = parse_application_opts(Opts),
-    App = {application, Name, [{description, ?APP_DESC} | ApplicationOpts]},
-    application:load(App).
-
-%%--------------------------------------------------------------------
-%% Function: 
-%% @doc
-%%   
-%% @end
-%%--------------------------------------------------------------------
--spec unload_app(app()) -> ok.
-%%--------------------------------------------------------------------
-unload_app(Name) ->
-    case application:get_all_key(Name) of
-        {ok, KV} ->
-            case lists:keyfind(description, 1, KV) of
-                {value, {_, ?APP_DESC}} ->
-                    case lists:keyfind(mod, 1, KV) of
-                        {value, {_, {Mod, _}}} ->
-                            case code:is_loaded(Mod) of
-                                {file, ?LOADED_MODULE} -> unload_mod(Mod);
-                                _ -> ok
-                            end;
-                        _ ->
-                            ok
-                    end,
-                    application:unload(Name);
-                _ ->
-                    erlang:error(badarg, [Name])
+    case forms(S) of
+        {ok, Forms} ->
+            case compile:forms(Forms, [return_errors, binary]) of
+                {ok, Mod, Bin} ->
+                    {module, _} = code:load_binary(Mod, ?LOADED_MODULE, Bin),
+                    ok;
+                Error ->
+                    Error
             end;
-        _ ->
-            erlang:error(badarg, [Name])
+        Error ->
+            Error
     end.
 
 %%--------------------------------------------------------------------
@@ -251,11 +195,141 @@ unload_app(Name) ->
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec start_app(app(), application_opts()) -> ok.
+-spec load_mod(module(), [binary() | string()]) ->
+          ok | {error, _} | {error, _, _}.
+%%--------------------------------------------------------------------
+load_mod(Mod, Funs) ->
+    case forms_mod_funs(Mod, Funs) of
+        {ok, Forms} ->
+            case compile:forms(Forms, [return_errors, binary]) of
+                {ok, Mod, Bin} ->
+                    {module, _} = code:load_binary(Mod, ?LOADED_MODULE, Bin),
+                    ok;
+                Error ->
+                    Error
+            end;
+        Error ->
+            Error
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec unload_mod(module()) -> ok | {error, not_loaded | not_shadow}.
+%%--------------------------------------------------------------------
+unload_mod(Mod) ->
+    Unload = fun() ->
+                     true = is_boolean(code:purge(Mod)),
+                     true = code:delete(Mod),
+                     ok
+             end,
+    case code:is_loaded(Mod) of
+        {file, ?HIDDEN_MODULE} -> Unload();
+        {file, ?LOADED_MODULE} -> Unload();
+        {file, _} -> {error, not_loaded};
+        false -> {error, not_loaded}
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec load_app(app(), application_opts()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+load_app(Name, Opts) ->
+    case parse_application_opts(Opts) of
+        {ok, AppOpts} ->
+            App = {application, Name, [{description, ?APP_DESC} | AppOpts]},
+            application:load(App);
+        Error ->
+            Error
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec unload_app(app()) -> ok | {error, not_loaded | not_shadow_application}.
+%%--------------------------------------------------------------------
+unload_app(Name) ->
+    case application:get_all_key(Name) of
+        {ok, KV} ->
+            case {jhn_plist:find(description, KV), jhn_plist:find(mod, KV)} of
+                {?APP_DESC, {Mod, _}} ->
+                    case code:is_loaded(Mod) of
+                        {file, ?LOADED_MODULE} -> unload_mod(Mod);
+                        _ -> ok
+                    end,
+                    application:unload(Name);
+                {?APP_DESC, _} ->
+                    application:unload(Name);
+                _ ->
+                    {error, not_shadow_application}
+            end;
+        _ ->
+            {error, not_loaded}
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec start_app(app(), application_opts()) -> ok | {error, _}.
 %%--------------------------------------------------------------------
 start_app(Name, Opts) ->
-    load_app(Name, Opts),
-    application:start(Name).
+    case load_app(Name, Opts) of
+        ok -> application:start(Name);
+        Error -> Error
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec start_all_app(app(), application_opts()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+start_all_app(Name, Opts) ->
+    case load_app(Name, Opts) of
+        ok ->
+            case application:ensure_all_start(Name) of
+                {ok, Started} ->
+                    application:set_env(Name, jhn_shadow_started, Started);
+                Error -> Error
+            end;
+        Error ->
+            Error
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec stop_app(app()) -> ok | {error, _}.
+%%--------------------------------------------------------------------
+stop_app(Name) ->
+    case lists:keymember(Name, 1, application:which_applications()) of
+        true ->
+            ok = application:stop(Name),
+            Apps = application:get_env(Name, jhn_shadow_started, []),
+            [application:stop(App) || App <- Apps],
+            [application:unload(App) || App <- Apps],
+            unload_app(Name);
+        false ->
+            {error, not_running}
+    end.
 
 %%====================================================================
 %% jhn_server callbacks
@@ -421,25 +495,46 @@ rename(Mod, Name) ->
 %%--------------------------------------------------------------------
 
 forms_mod_funs(Mod, Fs) ->
-    {Exported, Funcs} = compile_functions(Fs, [], []),
-    [{attribute, 0, module, Mod}, {attribute, 0, export, Exported} | Funcs].
+    case compile_functions(Fs, [], []) of
+        {ok, Exported, Funcs} ->
+            {ok, [{attribute, 0, module, Mod},
+                  {attribute, 0, export, Exported} | Funcs]};
+        Error -> Error
+    end.
 
 compile_functions([], Exported, Forms) ->
-    {lists:reverse(Exported), lists:reverse(Forms)};
+    {ok, lists:reverse(Exported), lists:reverse(Forms)};
 compile_functions([F | Fs], Exported, Forms) when is_binary(F) ->
     compile_functions([binary_to_list(F) | Fs], Exported, Forms);
 compile_functions([F | Fs], Exported, Forms) ->
-    {ok, Tokens, _} = erl_scan:string(F),
-    {ok, Fun = {function, _, Name, Arity, _}} = erl_parse:parse_form(Tokens),
-    compile_functions(Fs, [{Name, Arity} | Exported], [Fun | Forms]).
+    case erl_scan:string(F) of
+        {ok, Tokens, _} ->
+            case erl_parse:parse_form(Tokens) of
+                {ok, Fun = {function, _, Name, Arity, _}} ->
+                    Exported1 = [{Name, Arity} | Exported],
+                    compile_functions(Fs, Exported1, [Fun | Forms]);
+                Error ->
+                    Error
+            end;
+        Error ->
+            Error
+    end.
 
 forms(S) -> forms_string(split(S, [], []), []).
 
-forms_string([], Acc) -> lists:reverse(Acc);
+forms_string([], Acc) -> {ok, lists:reverse(Acc)};
 forms_string([H | T], Acc) ->
-    {ok, Tokens, _} = erl_scan:string(H),
-    {ok, Parsed} = erl_parse:parse_form(Tokens),
-    forms_string(T, [Parsed | Acc]).
+    case erl_scan:string(H) of
+        {ok, Tokens, _} ->
+            case erl_parse:parse_form(Tokens) of
+                {ok, Parsed} ->
+                    forms_string(T, [Parsed | Acc]);
+                Error ->
+                    Error
+            end;
+        Error ->
+            Error
+    end.
 
 split([], [], Forms) -> lists:reverse(Forms);
 split([$\n | T], Acc, Forms) -> split(T, Acc, Forms);
@@ -458,31 +553,34 @@ split_string([H | T], Acc, Forms) ->
 %% Load Application
 %%--------------------------------------------------------------------
 parse_application_opts(Env) when is_list(Env) ->
-    case lists:all(fun({Key, _}) -> is_atom(Key) end, Env) of
-        true -> [{env, Env}];
-        false -> erlang:error(badarg, [Env])
-    end;
+    parse_application_opts(#{env => Env});
 parse_application_opts(Map = #{}) ->
-    [parse_application_opt(K, V) || K := V <- Map].
+    Keys = [parse_application_opt(K, V) || K := V <- Map],
+    case jhn_plist:member(error, Keys) of
+        true ->
+            {error, [Error || {error, Error} <- Keys]};
+        false ->
+            {ok, Keys}
+    end.
 
 parse_application_opt(env, Env) ->
     case lists:all(fun({Key, _}) -> is_atom(Key) end, Env) of
         true -> {env, Env};
-        false -> erlang:error(badarg, [Env])
+        false -> {error, {bad_env, Env}}
     end;
-parse_application_opt(applications, Applications) ->
-    case lists:all(fun(App) -> is_atom(App) end, Applications) of
-        true -> {applications, Applications};
-        false -> erlang:error(badarg, [Applications])
+parse_application_opt(applications, Apps) ->
+    case is_list(Apps) andalso lists:all(fun(App) -> is_atom(App) end, Apps) of
+        true -> {applications, Apps};
+        false -> {error, {bad_applications, Apps}}
     end;
 parse_application_opt(mod, ModArg = {Mod, _}) ->
     case is_atom(Mod) of
         true -> {mod, ModArg};
-        false -> erlang:error(badarg, [mod, ModArg])
+        false -> {error, {bad_mod, ModArg}}
     end;
 parse_application_opt(sup, {App, Mod, Args}) ->
-    case is_atom(App) andalso is_atom(Mod) of
-        false -> erlang:error(badarg, [sup, {App, Mod, Args}]);
+    case is_atom(App) and is_atom(Mod) and is_list(Args) of
+        false -> {error, {bad_sup, sup, {App, Mod, Args}}};
         true ->
             CBM = callback_name(App),
             Start = ["start(Args) -> apply(", Mod, ", start_link, Args)."],
@@ -490,14 +588,17 @@ parse_application_opt(sup, {App, Mod, Args}) ->
             {mod, {CBM, Args}}
     end;
 parse_application_opt(sup, {App, Mod, Func, Args}) ->
-    case is_atom(App) andalso is_atom(Mod) of
-        false -> erlang:error(badarg, [sup, {App, Mod, Func, Args}]);
+    case lists:all(fun erlang:is_atom/1, [App, Mod, Func]) and is_list(Args) of
+        false -> {error, {bad_sup, {App, Mod, Func, Args}}};
         true ->
             CBM = callback_name(App),
             Start = ["start(Args) -> apply(", Mod, ", ", Func, ", Args)."],
             load_mod(CBM, [lists:concat(Start), "stop(_) -> ok."]),
             {mod, {CBM, Args}}
-    end.
+    end;
+parse_application_opt(Key, Op) ->
+    {error, {bad_opt, {Key, Op}}}.
+
 
 callback_name(App) -> binary_to_atom(<<(atom_to_binary(App))/binary, "_app">>).
 

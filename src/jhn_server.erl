@@ -70,12 +70,12 @@
 %%%   sys:get_status/2      =====>  format_status/2
 %%%
 %%%   If a callback function fails or returns a bad value, the jhn_server
-%%%   process terminates. N.B. that a gen_server process does not trap exit
+%%%   process terminates. N.B. that a jhn_server process does not trap exit
 %%%   signals automatically, this must be explicitly initiated in the
 %%%   callback module. The process is by default linked to the parent.
 %%%
 %%%   jhn_server supports hibernation. Any call, cast or plain message sent
-%%%   to the process that has not a matching clause in the appropriate
+%%%   to the process that does not have matching clause in the appropriate
 %%%   request/2 or messsage/2 call back function will be discarded and logged
 %%%   as unexpected. If the optional callback funtion message/2 is not defined
 %%%   there are no matching function clauses at all.
@@ -170,7 +170,8 @@
                         payload = ok   :: _}).
 
 %% Types
--type opt()  :: {atom(), _}.
+-type opt()  :: {link, boolean()} | {timeout, infinity | non_neg_integer()} |
+                {name, atom()} | {arg, _}.
 -type opts() :: [opt()].
 
 -type server_ref() :: atom() | {atom(), node()} | pid().
@@ -182,7 +183,7 @@
 -type from() :: reference().
 
 %% Exported Types
--export_type([from/0, init_return/1, return/1]).
+-export_type([from/0, init_return/1, return/1, opts/0]).
 
 %%====================================================================
 %% Behaviour callbacks

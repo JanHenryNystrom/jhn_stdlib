@@ -40,6 +40,10 @@
 log(E = #{msg := {report, #{label := {application_controller, exit}}}}, _) ->
     #{msg := {_, #{report  := [{application, A}, {exited, How} | _]}}} = E,
     inform({application_exit, A, How});
+log(#{msg := {report, #{label := {jhn_shadow,unexpected}, message := M}}}, _) ->
+    inform({unexpected, M});
+log(#{msg := {report, #{label := {jhn_server,unexpected}, message := M}}}, _) ->
+    inform({unexpected, M});
 log(Event, _) ->
     ?debugFmt("~nLog: ~p~n", [Event]).
 
@@ -53,9 +57,13 @@ log(Event, _) ->
 hide_3_module_test_() ->
     {setup,
      fun() ->
-             ok = jhn_shadow:load_mod(dark, ["hide(M, F, A) -> {M, F, A}."])
+             ok = jhn_shadow:load_mod(dark, ["hide(M, F, A) -> {M, F, A}."]),
+             setup_logger()
      end,
-     fun(_) -> ok = jhn_shadow:unload_mod(dark) end,
+     fun(Config) ->
+             ok = jhn_shadow:unload_mod(dark),
+             cleanup_logger(Config)
+     end,
     [?_test(?assertMatch(ok, jhn_shadow:hide(jhn_blist, dark, [{all, 2}]))),
      ?_test(?assertMatch(ok, jhn_shadow:hide(jhn_bloom, dark, [{filter, 0},
                                                                {filter, 1}]))),
@@ -68,21 +76,14 @@ hide_3_module_test_() ->
      ?_test(?assertMatch(ok, jhn_shadow:reveal(jhn_bloom))),
      ?_test(?assertMatch({error, not_hidden}, jhn_shadow:reveal(jhn_bloom))),
      ?_test(?assertMatch({error, not_hidden}, jhn_shadow:reveal(foo))),
-     ?_test(?assertMatch(true, jhn_blist:all(fun(_) -> true end, <<>>)))
+     ?_test(?assertMatch(true, jhn_blist:all(fun(_) -> true end, <<>>))),
+     ?_test(?assertMatch({error, _, _},
+                         jhn_shadow:hide(jhn_blist, dark, [{4, 2}])))
     ]}.
 
 hide_3_process_test_() ->
     {setup,
      fun() ->
-             Config = #{id => ?MODULE,
-                        config => none,
-                        level => all,
-                        module => ?MODULE,
-                        filter_default => log,
-                        filters => [],
-                        formatter => {?MODULE, #{}}
-                       },
-             logger:add_handler(default, ?MODULE, Config),
              ok = jhn_shadow:load_mod(
                     dark,
                     ["init(State) -> {ok, State}.",
@@ -90,17 +91,21 @@ hide_3_process_test_() ->
                      "peek(get, State) -> {ok, State, []}."]),
              {ok, Pid} = jhn_shadow:create(dark, [{arg, []}]),
              persistent_term:put(the_shadow, Pid),
-             Pid
+             {Pid, setup_logger()}
      end,
-     fun(Pid) ->
+     fun({Pid, Config}) ->
              true = persistent_term:erase(the_shadow),
              ok = jhn_shadow:destroy(Pid),
-             ok = jhn_shadow:unload_mod(dark) end,
-    [?_test(?assertMatch({links, [_]},
+             ok = jhn_shadow:unload_mod(dark),
+             cleanup_logger(Config)
+     end,
+    [?_test(?assertMatch(true, register(tester, self()))),
+     ?_test(?assertMatch({links, [_]},
                          process_info(persistent_term:get(the_shadow), links))),
      ?_test(?assertMatch({status, _, _, _},
                          sys:get_status(persistent_term:get(the_shadow)))),
      ?_test(?assertMatch(foo, persistent_term:get(the_shadow) ! foo)),
+     ?_test(?assertMatch({unexpected, foo}, wait())),
      ?_test(?assertMatch(ok,
                          jhn_shadow:hide(jhn_blist,
                                          persistent_term:get(the_shadow),
@@ -119,26 +124,22 @@ hide_3_process_test_() ->
 hide_3_named_process_test_() ->
     {setup,
      fun() ->
-             Config = #{id => ?MODULE,
-                        config => none,
-                        level => all,
-                        module => ?MODULE,
-                        filter_default => log,
-                        filters => [],
-                        formatter => {?MODULE, #{}}
-                       },
-             logger:add_handler(default, ?MODULE, Config),
              ok = jhn_shadow:load_mod(
                     dark,
                     ["hide(M, F, A, _) -> {ok, true, {M, F, A}}.",
                      "peek(take, State) -> {ok, State, undefined}."]),
-             jhn_shadow:create(dark, [{name, shadow}, {link, false}])
+             jhn_shadow:create(dark, [{name, shadow}, {link, false}]),
+             setup_logger()
      end,
-     fun(_) ->
+     fun(Config) ->
              ok = jhn_shadow:destroy(shadow),
-             ok = jhn_shadow:unload_mod(dark) end,
-    [?_test(?assertMatch({links, []}, process_info(whereis(shadow), links))),
+             ok = jhn_shadow:unload_mod(dark),
+             cleanup_logger(Config)
+     end,
+    [?_test(?assertMatch(true, register(tester, self()))),
+     ?_test(?assertMatch({links, []}, process_info(whereis(shadow), links))),
      ?_test(?assertMatch(ok, jhn_server:cast(shadow, foo))),
+     ?_test(?assertMatch({unexpected, foo}, wait())),
      ?_test(?assertMatch({status, _, _, _}, sys:get_status(shadow))),
      ?_test(?assertMatch(ok,
                          jhn_shadow:hide(jhn_blist,
@@ -167,7 +168,10 @@ load_mod_1_test_() ->
      end,
      fun(_) -> ok = jhn_shadow:unload_mod(loaded) end,
     [?_test(?assertMatch(<<"OK.">>, loaded:ok())),
-     ?_test(?assertMatch(foo, loaded:atom("foo")))    ]}.
+     ?_test(?assertMatch(foo, loaded:atom("foo"))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_mod(".0."))),
+     ?_test(?assertMatch({error, _, _}, jhn_shadow:load_mod("ok() -> ok.")))
+    ]}.
 
 load_mod_2_test_() ->
     {setup,
@@ -177,7 +181,10 @@ load_mod_2_test_() ->
      end,
      fun(_) -> ok = jhn_shadow:unload_mod(loaded) end,
     [?_test(?assertMatch(<<"OK.">>, loaded:ok())),
-     ?_test(?assertMatch(foo, loaded:atom("foo")))
+     ?_test(?assertMatch(foo, loaded:atom("foo"))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_mod(bar, [".0."]))),
+     ?_test(?assertMatch({error, _, _},
+                         jhn_shadow:load_mod(bar, ["-export([bar/1])."])))
     ]}.
 
 unload_mod_1_test_() ->
@@ -190,8 +197,12 @@ unload_mod_1_test_() ->
              ok = jhn_shadow:load_mod(M)
      end,
      fun(_) -> ok end,
-    [?_test(?assertMatch(ok, jhn_shadow:unload_mod(loaded))),
-     ?_test(?assertError(undef, loaded:ok()))
+    [?_test(?assertMatch({file, _}, code:is_loaded(loaded))),
+     ?_test(?assertMatch(<<"OK.">>, loaded:ok())),
+     ?_test(?assertMatch(ok, jhn_shadow:unload_mod(loaded))),
+     ?_test(?assertError(undef, loaded:ok())),
+     ?_test(?assertMatch({error, not_loaded}, jhn_shadow:unload_mod(kernel))),
+     ?_test(?assertMatch({error, not_loaded}, jhn_shadow:unload_mod(bla)))
     ]}.
 
 %% ===================================================================
@@ -199,6 +210,18 @@ unload_mod_1_test_() ->
 %% ===================================================================
 
 load_app_2_test_() ->
+    BaadSpec1 = #{env => [{1, one}],
+                  applications => 5,
+                  mod => {1, one},
+                  sup => {1, 2, 3},
+                  foo => bar},
+    BaadSpec2 = #{sup => {app, 2, 3}, mod => fnu},
+    BaadSpec3 = #{sup => {app, mod, 3}},
+    BaadSpec4 = #{sup => {1, 2, 3, 4}},
+    BaadSpec5 = #{sup => {app, 2, 3, 4}},
+    BaadSpec6 = #{sup => {app, mod, 3, 4}},
+    BaadSpec7 = #{sup => {app, mod, func, 4}},
+    BaadSpec8 = #{sup => fnu},
     {setup,
      fun() -> ok end,
      fun(_) -> ok end,
@@ -208,25 +231,23 @@ load_app_2_test_() ->
                                          1,
                                          application:loaded_applications()))),
      ?_test(?assertMatch({ok, 1}, application:get_env(foo, one))),
-     ?_test(?assertMatch(ok, application:unload(foo))),
-     ?_test(?assertMatch([], application:get_all_env(foo)))
+     ?_test(?assertMatch(ok, jhn_shadow:unload_app(foo))),
+     ?_test(?assertMatch([], application:get_all_env(foo))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, [{1, one}]))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, BaadSpec1))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, BaadSpec2))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, BaadSpec3))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, BaadSpec4))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, BaadSpec5))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, BaadSpec6))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, BaadSpec7))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:load_app(foo, BaadSpec8)))
     ]}.
 
 start_app_2_test_() ->
     {setup,
-     fun() ->
-             logger:remove_handler(default),
-             Config = #{id => ?MODULE,
-                        config => none,
-                        level => all,
-                        module => ?MODULE,
-                        filter_default => log,
-                        filters => [],
-                        formatter => {?MODULE, #{}}
-                       },
-             logger:add_handler(default, ?MODULE, Config)
-     end,
-     fun(_) -> ok end,
+     fun() -> setup_logger() end,
+     fun(Config) -> cleanup_logger(Config) end,
     [?_test(?assertMatch(true, register(tester, self()))),
      ?_test(?assertMatch(ok, jhn_shadow:start_app(foo, [{one, 1}]))),
      ?_test(?assertMatch(true,
@@ -237,8 +258,12 @@ start_app_2_test_() ->
      ?_test(?assertMatch(ok, application:stop(foo))),
      ?_test(?assertMatch({application_exit, foo, stopped}, wait())),
      ?_test(?assertMatch({ok, 1}, application:get_env(foo, one))),
-     ?_test(?assertMatch(ok, application:unload(foo))),
-     ?_test(?assertMatch([], application:get_all_env(foo)))
+     ?_test(?assertMatch(ok, jhn_shadow:unload_app(foo))),
+     ?_test(?assertMatch([], application:get_all_env(foo))),
+     ?_test(?assertMatch({error, not_shadow_application},
+                          jhn_shadow:unload_app(kernel))),
+     ?_test(?assertMatch({error, not_loaded},
+                          jhn_shadow:unload_app(foo)))
     ]}.
 
 %% ===================================================================
@@ -250,3 +275,22 @@ inform(X) -> tester ! X.
 wait() -> wait(10000).
 
 wait(Time) -> receive Y -> Y after Time -> timeout end.
+
+setup_logger() ->
+    {ok, DefaultConfig} = logger:get_handler_config(default),
+    logger:remove_handler(default),
+    Config = #{id => ?MODULE,
+               config => none,
+               level => all,
+               module => ?MODULE,
+               filter_default => log,
+               filters => [],
+               formatter => {?MODULE, #{}}
+              },
+    logger:add_handler(default, ?MODULE, Config),
+    DefaultConfig.
+
+cleanup_logger(DefaultConfig = #{module := Mod}) ->
+    logger:remove_handler(default),
+    logger:add_handler(default, Mod, DefaultConfig).
+
