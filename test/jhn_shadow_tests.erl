@@ -81,6 +81,22 @@ hide_3_module_test_() ->
                          jhn_shadow:hide(jhn_blist, dark, [{4, 2}])))
     ]}.
 
+hide_3_module_all_test_() ->
+    {setup,
+     fun() ->
+             ok = jhn_shadow:load_mod(dark, ["hide(M, F, A) -> {M, F, A}."]),
+             setup_logger()
+     end,
+     fun(Config) ->
+             ok = jhn_shadow:unload_mod(dark),
+             cleanup_logger(Config)
+     end,
+    [?_test(?assertMatch(ok, jhn_shadow:hide(jhn_blist, dark, all))),
+     ?_test(?assertMatch({jhn_blist, all, [a, b]}, jhn_blist:all(a, b))),
+     ?_test(?assertMatch({jhn_blist, any, [a, b]}, jhn_blist:any(a, b))),
+     ?_test(?assertMatch(ok, jhn_shadow:reveal(jhn_blist)))
+    ]}.
+
 hide_3_process_test_() ->
     {setup,
      fun() ->
@@ -255,15 +271,111 @@ start_app_2_test_() ->
                                          1,
                                          application:which_applications()))),
      ?_test(?assertMatch({ok, 1}, application:get_env(foo, one))),
-     ?_test(?assertMatch(ok, application:stop(foo))),
+     ?_test(?assertMatch(ok, jhn_shadow:stop_app(foo))),
      ?_test(?assertMatch({application_exit, foo, stopped}, wait())),
-     ?_test(?assertMatch({ok, 1}, application:get_env(foo, one))),
-     ?_test(?assertMatch(ok, jhn_shadow:unload_app(foo))),
      ?_test(?assertMatch([], application:get_all_env(foo))),
+     ?_test(?assertMatch({error, not_running}, jhn_shadow:stop_app(foo))),
      ?_test(?assertMatch({error, not_shadow_application},
                           jhn_shadow:unload_app(kernel))),
      ?_test(?assertMatch({error, not_loaded},
-                          jhn_shadow:unload_app(foo)))
+                          jhn_shadow:unload_app(foo))),
+     ?_test(?assertMatch({error, _}, jhn_shadow:start_app(foo, #{bar => 1})))
+    ]}.
+
+start_all_app_2_test_() ->
+    {setup,
+     fun() -> setup_logger() end,
+     fun(Config) -> cleanup_logger(Config) end,
+    [?_test(?assertMatch(true, register(tester, self()))),
+     ?_test(?assertMatch(ok, jhn_shadow:start_all_app(foo, [{one, 1}]))),
+     ?_test(?assertMatch(true,
+                         lists:keymember(foo,
+                                         1,
+                                         application:which_applications()))),
+     ?_test(?assertMatch({ok, 1}, application:get_env(foo, one))),
+     ?_test(?assertMatch(ok, jhn_shadow:stop_app(foo))),
+     ?_test(?assertMatch({application_exit, foo, stopped}, wait())),
+     ?_test(?assertMatch([], application:get_all_env(foo))),
+     ?_test(?assertMatch({error, not_running}, jhn_shadow:stop_app(foo))),
+     ?_test(?assertMatch({error, not_shadow_application},
+                          jhn_shadow:unload_app(kernel))),
+     ?_test(?assertMatch({error, not_loaded},
+                          jhn_shadow:unload_app(foo))),
+     ?_test(?assertMatch({error, _},
+                         jhn_shadow:start_all_app(foo, #{bar => 1}))),
+     ?_test(?assertMatch({error, _},
+                         jhn_shadow:start_all_app(foo,
+                                                  #{applications => [huga]})))
+    ]}.
+
+start_app_2_mod_test_() ->
+    {setup,
+     fun() -> jhn_shadow:load_mod(foo_app,
+                                  ["start(_, X) -> tester ! X, {ok, self()}."]),
+              setup_logger()
+     end,
+     fun(Config) -> cleanup_logger(Config) end,
+    [?_test(?assertMatch(true, register(tester, self()))),
+     ?_test(?assertMatch(ok,
+                         jhn_shadow:start_app(foo,
+                                              #{mod => {foo_app, x}}))),
+     ?_test(?assertMatch(true,
+                         lists:keymember(foo,
+                                         1,
+                                         application:which_applications()))),
+     ?_test(?assertMatch(x, wait())),
+     ?_test(?assertMatch(ok, jhn_shadow:stop_app(foo))),
+     ?_test(?assertMatch({application_exit, foo, stopped}, wait())),
+     ?_test(?assertMatch([], application:get_all_env(foo)))
+    ]}.
+
+start_app_2_sup_test_() ->
+    {setup,
+     fun() ->
+             jhn_shadow:load_mod(foo_sup,
+                                 ["start_link(X) -> tester ! X, {ok, self()}."]
+                                ),
+             setup_logger()
+     end,
+     fun(Config) -> cleanup_logger(Config) end,
+    [?_test(?assertMatch(true, register(tester, self()))),
+     ?_test(?assertMatch(ok,
+                         jhn_shadow:start_app(foo,
+                                              #{sup => {foo, foo_sup, [x]}}))),
+     ?_test(?assertMatch(true,
+                         lists:keymember(foo,
+                                         1,
+                                         application:which_applications()))),
+     ?_test(?assertMatch(x, wait())),
+     ?_test(?assertMatch(ok, jhn_shadow:stop_app(foo))),
+     ?_test(?assertMatch({application_exit, foo, stopped}, wait())),
+     ?_test(?assertMatch([], application:get_all_env(foo)))
+    ]}.
+
+start_app_2_sup_func_test_() ->
+    {setup,
+     fun() ->
+             jhn_shadow:load_mod(foo_sup,
+                                 ["create(X) -> tester ! X, {ok, self()}."]
+                                ),
+             setup_logger()
+     end,
+     fun(Config) -> cleanup_logger(Config) end,
+    [?_test(?assertMatch(true, register(tester, self()))),
+     ?_test(?assertMatch(ok,
+                         jhn_shadow:start_app(foo,
+                                              #{sup => {foo,
+                                                        foo_sup,
+                                                        create,
+                                                        [x]}}))),
+     ?_test(?assertMatch(true,
+                         lists:keymember(foo,
+                                         1,
+                                         application:which_applications()))),
+     ?_test(?assertMatch(x, wait())),
+     ?_test(?assertMatch(ok, jhn_shadow:stop_app(foo))),
+     ?_test(?assertMatch({application_exit, foo, stopped}, wait())),
+     ?_test(?assertMatch([], application:get_all_env(foo)))
     ]}.
 
 %% ===================================================================

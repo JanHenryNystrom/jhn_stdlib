@@ -16,7 +16,32 @@
 
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%  A simple lightweight mocking library ...
+%%%  A simple lightweight mocking library that allows the mocking of modules
+%%%  and applications and the simplified loading of modules used to mock.
+%%%
+%%%  A module can be mocked for some or all of its exported functions, statless
+%%%  or with a state that can be inspected and interacted with to provide more
+%%%  intricate mocking behaviour. The mocked module must be compiled in the
+%%%  load path but no special flags or preparation of the module is needed.
+%%%
+%%%  When the mocking is no longer required the module can be "revealed" and
+%%%  used normally. The original module is loaded.
+%%%
+%%%  To be noted is that in the mocked module for unmocked (passthrough)
+%%%  functions any use of the atom of the module name is replaced with
+%%%  hidden_{original module name}.
+%%%
+%%%  
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%
+%%%
 %%%
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -114,9 +139,10 @@ destroy(Shadow) -> jhn_server:cast(Shadow, stop).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec hide(module(), module() | pid() | {name, name()}, [fa()]) ->
+-spec hide(module(), module() | pid() | {name, name()}, all | [fa()]) ->
           ok | {error, _} | {error, _, _}.
 %%--------------------------------------------------------------------
+hide(Mod, CB, all) -> hide(Mod, CB, exported(Mod));
 hide(Mod, CB, Funcs) ->
     Hid = hidden_name(Mod),
     case code:is_loaded(Hid) of
@@ -302,10 +328,14 @@ start_app(Name, Opts) ->
 start_all_app(Name, Opts) ->
     case load_app(Name, Opts) of
         ok ->
-            case application:ensure_all_start(Name) of
+            case application:ensure_all_started(Name) of
                 {ok, Started} ->
-                    application:set_env(Name, jhn_shadow_started, Started);
-                Error -> Error
+                    application:set_env(Name,
+                                        jhn_shadow_started,
+                                        lists:delete(Name, Started));
+                Error ->
+                    unload_app(Name),
+                    Error
             end;
         Error ->
             Error
@@ -583,7 +613,7 @@ parse_application_opt(sup, {App, Mod, Args}) ->
         false -> {error, {bad_sup, sup, {App, Mod, Args}}};
         true ->
             CBM = callback_name(App),
-            Start = ["start(Args) -> apply(", Mod, ", start_link, Args)."],
+            Start = ["start(_, Args) -> apply(", Mod, ", start_link, Args)."],
             load_mod(CBM, [lists:concat(Start), "stop(_) -> ok."]),
             {mod, {CBM, Args}}
     end;
@@ -592,7 +622,7 @@ parse_application_opt(sup, {App, Mod, Func, Args}) ->
         false -> {error, {bad_sup, {App, Mod, Func, Args}}};
         true ->
             CBM = callback_name(App),
-            Start = ["start(Args) -> apply(", Mod, ", ", Func, ", Args)."],
+            Start = ["start(_, Args) -> apply(", Mod, ", ", Func, ", Args)."],
             load_mod(CBM, [lists:concat(Start), "stop(_) -> ok."]),
             {mod, {CBM, Args}}
     end;
