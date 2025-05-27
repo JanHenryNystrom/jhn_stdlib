@@ -513,12 +513,42 @@ rename(Mod, Name) when is_atom(Name) -> rename(Mod, atom_to_binary(Name));
 rename(Mod, Name) ->
     {Mod, B, _} = code:get_object_code(Mod),
     {ok, Mod, Cs} = beam_lib:all_chunks(B),
-    {value, {_, <<Atoms:32, Sz:8, _:Sz/binary, T/binary>>}, Cs1} =
-        lists:keytake(?ATOM_KEY, 1, Cs),
-    Sz1 = byte_size(Name),
-    AtomsChunk = <<Atoms:32, Sz1:8, Name:Sz1/binary, T/binary>>,
+    {value, {_, <<Atoms:32, T/binary>>}, Cs1} = lists:keytake(?ATOM_KEY, 1, Cs),
+    {_, T1} = read_atom(T),
+    AtomsChunk = <<Atoms:32, (write_atom(Name, T1))/binary>>,
     {ok, B1} = beam_lib:build_module([{?ATOM_KEY, AtomsChunk} | Cs1]),
     B1.
+
+-if(?OTP_RELEASE >= 28).
+
+read_atom(<<Size:4, 0:1, _:3, T/binary>>) ->
+    <<Atom:Size/binary, T1/binary>> = T,
+    {Atom, T1};
+read_atom(<<High:3, 0:1, 1:1, _:3, Low:8, T/binary>>) ->
+    Size = (High bsl 8) bor Low,
+    <<Atom:Size/binary, T1/binary>> = T,
+    {Atom, T1}.
+
+write_atom(Atom, T) ->
+    case byte_size(Atom) of
+        Size when Size =< 15 ->
+            <<Size:4, 0:1, 0:3, Atom:Size/binary, T/binary>>;
+        Size when Size =< 2047 ->
+            <<_:5, High:3, Low:8>> = <<Size:16>>,
+            <<High:3, 0:1, 1:1, 0:3, Low:8, Atom:Size/binary, T/binary>>
+    end.
+
+-else.
+
+read_atom(<<Size:8, T/binary>>) ->
+    <<Atom:Size/binary, T1/binary>> = T,
+    {Atom, T1}.
+
+write_atom(Atom, T) ->
+    Size = byte_size(Atom),
+    <<Size:8, Atom:Size/binary, T/binary>>.
+
+-endif.
 
 %%--------------------------------------------------------------------
 %% Load Modules
@@ -649,7 +679,3 @@ unexpected(Type, Msg, State) ->
              tag => error,
              report_cb => fun ?MODULE:report_to_format/2},
     logger:log(error, Report, Meta).
-
-%%--------------------------------------------------------------------
-%% Common
-%%--------------------------------------------------------------------
