@@ -19,7 +19,7 @@
 %%%  A simple lightweight mocking library that allows the mocking of modules
 %%%  and applications and the simplified loading of modules used to mock.
 %%%
-%%%  A module can be mocked for some or all of its exported functions, statless
+%%%  A module can be mocked for some or all of its exported functions, stateless
 %%%  or with a state that can be inspected and interacted with to provide more
 %%%  intricate mocking behaviour. The mocked module must be compiled in the
 %%%  load path but no special flags or preparation of the module is needed.
@@ -52,7 +52,7 @@
 
 %% Library functions
 -export([create/2, destroy/1,
-         hide/3, reveal/1, peek/2,
+         hide/3, reveal/1, peek/2, passthrough/3,
          load_mod/1, load_mod/2, unload_mod/1,
          load_app/2, unload_app/1, start_app/2, start_all_app/2, stop_app/1
         ]).
@@ -66,17 +66,17 @@
 %% Callbacks
 
 %% hide
--callback hide(module(), name(), [_]) -> _.
+-callback hide(module(), name(), args()) -> _.
 
 %% hidden by shadow
 -callback init(_) -> {ok, _}.
--callback hide(module(), name(), [_], State) -> {ok, _, State}.
+-callback hide(module(), name(), args(), State) -> {ok, _, State}.
 -callback peek(_, State) -> {ok, _, State}.
 
 -optional_callbacks([hide/3, init/1, hide/4, peek/2]).
 
 %% Defines
--define(ATOM_KEY, "AtU8").
+-define(ATOMS, "AtU8").
 
 -define(APP_DESC, "Shadow app.").
 -define(LOADED_MODULE, "jhn_shadow loaded module").
@@ -85,17 +85,19 @@
 
 %% Types
 -type name() :: atom().
+-type args() :: [_].
 -type fa()   :: {name(), arity()}.
 -type app()  :: atom().
 -type env()  :: [{atom(), _}].
 
 -type module_opts() :: jhn_server:opts().
 
--type application_opt() :: env() | #{env => env(),
-                                     applications => [atom()],
-                                     mod => {module(), _},
-                                     sup => {app(), module(), [_]},
-                                     sup => {app(), module(), name(), [_]}}.
+-type application_opt() ::
+        env() |
+        #{env => env(),
+          applications => [atom()],
+          mod => dummy | {module(), _},
+          sup => {module(), args()} | {module(), name(), args()}}.
 -type application_opts() :: [application_opt()].
 
 -type shadow() :: pid().
@@ -198,6 +200,16 @@ peek(Shadow, Arg) -> jhn_server:call(Shadow, {peek, Arg}) .
 %%   
 %% @end
 %%--------------------------------------------------------------------
+-spec passthrough(module(), name(), args()) -> _.
+%%--------------------------------------------------------------------
+passthrough(Mod, Name, Args) -> apply(hidden_name(Mod), Name, Args).
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
 -spec load_mod(binary() | string()) -> ok | {error, _} | {error, _, _}.
 %%--------------------------------------------------------------------
 load_mod(B) when is_binary(B) -> load_mod(binary_to_list(B));
@@ -268,7 +280,7 @@ unload_mod(Mod) ->
 -spec load_app(app(), application_opts()) -> ok | {error, _}.
 %%--------------------------------------------------------------------
 load_app(Name, Opts) ->
-    case parse_application_opts(Opts) of
+    case parse_application_opts(Name, Opts) of
         {ok, AppOpts} ->
             App = {application, Name, [{description, ?APP_DESC} | AppOpts]},
             application:load(App);
@@ -467,27 +479,27 @@ exported(Mod) ->
 gen(Mod, Hidden, CB, Exported, Funcs) ->
     [{attribute, 0, module, Mod},
      {attribute, 0, export, Exported} |
-     [hidden(CB, Mod, Name, Arity) || {Name, Arity} <- Funcs] ++
-     [passthrough(Hidden, Name, Arity) || {Name, Arity} <- Exported -- Funcs]
+     [hidden_function(CB, Mod, Name, Arity) || {Name, Arity} <- Funcs] ++
+     [passthrough_f(Hidden, Name, Arity) || {Name, Arity} <- Exported -- Funcs]
     ].
 
-hidden(CB, Mod, Name, Arity) when is_atom(CB) ->
+hidden_function(CB, Mod, Name, Arity) when is_atom(CB) ->
     Args = args(Arity),
     HideArgs = [atom(Mod), atom(Name), list(Args)],
     {function, 0, Name, Arity, [clause(Args, [call(CB, hide, HideArgs)])]};
-hidden({name, Shadow}, Mod, Name, Arity) when is_atom(Shadow) ->
+hidden_function({name, Shadow}, Mod, Name, Arity) when is_atom(Shadow) ->
     Args = args(Arity),
     Tuple = tuple([atom(hide), atom(Mod), atom(Name), list(Args)]),
     Call = call(jhn_server, call, [atom(Shadow), Tuple]),
     {function, 0, Name, Arity, [clause(Args, [Call])]};
-hidden(Shadow, Mod, Name, Arity) when is_pid(Shadow) ->
+hidden_function(Shadow, Mod, Name, Arity) when is_pid(Shadow) ->
     Args = args(Arity),
     To = call(list_to_pid, [string(pid_to_list(Shadow))]),
     Tuple = tuple([atom(hide), atom(Mod), atom(Name), list(Args)]),
     Call = call(jhn_server, call, [To, Tuple]),
     {function, 0, Name, Arity, [clause(Args, [Call])]}.
 
-passthrough(Hidden, Name, Arity) ->
+passthrough_f(Hidden, Name, Arity) ->
     Args = args(Arity),
     {function, 0, Name, Arity, [clause(Args, [call(Hidden, Name, Args)])]}.
 
@@ -513,23 +525,25 @@ rename(Mod, Name) when is_atom(Name) -> rename(Mod, atom_to_binary(Name));
 rename(Mod, Name) ->
     {Mod, B, _} = code:get_object_code(Mod),
     {ok, Mod, Cs} = beam_lib:all_chunks(B),
-    {value, {_, <<Atoms:32, T/binary>>}, Cs1} = lists:keytake(?ATOM_KEY, 1, Cs),
-    {_, T1} = read_atom(T),
-    AtomsChunk = <<Atoms:32, (write_atom(Name, T1))/binary>>,
-    {ok, B1} = beam_lib:build_module([{?ATOM_KEY, AtomsChunk} | Cs1]),
+    {value, {_, <<L:1, No:31, T/binary>>}, Cs1} = lists:keytake(?ATOMS, 1, Cs),
+    AtomsChunk = <<L:1, No:31, (add_atom(L, Name, skip_atom(L, T)))/binary>>,
+    {ok, B1} = beam_lib:build_module([{?ATOMS, AtomsChunk} | Cs1]),
     B1.
 
--if(?OTP_RELEASE >= 28).
+skip_atom(0, <<Size:8, T/binary>>) ->
+    <<_:Size/binary, T1/binary>> = T,
+    T1;
+skip_atom(1, <<Size:4, 0:1, _:3, T/binary>>) ->
+    <<_:Size/binary, T1/binary>> = T,
+    T1;
+skip_atom(1, <<High:3, 0:1, 1:1, _:3, Low:8, T/binary>>) ->
+    <<_:((High bsl 8) bor Low)/binary, T1/binary>> = T,
+    T1.
 
-read_atom(<<Size:4, 0:1, _:3, T/binary>>) ->
-    <<Atom:Size/binary, T1/binary>> = T,
-    {Atom, T1};
-read_atom(<<High:3, 0:1, 1:1, _:3, Low:8, T/binary>>) ->
-    Size = (High bsl 8) bor Low,
-    <<Atom:Size/binary, T1/binary>> = T,
-    {Atom, T1}.
-
-write_atom(Atom, T) ->
+add_atom(0, Atom, T) ->
+    Size = byte_size(Atom),
+    <<Size:8, Atom:Size/binary, T/binary>>;
+add_atom(1, Atom, T) ->
     case byte_size(Atom) of
         Size when Size =< 15 ->
             <<Size:4, 0:1, 0:3, Atom:Size/binary, T/binary>>;
@@ -537,18 +551,6 @@ write_atom(Atom, T) ->
             <<_:5, High:3, Low:8>> = <<Size:16>>,
             <<High:3, 0:1, 1:1, 0:3, Low:8, Atom:Size/binary, T/binary>>
     end.
-
--else.
-
-read_atom(<<Size:8, T/binary>>) ->
-    <<Atom:Size/binary, T1/binary>> = T,
-    {Atom, T1}.
-
-write_atom(Atom, T) ->
-    Size = byte_size(Atom),
-    <<Size:8, Atom:Size/binary, T/binary>>.
-
--endif.
 
 %%--------------------------------------------------------------------
 %% Load Modules
@@ -612,10 +614,10 @@ split_string([H | T], Acc, Forms) ->
 %%--------------------------------------------------------------------
 %% Load Application
 %%--------------------------------------------------------------------
-parse_application_opts(Env) when is_list(Env) ->
-    parse_application_opts(#{env => Env});
-parse_application_opts(Map = #{}) ->
-    Keys = [parse_application_opt(K, V) || K := V <- Map],
+parse_application_opts(App, Env) when is_list(Env) ->
+    parse_application_opts(App, #{env => Env});
+parse_application_opts(App, Map = #{}) ->
+    Keys = [parse_application_opt(K, V, App) || K := V <- Map],
     case jhn_plist:member(error, Keys) of
         true ->
             {error, [Error || {error, Error} <- Keys]};
@@ -623,22 +625,26 @@ parse_application_opts(Map = #{}) ->
             {ok, Keys}
     end.
 
-parse_application_opt(env, Env) ->
+parse_application_opt(env, Env, _) ->
     case lists:all(fun({Key, _}) -> is_atom(Key) end, Env) of
         true -> {env, Env};
         false -> {error, {bad_env, Env}}
     end;
-parse_application_opt(applications, Apps) ->
+parse_application_opt(applications, Apps, _) ->
     case is_list(Apps) andalso lists:all(fun(App) -> is_atom(App) end, Apps) of
         true -> {applications, Apps};
         false -> {error, {bad_applications, Apps}}
     end;
-parse_application_opt(mod, ModArg = {Mod, _}) ->
+parse_application_opt(mod, dummy, App) ->
+    CBM = callback_name(App),
+    load_mod(CBM, ["start(_, no_arg) -> {ok, self()}", "stop(_) -> ok."]),
+    {mod, {CBM, no_arg}};
+parse_application_opt(mod, ModArg = {Mod, _}, _) ->
     case is_atom(Mod) of
         true -> {mod, ModArg};
         false -> {error, {bad_mod, ModArg}}
     end;
-parse_application_opt(sup, {App, Mod, Args}) ->
+parse_application_opt(sup, {Mod, Args}, App) ->
     case is_atom(App) and is_atom(Mod) and is_list(Args) of
         false -> {error, {bad_sup, sup, {App, Mod, Args}}};
         true ->
@@ -647,7 +653,7 @@ parse_application_opt(sup, {App, Mod, Args}) ->
             load_mod(CBM, [lists:concat(Start), "stop(_) -> ok."]),
             {mod, {CBM, Args}}
     end;
-parse_application_opt(sup, {App, Mod, Func, Args}) ->
+parse_application_opt(sup, {Mod, Func, Args}, App) ->
     case lists:all(fun erlang:is_atom/1, [App, Mod, Func]) and is_list(Args) of
         false -> {error, {bad_sup, {App, Mod, Func, Args}}};
         true ->
@@ -656,7 +662,7 @@ parse_application_opt(sup, {App, Mod, Func, Args}) ->
             load_mod(CBM, [lists:concat(Start), "stop(_) -> ok."]),
             {mod, {CBM, Args}}
     end;
-parse_application_opt(Key, Op) ->
+parse_application_opt(Key, Op, _) ->
     {error, {bad_opt, {Key, Op}}}.
 
 
