@@ -26,7 +26,7 @@
 %%%-------------------------------------------------------------------
 {application, jhn_stdlib,
  [{description, "Jan Henry Nystrom's standard library,"
-   "CBOR, JSON, MessagePack, Syslog, URI, IP address, Timestamp, UUID,"
+   "CBOR, JSON, BSON, MessagePack, Syslog, URI, IP address, Timestamp, UUID,"
    "prefix/range/T-trees, Bloom filters, HTTP client, Mustache rendering,"
    " and Server and FSM behaviours"},
   {vsn, git},
