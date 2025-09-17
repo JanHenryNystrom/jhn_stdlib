@@ -2,7 +2,7 @@ jhn_stdlib [(γ)][5]
 ==========
 
 A few thought experiments solidified as code: CBOR, JSON, MessagePack, syslog,
-URI, IP addresses, Timestamp, UUID, TypeID
+URI, IP addresses, Timestamp, UUID, TypeID, mocking
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
@@ -76,6 +76,8 @@ Features/Modules
        * CRC32-C checksum -- ```jhn_hash:crc32c/1``` [rfc9260][33]
        * xxHash-32 checksum -- ```jhn_hash:xxh32/1```, ```jhn_hash:xxh32/2``` [xxHash][34]
     * Consistent Hashing -- ```jhn_chash:jump/2``` [J. Lamping, Eric Veach][28]
+  * Utility
+     * Mocking -- ```jhn_shadow```
 
 <a name='deprecated'/>
 
