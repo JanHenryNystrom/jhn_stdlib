@@ -70,12 +70,12 @@
 %%%   sys:get_status/2      =====>  format_status/2
 %%%
 %%%   If a callback function fails or returns a bad value, the jhn_server
-%%%   process terminates. N.B. that a gen_server process does not trap exit
+%%%   process terminates. N.B. that a jhn_server process does not trap exit
 %%%   signals automatically, this must be explicitly initiated in the
 %%%   callback module. The process is by default linked to the parent.
 %%%
 %%%   jhn_server supports hibernation. Any call, cast or plain message sent
-%%%   to the process that has not a matching clause in the appropriate
+%%%   to the process that does not have matching clause in the appropriate
 %%%   request/2 or messsage/2 call back function will be discarded and logged
 %%%   as unexpected. If the optional callback funtion message/2 is not defined
 %%%   there are no matching function clauses at all.
@@ -170,7 +170,8 @@
                         payload = ok   :: _}).
 
 %% Types
--type opt()  :: {atom(), _}.
+-type opt()  :: {link, boolean()} | {timeout, infinity | non_neg_integer()} |
+                {name, atom()} | {arg, _}.
 -type opts() :: [opt()].
 
 -type server_ref() :: atom() | {atom(), node()} | pid().
@@ -182,7 +183,7 @@
 -type from() :: reference().
 
 %% Exported Types
--export_type([from/0, init_return/1, return/1]).
+-export_type([from/0, init_return/1, return/1, opts/0]).
 
 %%====================================================================
 %% Behaviour callbacks
@@ -226,7 +227,7 @@ create(Mod) -> create(Mod, []).
 %%         default is 'no_arg'.
 %% @end
 %%--------------------------------------------------------------------
--spec create(atom(),  opts()) -> {ok, pid()} | ignore | {error, _}.
+-spec create(atom(), opts()) -> {ok, pid()} | ignore | {error, _}.
 %%--------------------------------------------------------------------
 create(Mod, Options) ->
     case opts(Options, #opts{}) of
@@ -477,21 +478,12 @@ system_code_change(State = #state{data = Data, mod = Mod}, _, OldVsn, Extra) ->
 -spec format_status(_, _) -> [{atom(), _}].
 %%--------------------------------------------------------------------
 format_status(Opt, [PDict, SysState, Parent, _, State]) ->
-    #state{mod = Mod, data = Data} = State,
-    NameTag = case State#state.name of
-                  Name when is_pid(Name) -> pid_to_list(Name);
-                  Name when is_atom(Name) -> Name
-              end,
-    Header = lists:concat(["Status for jhn server ", NameTag]),
-    Specfic =
-        case State#state.format_status of
-            false -> [{data, [{"State", State}]}];
-            true ->
-                try Mod:format_status(Opt, [PDict, Data])
-                catch _:_ -> [{data, [{"State", Data}]}] end
-        end,
-    [{header, Header},
-     {data, [{"Status", SysState}, {"Parent", Parent}]} | Specfic].
+    case State#state.format_status of
+        false -> format_status(Parent, SysState, State);
+        true ->
+            try (State#state.mod):format_status(Opt, [PDict, State#state.data])
+            catch _:_ -> format_status(Parent, SysState, State) end
+    end.
 
 %%====================================================================
 %% proc_lib callbacks
@@ -501,7 +493,7 @@ format_status(Opt, [PDict, SysState, Parent, _, State]) ->
 %% Function: init(Module, Arguments, Opts, Parent) ->
 %% @private
 %%--------------------------------------------------------------------
--spec init(atom(), _, #opts{}, pid()) -> _.
+-spec init(atom(), _, #opts{}, pid()) -> no_return().
 %%--------------------------------------------------------------------
 init(Mod, Arg, Opts, Parent) ->
     State =
@@ -745,6 +737,16 @@ next_loop(State = #state{hibernated = true}) ->
     proc_lib:hibernate(?MODULE, loop, [State]);
 next_loop(State) ->
     loop(State).
+
+%%--------------------------------------------------------------------
+format_status(Parent, SysState, State = #state{data = Data}) ->
+    NameTag = case State#state.name of
+                  Name when is_pid(Name) -> pid_to_list(Name);
+                  Name when is_atom(Name) -> Name
+              end,
+    Header = lists:concat(["Status for jhn server ", NameTag]),
+    [{header, Header},
+     {data, [{"Status", SysState}, {"Parent", Parent}, {"State", Data}]}].
 
 %%--------------------------------------------------------------------
 %% Logging
