@@ -31,24 +31,15 @@
 %%%  functions any use of the atom of the module name is replaced with
 %%%  hidden_{original module name}.
 %%%
-%%%  
-%%%
-%%%
-%%%
-%%%
-%%%
-%%%
-%%%
-%%%
-%%%
-%%%
-%%%
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %% @copyright (C) 2025, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(jhn_shadow).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
+
+%% Silencing dialyzer warning
+-dialyzer({nowarn_function, hide/3}).
 
 %% Library functions
 -export([create/2, destroy/1,

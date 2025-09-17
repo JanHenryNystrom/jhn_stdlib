@@ -31,7 +31,7 @@
    " and Server and FSM behaviours"},
   {vsn, git},
   {registered, []},
-  {applications, [kernel, stdlib]},
+  {applications, [kernel, stdlib, compiler]},
   {env, []},
   {doc, "doc"},
   %% HEX configs

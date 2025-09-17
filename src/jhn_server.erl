@@ -493,7 +493,7 @@ format_status(Opt, [PDict, SysState, Parent, _, State]) ->
 %% Function: init(Module, Arguments, Opts, Parent) ->
 %% @private
 %%--------------------------------------------------------------------
--spec init(atom(), _, #opts{}, pid()) -> _.
+-spec init(atom(), _, #opts{}, pid()) -> no_return().
 %%--------------------------------------------------------------------
 init(Mod, Arg, Opts, Parent) ->
     State =
