@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2017-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2017-2025 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2017-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2017-2025, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(jhn_timestamp_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -49,6 +49,10 @@ gen_1_test_() ->
       ?_test(?assertMatch(
                 #{fraction := 0},
                 jhn_timestamp:decode(iolist_to_binary(jhn_timestamp:gen()))))},
+     {"gen([datetime])",
+      ?_test(?assertMatch(#{year := _},
+                          jhn_timestamp:decode(
+                            jhn_timestamp:gen([datetime]))))},
      {"gen([posix])",
       ?_test(?assertMatch(#{fraction := 0},
                           jhn_timestamp:decode(jhn_timestamp:gen([posix]))))},
