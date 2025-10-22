@@ -283,6 +283,53 @@ rfc7231_test_() ->
                              [rfc7231]))))
      ].
 
+%%--------------------------------------------------------------------
+%% Spin
+%%--------------------------------------------------------------------
+spin_test_() ->
+    [?_test(
+        ?assertMatch(
+           #{},
+           jhn_timestamp:decode(
+             jhn_timestamp:encode(
+               jhn_timestamp:decode(
+                 jhn_timestamp:encode(D,[rfc7231, binary]),
+                 [rfc7231]),
+               [posix])))) ||
+        Year <- [2000, 2002],
+        Month <- lists:seq(1, 12),
+        Day <- lists:seq(1, 9),
+        D <- [{{Year, Month, Day}, {10, 10, 10}}]
+     ].
+
+spin_datetime_test_() ->
+    [?_test(
+        ?assertEqual(no,
+                     maps:get(fraction,
+                              jhn_timestamp:decode(
+                                jhn_timestamp:gen([datetime, milli])),
+                              no))),
+     ?_test(
+        ?assertMatch({#{}, ~""},
+                     jhn_timestamp:decode(jhn_timestamp:gen([rfc7231, binary]),
+                                          [rfc7231, continue]))),
+     ?_test( ?assertError(badarg, jhn_timestamp:gen([bad])))
+    ]
+     ++
+    [?_test(
+        ?assertMatch(
+           #{fraction := _},
+           jhn_timestamp:decode(
+             jhn_timestamp:encode(
+               jhn_timestamp:decode(
+                 jhn_timestamp:gen([datetime, Precision]),
+                 [Precision]),
+               [datetime, Precision]),
+             [Precision]))) ||
+        Precision <- [milli, micro, nano]
+     ].
+
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
