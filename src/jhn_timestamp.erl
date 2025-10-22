@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2017-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2017-2025 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -22,27 +22,43 @@
 %%%
 %%%  The timestamp is represented as follows:
 %%%
-%%%  posix  : integer()
+%%%  posix    : non_neg_integer()
 %%%
-%%%  stamp  : #{year => integer(),
-%%%             month => integer(),
-%%%             day => integer(),
-%%%             hour => integer(),
-%%%             minute => integer(),
-%%%             second => integer(),
-%%%             fraction => integer(),
-%%%             offset => Offset
-%%%            }
-%%%  Offset : 'Z' | #{sign => '+' | '-',
-%%%                   hours => integer(),
-%%%                   minutes => integer()}
+%%%  stamp    : #{year     := year(),
+%%%               month    := month(),
+%%%               day      := day(),
+%%%               hour     := hour(),
+%%%               minute   := minute(),
+%%%               second   := second(),
+%%%               fraction => pos_integer(),
+%%%               offset   => offset()
+%%%              }
 %%%
-%%%  The fraction and offset parts are optional
+%%%  offset() : 'Z' | #{sign    := '+' | '-',
+%%%                       hours   := hours(),
+%%%                       minutes := minutes()}
+%%%
+%%%  datetime : {{year(), month(), day()},
+%%%              {hour(), minute(), second() | float()}}
+%%%
+%%%  The datetime is the usual calendar one extended with float seconds to
+%%%  represent fractions (you have to know the precision used, default seconds).
+%%%
+%%%  year()   : pos_integer().
+%%%  month()  : 1..12.
+%%%  day()    : 1..31.
+%%%  hour()   : 0..23.
+%%%  minute() : 0..59.
+%%%  second() : 0..59.
+%%%  second() : 0..59.
+%%%
+%%%  The fraction and offset parts are optional and defaults to 0 and Z.
+%%%  The precision of the fraction is default seconds, hence default fraction 0.
 %%%
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2017-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2017-2025, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(jhn_timestamp).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -53,22 +69,46 @@
          decode/1, decode/2]).
 
 %% Exported types
--export_type([posix/0, stamp/0]).
+-export_type([posix/0, stamp/0, datetime/0]).
 
 %% Records
 -record(opts,
-        {precision = seconds  :: seconds | milli | micro | nano,
+        {precision = seconds  :: precision(),
          continue = false     :: boolean(),
          rfc7231 = false      :: boolean(),
-         return_type = iolist :: iolist | binary | list | posix}).
+         return_type = iolist :: return_type()}).
 
 %% Types
--type posix() :: integer().
--type stamp() :: map().
+-type posix() :: non_neg_integer().
+-type stamp() :: #{year := year(),
+                   month := month(),
+                   day := day(),
+                   hour := hour(),
+                   minute := minute(),
+                   second := second(),
+                   fraction => pos_integer(),
+                   offset => offset()
+                  }.
 
+-type year()   :: pos_integer().
+-type month()  :: 1..12.
+-type day()    :: 1..31.
+-type hour()   :: 0..23.
+-type minute() :: 0..59.
+-type second() :: 0..59.
+-type offset() :: 'Z' |
+                  #{sign    := '+' | '-',
+                    hours   := hour(),
+                    minutes := minute()
+                   }.
 
--type opt() :: seconds | milli | micro | nano |
-               rfc7231 | iolist | binary | list | posix | continue.
+-type datetime() :: {{year(), month(), day()}, {hour(), minute(), second()}}.
+
+-type precision() :: seconds | milli | micro | nano.
+
+-type return_type() :: iolist | binary | list | posix | datetime.
+
+-type opt() :: precision() | rfc7231 | return_type() | continue.
 
 %% Defines
 -define(SECONDS_PER_MINUTE, 60).
@@ -97,7 +137,7 @@ gen() -> gen([]).
 %% Function: gen(Options) -> Encoded
 %% @doc
 %%   Generates a timestamp and encode as an iolist, list, binary,
-%%   or integer posix timestamp.
+%%   integer posix timestamp or a nested datetime tuple.
 %%   Options are:
 %%     seconds (default) -> second precision
 %%     milli -> milli second precision
@@ -106,6 +146,7 @@ gen() -> gen([]).
 %%     binary -> a binary is returned
 %%     list -> a flat list is returned
 %%     iolist (default) -> an iolist is returned
+%%     datetime -> a datetime nested tuple is returned
 %%     rfc7231 -> the returned string is rfc7231 compatible, and precision is
 %%                seconds, e.g., 
 %%     posix -> a posix integer timestamp is returned
@@ -127,14 +168,15 @@ gen(Opts) ->
 %%   Equivalent of encode(Stamp, [])
 %% @end
 %%--------------------------------------------------------------------
--spec encode(stamp() | posix()) -> iolist().
+-spec encode(stamp() | posix() | datetime()) -> iolist().
 %%--------------------------------------------------------------------
 encode(Stamp) -> encode(Stamp, #opts{}).
 
 %%--------------------------------------------------------------------
 %% Function: encode(Stamp, Options) -> Encoded
 %% @doc
-%%   Encodes the Stamp as an iolist or binary.
+%%   Encodes the stamp and encode as an iolist, list, binary,
+%%   integer posix timestamp or a nested datetime tuple.
 %%   Encode will give an exception if the Stamp is not well formed.
 %%   Options are:
 %%     seconds (default) -> second precision (no fraction generated)
@@ -144,28 +186,30 @@ encode(Stamp) -> encode(Stamp, #opts{}).
 %%     binary -> a binary is returned
 %%     list -> a flat list is returned
 %%     iolist -> an iolist is returned
+%%     datetime -> a datetime nested tuple is returned
 %%     rfc7231 -> the returned string is rfc7231 compatible
 %%     posix -> a posix integer timestamp is returned
 %% @end
 %%--------------------------------------------------------------------
--spec encode(stamp() | posix(), [opt()] | #opts{}) ->
-                    iolist() | binary() | list() | posix().
+-spec encode(stamp() | posix() | datetime(), [opt()] | #opts{}) ->
+                    iolist() | binary() | list() | posix() | datetime().
 %%--------------------------------------------------------------------
 encode(Stamp, ParsedOpts = #opts{}) ->
     case ParsedOpts#opts.return_type of
         iolist -> do_encode(Stamp, ParsedOpts);
         posix -> do_encode(Stamp, ParsedOpts);
         binary -> iolist_to_binary(do_encode(Stamp, ParsedOpts));
-        list -> binary_to_list(iolist_to_binary(do_encode(Stamp, ParsedOpts)))
+        list -> binary_to_list(iolist_to_binary(do_encode(Stamp, ParsedOpts)));
+        datetime -> do_encode(Stamp, ParsedOpts)
     end;
 encode(Stamp, Opts) ->
     encode(Stamp, parse_opts(Opts, #opts{})).
 
 %%--------------------------------------------------------------------
-%% Function: decode(Binary | Posix) -> Stamp
+%% Function: decode(Binary | Posix | DateTime) -> Stamp
 %% @doc
-%%   Decodes the binary or posix integer timestamp into a map representing
-%%   a timestamp.
+%%   Decodes the binary, posix integer or datetime tuple timestamp into a map
+%%   representing a timestamp.
 %%   Equivalent of decode(Binary, [])
 %% @end
 %%--------------------------------------------------------------------
@@ -174,10 +218,10 @@ encode(Stamp, Opts) ->
 decode(Binary) -> decode(Binary, #opts{}).
 
 %%--------------------------------------------------------------------
-%% Function: decode(Binary | Posix, Options) -> Stamp
+%% Function: decode(Binary | Posix | DateTime, Options) -> Stamp
 %% @doc
-%%   Decodes the binary or posix integer timestamp into a map representing
-%%   a timestamp.
+%%   Decodes the binary, posix integer or datetime timestamp into a map
+%%   representing a timestamp.
 %%   Decode will give an exception if the binary is not well formed timestamp.
 %%   Options are:
 %%     seconds (default) -> second precision
@@ -188,9 +232,10 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%     continue -> all remaining indata is returned when decoding a binary
 %% @end
 %%--------------------------------------------------------------------
--spec decode(binary() | posix(), [opt()] | #opts{}) -> stamp() |
-                                                       {stamp(), binary()}.
+-spec decode(binary() | posix() | datetime(), [opt()] | #opts{}) -> stamp() |
+          {stamp(), binary()}.
 %%--------------------------------------------------------------------
+decode(D = {{_,_,_}, {_, _, _}}, #opts{precision = P}) -> decode_datetime(D, P);
 decode(Binary, Opts = #opts{rfc7231 = true}) -> decode_rfc7231(Binary, Opts);
 decode(Binary, Opts = #opts{rfc7231 = false}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> decode(Binary, parse_opts(Opts, #opts{})).
@@ -212,6 +257,10 @@ precision(nano) -> nano_seconds.
 %% Encoding
 %% ===================================================================
 
+do_encode(D = {{_, _, _}, {_, _, _}}, Opts = #opts{precision = P}) ->
+    do_encode(decode_datetime(D, P), Opts);
+do_encode(Map = #{}, #opts{return_type = datetime, precision = Precision}) ->
+    encode_datetime(Map, Precision);
 do_encode(Map, #opts{return_type = posix, precision = P}) ->
     #{year := Year, month := Month, day := Day,
       hour := Hour, minute := Minute, second := Second} = Map,
@@ -262,9 +311,9 @@ do_encode(Seconds, Opts = #opts{precision = seconds}) ->
 do_encode(Milli, Opts = #opts{precision = milli}) ->
     do_encode(decode_posix(Milli div 1000, Milli rem 1000), Opts);
 do_encode(Micro, Opts = #opts{precision = micro}) ->
-    do_encode(decode_posix(Micro div 1000000, Micro rem 1000000), Opts);
+    do_encode(decode_posix(Micro div 1000_000, Micro rem 1000_000), Opts);
 do_encode(Nano, Opts = #opts{precision = nano}) ->
-    do_encode(decode_posix(Nano div 1000000000, Nano rem 1000000000), Opts).
+    do_encode(decode_posix(Nano div 1000_000_000, Nano rem 1000_000_000), Opts).
 
 days(Year, Month, Day) ->
     year1(Year) + month_days(Month) + leap(Year, Month) + Day - 1.
@@ -324,6 +373,26 @@ pad(Integer, Size) ->
     List = integer_to_list(Integer),
     [lists:duplicate(Size - length(List), $0), List].
 
+encode_datetime(Stamp, seconds) ->
+    #{year := Y, month := M, day := D,
+      hour := H, minute := Mi, second := S} = Stamp,
+    {{Y, M, D}, {H, Mi, S}};
+encode_datetime(Stamp, milli) ->
+    #{year := Y, month := M, day := D,
+      hour := H, minute := Mi, second:=S,
+      fraction :=F } = Stamp,
+    {{Y, M, D}, {H, Mi, S + F/1000}};
+encode_datetime(Stamp, micro) ->
+    #{year := Y, month := M, day := D,
+      hour := H, minute := Mi, second:=S,
+      fraction :=F } = Stamp,
+    {{Y, M, D}, {H, Mi, S + F/1000_000}};
+encode_datetime(Stamp, nano) ->
+    #{year := Y, month := M, day := D,
+      hour := H, minute := Mi, second:=S,
+      fraction :=F } = Stamp,
+    {{Y, M, D}, {H, Mi, S + F/1000_000_000}}.
+
 %% ===================================================================
 %% Decoding
 %% ===================================================================
@@ -348,9 +417,9 @@ do_decode(Seconds, #opts{precision = seconds}) ->
 do_decode(Milli, #opts{precision = milli}) ->
     decode_posix(Milli div 1000, Milli rem 1000);
 do_decode(Micro, #opts{precision = micro}) ->
-    decode_posix(Micro div 1000000, Micro rem 1000000);
+    decode_posix(Micro div 1000_000, Micro rem 1000_000);
 do_decode(Nano, #opts{precision = nano}) ->
-    decode_posix(Nano div 1000000000, Nano rem 1000000000).
+    decode_posix(Nano div 1000_000_000, Nano rem 1000_000_000).
 
 decode_rfc7231(B, #opts{continue = Continue}) ->
     {Day, B1} = decode_digit(2, skip_day(B), $\s, []),
@@ -471,6 +540,30 @@ leap_date(Day) when Day < 305 -> {10,Day - 273};
 leap_date(Day) when Day < 335 -> {11,Day - 304};
 leap_date(Day) -> {12, Day - 334}.
 
+decode_datetime({{Y, M, D}, {H, Mi, S}}, _) when is_integer(S) ->
+    #{year => Y, month => M, day => D, hour => H, minute => Mi, second => S};
+decode_datetime({{Y, M, D}, {H, Mi, FS}}, seconds) when is_float(FS) ->
+    S = trunc(FS),
+    #{year => Y, month => M, day => D, hour => H, minute => Mi, second => S};
+decode_datetime({{Y, M, D}, {H, Mi, FS}}, milli) ->
+    S = trunc(FS),
+    F = trunc((FS - S) * 1000),
+    #{year => Y, month => M, day => D,
+      hour => H, minute => Mi, second => S,
+      fraction => F};
+decode_datetime({{Y, M, D}, {H, Mi, FS}}, micro) ->
+    S = trunc(FS),
+    F = trunc((FS - S) * 1000_000),
+    #{year => Y, month => M, day => D,
+      hour => H, minute => Mi, second => S,
+      fraction => F};
+decode_datetime({{Y, M, D}, {H, Mi, FS}}, nano) ->
+    S = trunc(FS),
+    F = trunc((FS - S) * 1000_000_000),
+    #{year => Y, month => M, day => D,
+      hour => H, minute => Mi, second => S,
+      fraction => F}.
+
 %% ===================================================================
 %% Common parts
 %% ===================================================================
@@ -487,5 +580,6 @@ parse_opt(binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(list, Opts) -> Opts#opts{return_type = list};
 parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(posix, Opts) -> Opts#opts{return_type = posix};
+parse_opt(datetime, Opts) -> Opts#opts{return_type = datetime};
 parse_opt(rfc7231, Opts) -> Opts#opts{rfc7231 = true};
 parse_opt(_, _) -> erlang:error(badarg).

@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2017-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2017-2025 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2017-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2017-2025, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(jhn_timestamp_tests).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
@@ -49,6 +49,10 @@ gen_1_test_() ->
       ?_test(?assertMatch(
                 #{fraction := 0},
                 jhn_timestamp:decode(iolist_to_binary(jhn_timestamp:gen()))))},
+     {"gen([datetime])",
+      ?_test(?assertMatch(#{year := _},
+                          jhn_timestamp:decode(
+                            jhn_timestamp:gen([datetime]))))},
      {"gen([posix])",
       ?_test(?assertMatch(#{fraction := 0},
                           jhn_timestamp:decode(jhn_timestamp:gen([posix]))))},
@@ -278,6 +282,53 @@ rfc7231_test_() ->
                              jhn_timestamp:gen([binary, rfc7231]),
                              [rfc7231]))))
      ].
+
+%%--------------------------------------------------------------------
+%% Spin
+%%--------------------------------------------------------------------
+spin_test_() ->
+    [?_test(
+        ?assertMatch(
+           #{},
+           jhn_timestamp:decode(
+             jhn_timestamp:encode(
+               jhn_timestamp:decode(
+                 jhn_timestamp:encode(D,[rfc7231, binary]),
+                 [rfc7231]),
+               [posix])))) ||
+        Year <- [2000, 2002],
+        Month <- lists:seq(1, 12),
+        Day <- lists:seq(1, 9),
+        D <- [{{Year, Month, Day}, {10, 10, 10}}]
+     ].
+
+spin_datetime_test_() ->
+    [?_test(
+        ?assertEqual(no,
+                     maps:get(fraction,
+                              jhn_timestamp:decode(
+                                jhn_timestamp:gen([datetime, milli])),
+                              no))),
+     ?_test(
+        ?assertMatch({#{}, ~""},
+                     jhn_timestamp:decode(jhn_timestamp:gen([rfc7231, binary]),
+                                          [rfc7231, continue]))),
+     ?_test( ?assertError(badarg, jhn_timestamp:gen([bad])))
+    ]
+     ++
+    [?_test(
+        ?assertMatch(
+           #{fraction := _},
+           jhn_timestamp:decode(
+             jhn_timestamp:encode(
+               jhn_timestamp:decode(
+                 jhn_timestamp:gen([datetime, Precision]),
+                 [Precision]),
+               [datetime, Precision]),
+             [Precision]))) ||
+        Precision <- [milli, micro, nano]
+     ].
+
 
 %% ===================================================================
 %% Internal functions.
