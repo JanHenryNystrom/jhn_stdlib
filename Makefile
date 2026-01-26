@@ -1,5 +1,5 @@
 #==============================================================================
-# Copyright 2013-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+# Copyright 2013-2026 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,3 +23,12 @@ ifeq (${BASE},)
 endif
 
 include deps/makefiles/erlang3.mk
+
+.PHONY: store_cacerts
+
+store_cacerts: compile
+	rebar3 shell --apps jhn_stdlib --eval \
+               'CAs = io_lib:format("~p.", [jhn_cacerts:fetch()]),\
+                File = filename:join([code:priv_dir(jhn_stdlib), "cacerts"]),\
+                file:write_file(File, CAs),\
+                init:stop().'

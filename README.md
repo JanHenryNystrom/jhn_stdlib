@@ -2,7 +2,7 @@ jhn_stdlib [(γ)][5]
 ==========
 
 A few thought experiments solidified as code: CBOR, JSON, MessagePack, syslog,
-URI, IP addresses, Timestamp, UUID, TypeID, mocking
+URI, IP addresses, Timestamp, UUID, TypeID, mocking, cacerts
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
@@ -78,6 +78,7 @@ Features/Modules
     * Consistent Hashing -- ```jhn_chash:jump/2``` [J. Lamping, Eric Veach][28]
   * Utility
      * Mocking -- ```jhn_shadow```
+     * CA-Certs -- ```jhn_cacerts```
 
 <a name='deprecated'/>
 

@@ -31,6 +31,7 @@
 %%%    headers -> a map of HTTP headers where the headers name can be an
 %%%               atom or binary and the value a binary
 %%%    options -> options to the transport's (tcp or ssl) connection function
+%%%    cacerts -> use jhn_cacerts for the ssl cacerts option
 %%%    redirect -> a boolean that determines if redirect are automatically
 %%%                followed for status codes 301, 302, 303, 307, 308 and in the
 %%%                case of 303 use the GET as the method
@@ -89,6 +90,7 @@
 -define(DEFAULT, #{headers => #{},
                    body => <<>>,
                    options => [],
+                   cacerts => false,
                    timeout => 5000,
                    redirect => false,
                    limit => undefined
@@ -217,6 +219,7 @@
                 socket,
                 limit = infinity :: timeout(),
                 options = [] :: [any()],
+                cacerts = false :: boolean(),
                 redirect :: boolean(),
                 redirections = []
                }).
@@ -547,6 +550,7 @@ request(Req) ->
               headers := Headers,
               body := Body,
               options := Options,
+              cacerts := CaCerts,
               redirect := Redirect,
               limit := Limit} = Req2,
             State = #state{host = Host,
@@ -558,7 +562,7 @@ request(Req) ->
                            fragment = Fragment,
                            query = Query,
                            body = Body,
-                           options = opts(Options, Host),
+                           options = opts(Options, Host, CaCerts),
                            redirect = Redirect,
                            limit = Limit},
             case connect_server(State) of
@@ -589,6 +593,7 @@ validate(body, <<>>, Req) -> Req;
 validate(uri, URI, Req) -> decode(URI, Req);
 validate(headers, Headers, Req) when is_map(Headers) -> Req;
 validate(options, Opts, Req) when is_list(Opts) -> Req;
+validate(cacerts, CaCerts, Req) when is_boolean(CaCerts) -> Req;
 validate(method, 'GET', Req) -> Req;
 validate(method, 'HEAD', Req) -> Req;
 validate(method, 'POST', Req) -> Req;
@@ -655,14 +660,18 @@ limit(Timeout) -> erlang:system_time(milli_seconds) + Timeout.
 %%------------------------------------------------------------------------------
 %% options
 %%------------------------------------------------------------------------------
-opts(Opts, Host) ->
+opts(Opts, Host, CaCerts) ->
     Opts1 = [binary, {packet, http_bin}, {active, false} | Opts],
+    Opts2 = case CaCerts of
+                true -> [{cacerts, jhn_cacerts:fetch()}, Opts1];
+                false -> Opts1
+            end,
     case inet_opt(Opts) of
-        true -> Opts1;
+        true -> Opts2;
         false ->
             case ipv6_host(Host) of
-                true -> [inet6 | Opts1];
-                false -> Opts1
+                true -> [inet6 | Opts2];
+                false -> Opts2
             end
     end.
 
