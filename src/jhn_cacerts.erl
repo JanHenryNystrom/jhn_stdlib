@@ -17,6 +17,21 @@
 %%%-------------------------------------------------------------------
 %%% @doc
 %%%  A cacerts utility lib:
+%%%  This lib will download cacerts from https://mkcert.org/generate/,
+%%%  if not possible it will use a list provided in the application priv-dir.
+%%%
+%%%  To get the list call fetch/0 and the list will the first downloaded the
+%%%  the first time and then stored a presistent term for speedy retrieval.
+%%%
+%%%  To trigger a download when/storage the actual list is not needed use the
+%%%  load/0 function.
+%%%
+%%%  If you want to have regular updated of the list call the start_link/0 or
+%%%  start_link/1 functions that will start a jhn_server and update the list
+%%%  at regular intervalls, once every 24 hours for start_link/0 and every
+%%%  interval milli-seconds for start_link(Interval).
+%%%
+%%%  The CaCerts list is comppatible with the cacerts option of the ssl libs.
 %%%
 %%% @end
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -44,9 +59,9 @@
 
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: load() -> ok | Error.
 %% @doc
-%%
+%%  Downloads and stores the cacert list.
 %% @end
 %%--------------------------------------------------------------------
 -spec load() -> ok | {error, _}.
@@ -58,9 +73,9 @@ load() ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: fetch() -> CaCerts | Error.
 %% @doc
-%%
+%%  Provides the cacert list, takes longer time on firs invvocation.
 %% @end
 %%--------------------------------------------------------------------
 -spec fetch() -> [binary()] | {error, _}.
@@ -79,9 +94,10 @@ fetch() ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: start_link() -> {ok, Pid} | ignore | Error.
 %% @doc
-%%
+%%  Starts a linked jhn_server that updates the cacert list every 24 hours,
+%%  equivalent to start_link(86_400_000).
 %% @end
 %%--------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | ignore | {error, _}.
@@ -89,9 +105,10 @@ fetch() ->
 start_link() -> start_link(86_400_000).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: start_link(Interval) -> {ok, Pid} | ignore | Error.
 %% @doc
-%%
+%%  Starts a linked jhn_server that updates the cacert list every Interval
+%%  milli-seconds,
 %% @end
 %%--------------------------------------------------------------------
 -spec start_link(pos_integer()) -> {ok, pid()} | ignore | {error, _}.
