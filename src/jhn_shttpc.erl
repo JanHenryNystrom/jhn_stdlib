@@ -32,6 +32,7 @@
 %%%               atom or binary and the value a binary
 %%%    options -> options to the transport's (tcp or ssl) connection function
 %%%    cacerts -> use jhn_cacerts for the ssl cacerts option
+%%%    allow_wildcard -> allow wildcard certificate matching
 %%%    redirect -> a boolean that determines if redirect are automatically
 %%%                followed for status codes 301, 302, 303, 307, 308 and in the
 %%%                case of 303 use the GET as the method
@@ -91,6 +92,7 @@
                    body => <<>>,
                    options => [],
                    cacerts => false,
+                   allow_wildcard => false,
                    timeout => 5000,
                    redirect => false,
                    limit => undefined
@@ -205,6 +207,12 @@
           <<"keep-alive">> => <<"Keep-Alive">>,
           <<"proxy-connection">> => <<"Proxy-Connection">>,
           <<"accept-patch">> => <<"Accept-Patch">>}).
+
+-define(ALLOW_WILDCARD,
+        {customize_hostname_check,
+         [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]}).
+
+
 
 %% Records
 -record(state, {transport = tcp :: tcp | ssl,
@@ -550,6 +558,7 @@ request(Req) ->
               body := Body,
               options := Options,
               cacerts := CaCerts,
+              allow_wildcard := AllowWildcard,
               redirect := Redirect,
               limit := Limit} = Req2,
             State = #state{host = Host,
@@ -561,7 +570,8 @@ request(Req) ->
                            fragment = Fragment,
                            query = Query,
                            body = Body,
-                           options = opts(Options, Host, CaCerts),
+                           options =
+                               opts(Options, Host, CaCerts, AllowWildcard),
                            redirect = Redirect,
                            limit = Limit},
             case connect_server(State) of
@@ -593,6 +603,7 @@ validate(uri, URI, Req) -> decode(URI, Req);
 validate(headers, Headers, Req) when is_map(Headers) -> Req;
 validate(options, Opts, Req) when is_list(Opts) -> Req;
 validate(cacerts, CaCerts, Req) when is_boolean(CaCerts) -> Req;
+validate(allow_wildcard, Allow, Req) when is_boolean(Allow) -> Req;
 validate(method, 'GET', Req) -> Req;
 validate(method, 'HEAD', Req) -> Req;
 validate(method, 'POST', Req) -> Req;
@@ -659,18 +670,22 @@ limit(Timeout) -> erlang:system_time(milli_seconds) + Timeout.
 %%------------------------------------------------------------------------------
 %% options
 %%------------------------------------------------------------------------------
-opts(Opts, Host, CaCerts) ->
+opts(Opts, Host, CaCerts, AllowWildcard) ->
     Opts1 = [binary, {packet, http_bin}, {active, false} | Opts],
     Opts2 = case CaCerts of
                 true -> [{cacerts, jhn_cacerts:fetch()} | Opts1];
                 false -> Opts1
             end,
+    Opts3 = case AllowWildcard of
+                true -> [?ALLOW_WILDCARD | Opts2];
+                false -> Opts2
+            end,
     case inet_opt(Opts) of
-        true -> Opts2;
+        true -> Opts3;
         false ->
             case ipv6_host(Host) of
-                true -> [inet6 | Opts2];
-                false -> Opts2
+                true -> [inet6 | Opts3];
+                false -> Opts3
             end
     end.
 
