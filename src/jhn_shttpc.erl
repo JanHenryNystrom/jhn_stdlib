@@ -219,7 +219,6 @@
                 socket,
                 limit = infinity :: timeout(),
                 options = [] :: [any()],
-                cacerts = false :: boolean(),
                 redirect :: boolean(),
                 redirections = []
                }).
@@ -663,7 +662,7 @@ limit(Timeout) -> erlang:system_time(milli_seconds) + Timeout.
 opts(Opts, Host, CaCerts) ->
     Opts1 = [binary, {packet, http_bin}, {active, false} | Opts],
     Opts2 = case CaCerts of
-                true -> [{cacerts, jhn_cacerts:fetch()}, Opts1];
+                true -> [{cacerts, jhn_cacerts:fetch()} | Opts1];
                 false -> Opts1
             end,
     case inet_opt(Opts) of
