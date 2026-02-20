@@ -1,13 +1,41 @@
--module(jhn_hpack_tests).
+%%==============================================================================
+%% Copyright 2026 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%% http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%==============================================================================
 
+%%%-------------------------------------------------------------------
+%%% @doc
+%%%   eunit unit tests for the jhn_hpack library module.
+%%% @end
+%%%
+%% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2026, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%%%-------------------------------------------------------------------
+-module(jhn_hpack_tests).
+-copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
+
+%% Includes
+-include_lib("eunit/include/eunit.hrl").
+
+%% Records
 -record(context,
         {table, without, never, max, limit, length, size,
          %% encode
          huffman_encode, return_type
         }).
 
--include_lib("eunit/include/eunit.hrl").
-
+%% Defines
 -define(HS1,
         [{~":method", ~"GET"},
          {~":path", ~"/"},
@@ -31,6 +59,14 @@
          {~"x-meow", ~"t"},
          {~"x-tyktorp", ~"t"}]).
 
+%% ===================================================================
+%% Tests.
+%% ===================================================================
+
+%%--------------------------------------------------------------------
+%% encode - decode
+%%--------------------------------------------------------------------
+
 encode_1_decode_1_test_() ->
     [?_test(encode_1_decode_1(Hs)) || Hs <- [?HS1, ?HS2]].
 
@@ -44,6 +80,10 @@ encode_2_decode_1_test_() ->
 encode_2_decode_1(Hs) ->
     {ok, Bin, _} = jhn_hpack:encode(Hs, #{huffman_encode => true}),
     ?assertMatch({ok, Hs, _}, jhn_hpack:decode(Bin)).
+
+%% ===================================================================
+%% RFC7541 based
+%% ===================================================================
 
 %%--------------------------------------------------------------------
 %% rfc7541 C.2.1 Literal Header Field with Indexing
@@ -104,12 +144,14 @@ rfc7541_c_2_3_test() ->
     HOpts = #{never => Never, huffman_encode => true},
     ?assertMatch(?C_2_3_STR, ?C_2_3_BIN),
     ?assertMatch({ok, ?C_2_3_BIN, _}, jhn_hpack:encode(?C_2_3_H, Opts)),
-    ?assertMatch({ok, ?C_2_3_H, #context{never = Never}},
-                 jhn_hpack:decode(?C_2_3_BIN)),
+    {ok, H1, C1} = jhn_hpack:decode(?C_2_3_BIN),
+    ?assertEqual(?C_2_3_H, H1),
+    ?assertEqual(Never, jhn_hpack:never(C1)),
     {ok, Bin, _} = jhn_hpack:encode(?C_2_3_H, HOpts),
     ?assertNotMatch(?C_2_3_BIN, Bin),
-    ?assertMatch({ok, ?C_2_3_H, #context{never = Never}},
-                 jhn_hpack:decode(Bin)).
+    {ok, H2, C2} = jhn_hpack:decode(?C_2_3_BIN),
+    ?assertEqual(?C_2_3_H, H2),
+    ?assertEqual(Never, jhn_hpack:never(C2)).
 
 %%--------------------------------------------------------------------
 %% rfc7541 C.2.4 Indexed Header Field

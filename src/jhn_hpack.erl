@@ -1,10 +1,50 @@
+%%==============================================================================
+%% Copyright 2026 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%% http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%==============================================================================
+
+%%%-------------------------------------------------------------------
+%%% @doc
+%%%  A HPACK library based on:
+%%%
+%%%  HPACK: Header Compression for HTTP/2                              (rfc7541)
+%%%
+%%%  The headers are represented as a list of header, value binary tuples and
+%%%  and the dynamic index size update by the tuple {size_update, Integer}.
+%%%  The context is configurable with a max size and a hard limit in the size.
+%%%
+%%%  For the encoding context a without and never list of header names can
+%%%  be provided. The decoding context contains a list of the never index
+%%%  that can be selected from the context.
+%%%
+%%% @end
+%%%
+%% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2021-2026, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%%%-------------------------------------------------------------------
 -module(jhn_hpack).
+-copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
--export([decode/1, decode/2,
-         encode/1, encode/2]).
+%% Library functions
+-export([encode/1, encode/2, decode/1, decode/2,
+         never/1
+        ]).
 
--define(MAX_SIZE, 4096).
+%% Exported types
+-export_type([context/0, field/0, size_update/0, header/0]).
 
+%% Records
 -record(context,
         {table          = []     :: [header()],
          without        = []     :: [header_name()],
@@ -27,6 +67,7 @@
          never          = []     :: [header_name()]
         }).
 
+%% Types
 -type header_name()  :: binary().
 -type header_value() :: binary().
 -type header()       :: {header_name(), header_value()}.
@@ -40,31 +81,38 @@
                   huffman_encode => boolean()
                  }.
 
-
--export_type([header/0]).
-
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
 
 %%--------------------------------------------------------------------
--spec decode(binary()) -> {ok, [field()], context()}.
-%%--------------------------------------------------------------------
-decode(Bin) -> decode(Bin, #{}).
-
-%%--------------------------------------------------------------------
--spec decode(binary(), context() | opts()) -> {ok, [field()], context()}.
-%%--------------------------------------------------------------------
-decode(Bin, Ctx = #context{}) -> decode(Bin, Ctx, []);
-decode(Bin, Opts = #{}) ->
-    #opts{limit = L, max = M} = maps:fold(fun opt/3, #opts{}, Opts),
-    decode(Bin, #context{limit = L, max = M}).
-
+%% Function: encode(Fields) -> HPACK.
+%% @doc
+%%   Encodes the structured Erlang term as a binary and a context.
+%%   Equivalent of encode(Fields, #{}).
+%% @end
 %%--------------------------------------------------------------------
 -spec encode([field()]) -> {ok, binary(), context()}.
 %%--------------------------------------------------------------------
 encode(Headers) -> encode(Headers, #{}).
 
+%%--------------------------------------------------------------------
+%% Function: encode(Term, Options | Context) -> HPACK.
+%% @doc
+%%   Encodes the list of HPACK fields as an iolist or binary and a context
+%%   used in futher encodings.
+%%   First call is made with options, following calls with the context returned
+%%   from the previous call to encode/2.
+%%   Encode will give an exception if the erlang term is not well formed.
+%%   Options are:
+%%     return_type => binary | iolist -> default binary
+%%     limit => integer() -> the limit for the max size value, default 4096
+%%     max => integer() -> the max size for the dynamic table default 4096
+%%     huffman_encode => boolean() -> if strings should be huffman encoded,
+%%                                    default false
+%%     without() => [header_name()] -> headers not to be indexed, default []
+%%     never() => [header_name()] -> headers never indexed, default []
+%% @end
 %%--------------------------------------------------------------------
 -spec encode([field()], context() | opts()) -> {ok, iodata(), context()}.
 %%--------------------------------------------------------------------
@@ -76,8 +124,49 @@ encode(Headers, Opts = #{}) ->
                    without = W, never = N},
     encode(Headers, Ctx).
 
+%%--------------------------------------------------------------------
+%% Function: decode(HPACK) -> {ok, Headers, Context}
+%% @doc
+%%   Decodes the binary into a list of headers and a context.
+%%   Equivalent of decode(HPACK, #{}).
+%% @end
+%%--------------------------------------------------------------------
+-spec decode(binary()) -> {ok, [header()], context()}.
+%%--------------------------------------------------------------------
+decode(Bin) -> decode(Bin, #{}).
+
+%%--------------------------------------------------------------------
+%% Function: decode(HPACK, Options | Context) -> {ok, Headers, Context}
+%% @doc
+%%   Decodes the binary into headers and a context used in futher decodings.
+%%   First call is made with options, following calls with the context returned
+%%   from the previous call to decode/2.
+%%   Decode will give an exception if the binary is not well formed.
+%%   Options are:
+%%     limit => integer() -> the limit for the max size value, default 4096
+%%     max => integer() -> the max size for the dynamic table default 4096
+%% @end
+%%--------------------------------------------------------------------
+-spec decode(binary(), context() | opts()) -> {ok, [header()], context()}.
+%%--------------------------------------------------------------------
+decode(Bin, Ctx = #context{}) -> decode(Bin, Ctx, []);
+decode(Bin, Opts = #{}) ->
+    #opts{limit = L, max = M} = maps:fold(fun opt/3, #opts{}, Opts),
+    decode(Bin, #context{limit = L, max = M}).
+
+%%--------------------------------------------------------------------
+%% Function: never(Context) -> {ok, [header_name]}
+%% @doc
+%%   Selects the header names that are marked as never in the decoding
+%%   context.
+%% @end
+%%--------------------------------------------------------------------
+-spec never(context()) -> [header_name()].
+%%--------------------------------------------------------------------
+never(#context{never = N}) -> N.
+
 %% ===================================================================
-%% Library functions.
+%% Internal functions.
 %% ===================================================================
 
 %% -------------------------------------------------------------------
@@ -424,9 +513,7 @@ drop(Ctx = #context{size = S, length = Len, table = Tab}) ->
     {Tab1, [E]} = lists:split(Len - 1, Tab),
     Ctx#context{size = S - entry_size(E), length = Len - 1, table = Tab1}.
 
-entry_size(E = <<_/binary>>) -> 32 + byte_size(E);
 entry_size({Name, Value}) -> 32 + byte_size(Name) + byte_size(Value).
-
 
 %% -------------------------------------------------------------------
 %% integer
@@ -434,14 +521,10 @@ entry_size({Name, Value}) -> 32 + byte_size(Name) + byte_size(Value).
 
 %% Decode
 
-decode_integer(<<1:1, B/bits>>, 1) -> plus(1, decode_integer(B, 0, 0));
-decode_integer(<<3:2, B/bits>>, 2) -> plus(3, decode_integer(B, 0, 0));
-decode_integer(<<7:3, B/bits>>, 3) -> plus(7, decode_integer(B, 0, 0));
 decode_integer(<<15:4, B/bits>>, 4) -> plus(15, decode_integer(B, 0, 0));
 decode_integer(<<31:5, B/bits>>, 5) -> plus(31, decode_integer(B, 0, 0));
 decode_integer(<<63:6, B/bits>>, 6) -> plus(63, decode_integer(B, 0, 0));
 decode_integer(<<127:7, B/bits>>, 7) -> plus(127, decode_integer(B, 0, 0));
-decode_integer(<<255:8, B/bits>>, 8) -> plus(255, decode_integer(B, 0, 0));
 decode_integer(B, Prefix) ->
     <<Value:Prefix, T/bits>> = B,
     {Value, T}.
@@ -462,14 +545,10 @@ pow(2, 42) -> 4398046511104.
 
 %% Encode
 
-encode_integer(1, 1) -> <<1:1, 0:8>>;
-encode_integer(3, 2) -> <<3:2, 0:8>>;
-encode_integer(7, 3) -> <<7:3, 0:8>>;
 encode_integer(15, 4) -> <<15:4, 0:8>>;
 encode_integer(31, 5) -> <<31:5, 0:8>>;
 encode_integer(63, 6) -> <<63:6, 0:8>>;
 encode_integer(127, 7) -> <<127:7, 0:8>>;
-encode_integer(255, 8) -> <<255, 0>>;
 encode_integer(Int, N) when Int < (1 bsl N - 1) -> <<Int:N>>;
 encode_integer(Int, N) ->
     Prefix = 1 bsl N - 1,
