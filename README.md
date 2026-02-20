@@ -1,7 +1,7 @@
 jhn_stdlib [(γ)][5]
 ==========
 
-A few thought experiments solidified as code: CBOR, JSON, MessagePack, syslog,
+A few thought experiments solidified as code: CBOR, HPACK, JSON, MessagePack, syslog,
 URI, IP addresses, Timestamp, UUID, TypeID, mocking, cacerts
 
   * [Introduction](#introduction)
@@ -42,6 +42,7 @@ Features/Modules
   * Protocols
     * Bencoding -- encoding/decoding -- ```jhn_bencoding```
     * CBOR -- encoding/decoding -- ```jhn_cbor``` [rfc8949][43], [rfc9542][45]
+    * HPACK -- encoding/decoding -- ```jhn_hpack``` [rfc7541][]
     * JSON  -- encoding/decoding -- ```jhn_json``` [rfc8259][30]
     * JSON Pointer -- encoding/decoding/evaluation -- ```jhn_json``` [rfc6901][8]
     * JSON Patch -- evaluation -- ```jhn_json``` [rfc6902][31]
@@ -177,3 +178,4 @@ I know I really should.
   [47]: https://en.wikipedia.org/wiki/Verhoeff_algorithm "Verhoeff algorithm"
   [48]: https://en.wikipedia.org/wiki/Damm_algorithm "Damm algorithm"
   [49]: https://github.com/jetify-com/typeid/tree/main/spec "TypeID Specification (Version 0.3.0)"
+  [50]: http://www.ietf.org/rfc/rfc7541.txt "HPACK: Header Compression for HTTP/2"

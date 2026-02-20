@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2021-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2021-2026 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -104,7 +104,7 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2021-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2021-2026, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 -module(jhn_cbor).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').

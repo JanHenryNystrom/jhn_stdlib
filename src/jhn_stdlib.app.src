@@ -1,6 +1,6 @@
 %% -*-erlang-*-
 %%==============================================================================
-%% Copyright 2013-2024 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% Copyright 2013-2026 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
-%% @copyright (C) 2013-2024, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2013-2026, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
 %%%-------------------------------------------------------------------
 {application, jhn_stdlib,
  [{description, "Jan Henry Nystrom's standard library,"
-   "CBOR, JSON, MessagePack, Syslog, URI, IP address, Timestamp, UUID, TypeID,"
-   "prefix/range/T-trees, Bloom filters, HTTP client, Mustache rendering,"
-   "mocking, cacerts, and Server and FSM behaviours"},
+   "CBOR, HPACK, JSON, MessagePack, Syslog, URI, IP address, Timestamp, UUID,"
+   "TypeID,prefix/range/T-trees, Bloom filters, HTTP client,"
+   "Mustache rendering,mocking, cacerts, and Server and FSM behaviours"},
   {vsn, git},
   {registered, []},
   {applications, [kernel, stdlib, compiler]},
