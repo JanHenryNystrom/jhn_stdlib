@@ -42,7 +42,7 @@ Features/Modules
   * Protocols
     * Bencoding -- encoding/decoding -- ```jhn_bencoding```
     * CBOR -- encoding/decoding -- ```jhn_cbor``` [rfc8949][43], [rfc9542][45]
-    * HPACK -- encoding/decoding -- ```jhn_hpack``` [rfc7541][]
+    * HPACK -- encoding/decoding -- ```jhn_hpack``` [rfc7541][50]
     * JSON  -- encoding/decoding -- ```jhn_json``` [rfc8259][30]
     * JSON Pointer -- encoding/decoding/evaluation -- ```jhn_json``` [rfc6901][8]
     * JSON Patch -- evaluation -- ```jhn_json``` [rfc6902][31]
