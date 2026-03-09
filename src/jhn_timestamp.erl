@@ -22,7 +22,7 @@
 %%%
 %%%  The timestamp is represented as follows:
 %%%
-%%%  posix    : non_neg_integer()
+%%%  posix    : -62167219200..253402300799
 %%%
 %%%  stamp    : #{year     := year(),
 %%%               month    := month(),
@@ -35,8 +35,8 @@
 %%%              }
 %%%
 %%%  offset() : 'Z' | #{sign    := '+' | '-',
-%%%                       hours   := hours(),
-%%%                       minutes := minutes()}
+%%%                     hours   := hours(),
+%%%                     minutes := minutes()}
 %%%
 %%%  datetime : {{year(), month(), day()},
 %%%              {hour(), minute(), second() | float()}}
@@ -44,12 +44,11 @@
 %%%  The datetime is the usual calendar one extended with float seconds to
 %%%  represent fractions (you have to know the precision used, default seconds).
 %%%
-%%%  year()   : pos_integer().
+%%%  year()   : 0..9999.
 %%%  month()  : 1..12.
 %%%  day()    : 1..31.
 %%%  hour()   : 0..23.
 %%%  minute() : 0..59.
-%%%  second() : 0..59.
 %%%  second() : 0..59.
 %%%
 %%%  The fraction and offset parts are optional and defaults to 0 and Z.
@@ -65,6 +64,7 @@
 
 %% Library functions
 -export([gen/0, gen/1,
+         valid/1, valid/2,
          encode/1, encode/2,
          decode/1, decode/2]).
 
@@ -79,7 +79,7 @@
          return_type = iolist :: return_type()}).
 
 %% Types
--type posix() :: non_neg_integer().
+-type posix() :: -62167219200..253402300799.
 -type stamp() :: #{year := year(),
                    month := month(),
                    day := day(),
@@ -90,7 +90,7 @@
                    offset => offset()
                   }.
 
--type year()   :: pos_integer().
+-type year()   :: 0..9999.
 -type month()  :: 1..12.
 -type day()    :: 1..31.
 -type hour()   :: 0..23.
@@ -148,7 +148,7 @@ gen() -> gen([]).
 %%     iolist (default) -> an iolist is returned
 %%     datetime -> a datetime nested tuple is returned
 %%     rfc7231 -> the returned string is rfc7231 compatible, and precision is
-%%                seconds, e.g., 
+%%                seconds, e.g., ~"Sun, 08 Mar 2026 13:19:52 GMT"
 %%     posix -> a posix integer timestamp is returned
 %% @end
 %%--------------------------------------------------------------------
@@ -160,6 +160,69 @@ gen(Opts = #opts{precision = Precision}) ->
     encode(erlang:system_time(precision(Precision)), Opts);
 gen(Opts) ->
     gen(parse_opts(Opts, #opts{})).
+
+%%--------------------------------------------------------------------
+%% Function: valid(TimeStamp) -> Boolean.
+%% @doc
+%%   Validates that a timestamp is correct, precision seconds and in the
+%%   format of a rfc3339 binary; posix integer; datetime or a stamp map.
+%%   Equivalent of valid(TimeStamp, [])
+%% @end
+%%--------------------------------------------------------------------
+-spec valid(stamp() | posix() | datetime() | binary() | posix()) -> boolean().
+%%--------------------------------------------------------------------
+valid(Time) -> valid(Time, #opts{}).
+
+%%--------------------------------------------------------------------
+%% Function: valid(TimeStamp, Options) -> Boolean.
+%% @doc
+%%   Validates that a timestamp is correct in the format of
+%%   a rfc3339 or rfc7231 binary; posix integer; datetime or a stamp map.
+%%   Options are:
+%%     seconds (default) -> second precision
+%%     milli -> milli second precision
+%%     micro -> micro second precision
+%%     nano -> nano second precision
+%%     rfc7231 -> rfc7231 format of the binary
+%%
+%%     N.B. for binary format in rfc7231 format the rfc7231 options must
+%%          provided and any precision other than seconds that must be
+%%          provided as an option otherwise the answer may be false.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec valid(stamp() | posix() | datetime() |binary()|posix(),[opt()]|#opts{}) ->
+          boolean().
+%%--------------------------------------------------------------------
+valid(Stamp = #{}, #opts{precision = Precision}) ->
+    #{year := Year, month := Month, day := Day,
+      hour := Hour, minute := Minute, second := Second} = Stamp,
+    Fraction = maps:get(fraction, Stamp, 0),
+    Offset = maps:get(offset, Stamp, 'Z'),
+    between(Year, 0, 9999) andalso
+        between(Month, 1, 12) andalso
+        between(Day, 1, 31) andalso
+        between(Hour, 0, 23) andalso
+        between(Minute, 0, 59) andalso
+        between(Second, 0, 59) andalso
+        valid_date(Year, Month, Day) andalso
+        valid_fraction(Fraction, Precision) andalso
+        valid_offset(Offset);
+valid(Time = <<WD:3/binary, _/binary>>, Opts = #opts{rfc7231 = true}) ->
+    try decode(Time, Opts) of
+        Stamp -> valid(Stamp, Opts) andalso valid_weekday(WD, Stamp)
+    catch _:_ -> false
+    end;
+valid(Time, Opts = #opts{}) ->
+    try decode(Time, Opts) of
+        Stamp -> valid(Stamp, Opts)
+    catch _:_ -> false
+    end;
+valid(Time, Opts) ->
+    try parse_opts(Opts, #opts{}) of
+        Opts1 -> valid(Time, Opts1)
+    catch _:_ -> false
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: encode(Stamp) -> IOList.
@@ -254,6 +317,40 @@ precision(micro) -> micro_seconds;
 precision(nano) -> nano_seconds.
 
 %% ===================================================================
+%% Validation
+%% ===================================================================
+
+between(X, L, U) when is_integer(X), X >= L, X =< U -> true;
+between(_, _, _) -> false.
+
+valid_fraction(0, seconds) -> true;
+valid_fraction(F, milli) -> between(F, 0, 999);
+valid_fraction(F, micro) -> between(F, 0, 999_999);
+valid_fraction(F, nano) -> between(F, 0, 999_999_999);
+valid_fraction(_, _) -> false.
+
+valid_offset('Z') -> true;
+valid_offset(#{sign := S, hours := H, minutes := M}) when S == '+'; S == '-' ->
+    between(H, 0, 23) andalso between(M, 0, 59);
+valid_offset(_) ->
+    false.
+
+valid_date(Y, 2, D) when Y rem 4 =:= 0, Y rem 100 > 0 -> D =< 29;
+valid_date(Y, 2, D) when Y rem 400 =:= 0 -> D =< 29;
+valid_date(_, 2, D) -> D =< 28;
+valid_date(_, 4, D) -> D =< 30;
+valid_date(_, 6, D) -> D =< 30;
+valid_date(_, 9, D) -> D =< 30;
+valid_date(_, 11, D) -> D =< 30;
+valid_date(_, _, D) -> D =< 31.
+
+valid_weekday(WD, #{year := Y, month := M, day := D}) ->
+    case weekday(Y, M, D) of
+        WD -> true;
+        _ -> false
+    end.
+
+%% ===================================================================
 %% Encoding
 %% ===================================================================
 
@@ -300,9 +397,7 @@ do_encode(Map = #{}, #opts{precision = Precision, rfc7231 = RFC7231}) ->
              pad(Hour), $:, pad(Minute), $:, pad(Second),
              Fraction, Offset];
         true ->
-            Days = (encode(Map, [posix]) + ?EPOCH) div ?SECONDS_PER_DAY,
-            WD = (Days + 5) rem 7 + 1,
-            [weekday(WD), ", ", pad(Day), " ", month(Month), " ",
+            [weekday(Year, Month, Day), ", ", pad(Day), " ", month(Month), " ",
              integer_to_binary(Year), " ",
              pad(Hour), $:, pad(Minute), $:, pad(Second), " GMT"]
     end;
@@ -336,13 +431,16 @@ leap(_, 2) -> 0;
 leap(Year, _) when Year rem 4 =:= 0, Year rem 100 > 0; Year rem 400 =:= 0 -> 1;
 leap(_, _) -> 0.
 
-weekday(1) -> <<"Mon">>;
-weekday(2) -> <<"Tue">>;
-weekday(3) -> <<"Wed">>;
-weekday(4) -> <<"Thu">>;
-weekday(5) -> <<"Fri">>;
-weekday(6) -> <<"Sat">>;
-weekday(7) -> <<"Sun">>.
+weekday(Year, Month, Day) ->
+    case (days(Year, Month, Day) + 5) rem 7 + 1 of
+        1 -> <<"Mon">>;
+        2 -> <<"Tue">>;
+        3 -> <<"Wed">>;
+        4 -> <<"Thu">>;
+        5 -> <<"Fri">>;
+        6 -> <<"Sat">>;
+        7 -> <<"Sun">>
+    end.
 
 month(1) -> <<"Jan">>;
 month(2) -> <<"Feb">>;

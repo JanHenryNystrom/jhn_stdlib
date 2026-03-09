@@ -184,7 +184,7 @@ open_1_server_test_() ->
       ?_test(
          ?assertMatch(ok,
                       jhn_syslog:close(
-                        jhn_syslog:open([tcp, server, {port, ?UDP}])))),
+                        jhn_syslog:open([tcp, server, {port, 0}])))),
       ?_test(
          ?assertMatch(ok,
                       jhn_syslog:close(

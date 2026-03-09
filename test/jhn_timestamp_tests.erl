@@ -106,6 +106,101 @@ gen_1_test_() ->
     ].
 
 %%--------------------------------------------------------------------
+%% Validate
+%%--------------------------------------------------------------------
+validate_1_test_() ->
+    [?_test(?assertEqual(true,
+                        jhn_timestamp:valid(jhn_timestamp:gen([binary])))),
+     ?_test(?assertEqual(true,
+                        jhn_timestamp:valid(jhn_timestamp:gen([datetime])))),
+     ?_test(?assertEqual(true,
+                         jhn_timestamp:valid(jhn_timestamp:gen([posix])))),
+     ?_test(?assertEqual(true,
+                        jhn_timestamp:valid(
+                          jhn_timestamp:decode(jhn_timestamp:gen([posix]))))),
+     ?_test(?assertEqual(false, jhn_timestamp:valid(~"gurka")))
+    ].
+
+validate_2_test_() ->
+    [?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-01-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2024-02-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2000-02-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-02-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-03-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-04-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-05-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-06-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-07-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-08-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-09-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-10-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-11-01T22:46:13Z"))),
+     ?_test(?assertEqual(true, jhn_timestamp:valid(~"2026-12-01T22:46:13Z")))
+    ] ++
+    [?_test(?assertEqual(true,
+                         jhn_timestamp:valid(
+                           jhn_timestamp:gen([rfc7231, binary]),
+                           [rfc7231]))),
+     ?_test(?assertEqual(false,
+                         jhn_timestamp:valid(
+                           ~"Mon, 08 Mar 2026 22:37:11 GMT",
+                           [rfc7231]))),
+     ?_test(?assertEqual(false,
+                         jhn_timestamp:valid(
+                           ~"Sun, 08 Mar 2026 22:37:11 KMT",
+                           [rfc7231]))),
+     ?_test(?assertEqual(false,
+                         jhn_timestamp:valid(
+                           ~"Sun, 08 Mar 2026 22:37:11 GMT",
+                           [rfc7231, gurka]))),
+     ?_test(?assertEqual(false, jhn_timestamp:valid(~"2026-03-42T22:46:13Z"))),
+     ?_test(?assertEqual(false,
+                         jhn_timestamp:valid(#{offset =>
+                                                   #{sign => '*',
+                                                     minutes => 30,
+                                                     hours => 10},
+                                               second => 12,
+                                               month => 3,
+                                               fraction => 0,
+                                               year => 2026,
+                                               day => 8,
+                                               hour => 23,
+                                               minute => 4}))),
+     ?_test(?assertEqual(false,
+                         jhn_timestamp:valid(#{offset => 'Z',
+                                               second => 12,
+                                               month => 3,
+                                               fraction => 1000,
+                                               year => 2026,
+                                               day => 8,
+                                               hour => 23,
+                                               minute => 4},
+                                             [seconds]))),
+     ?_test(?assertEqual(false, jhn_timestamp:valid(~"2026-04-31T22:46:13Z"))),
+     ?_test(?assertEqual(false,
+                         jhn_timestamp:valid(~"2026-03-08T22:46:13+00:90")))
+    ] ++
+    [[?_test(?assertEqual(true,
+                          jhn_timestamp:valid(
+                            jhn_timestamp:gen([binary, P]),
+                            [P]))),
+     ?_test(?assertEqual(true,
+                        jhn_timestamp:valid(
+                          jhn_timestamp:gen([datetime, P]),
+                          [P]))),
+     ?_test(?assertEqual(true,
+                         jhn_timestamp:valid(
+                           jhn_timestamp:gen([posix, P]),
+                           [P]))),
+     ?_test(?assertEqual(true,
+                        jhn_timestamp:valid(
+                          jhn_timestamp:decode(
+                            jhn_timestamp:gen([posix, P]),
+                            [P]),
+                          [P])))
+     ] || P <- [seconds, milli, micro, nano]].
+
+%%--------------------------------------------------------------------
 %% Encode
 %%--------------------------------------------------------------------
 encode_2_test_() ->
