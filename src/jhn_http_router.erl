@@ -30,7 +30,7 @@
 
 %% Exported types
 -export_type([route/0,
-              method_return/0, auth_type/0,
+              method_return/0, auth_type/0
              ]).
 
 %% Callbacks
@@ -64,7 +64,7 @@
                  path := path(),
                  headers := [{binary(), binary()}],
                  bindings := [{binary(), binary()}],
-                 extra := _,,
+                 extra := _,
                  log := boolean(),
                  body := binary()
                 }.

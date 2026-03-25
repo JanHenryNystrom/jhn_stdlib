@@ -43,6 +43,7 @@
 
 %% Library functions
 -export([create/2, destroy/1,
+         create_http11/2, destroy_http11/1,
          hide/3, reveal/1, peek/2, passthrough/3,
          load_mod/1, load_mod/2, unload_mod/1,
          load_app/2, unload_app/1, start_app/2, start_all_app/2, stop_app/1
@@ -74,6 +75,9 @@
 -define(SHADOW_MODULE, "jhn_shadow shadow module").
 -define(HIDDEN_MODULE, "jhn_shadow hidden module").
 
+-define(HTTP11_OPTS, [inet, {packet, http_bin}, binary, {active, false}]).
+-define(HTTP11_TIMEOUT, 1000_000_000).
+
 %% Types
 -type name() :: atom().
 -type args() :: [_].
@@ -82,6 +86,7 @@
 -type env()  :: [{atom(), _}].
 
 -type module_opts() :: jhn_server:opts().
+-type http11_opts() :: _.
 
 -type application_opt() ::
         env() |
@@ -100,6 +105,10 @@
                 %% Optional callbacks
                 peek             :: boolean()
                }).
+-record(http11_state, {listen       :: socket(),
+                       socket       :: socket(),
+                       headers = [] :: [{binary(), binary()}]
+                       }).
 
 %% ===================================================================
 %% Library functions
@@ -125,6 +134,46 @@ create(Mod, Opts) ->
 -spec destroy(shadow()) -> ok.
 %%--------------------------------------------------------------------
 destroy(Shadow) -> jhn_server:cast(Shadow, stop).
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec create_http11(module(),  http11_opts()) ->
+          {ok, integer()} | {error, _}.
+%%--------------------------------------------------------------------
+create_http11(Mod, Opts) ->
+    case gen_tcp:listen(0, ?HTTP11_OPTS) of
+        {ok, ListenSocket} ->
+            {ok, Port} = inet:port(ListenSocket),
+            Fun = fun() ->
+                          {ok, Socket} =
+                              gen_tcp:accept(ListenSocket, ?HTTP11_TIMEOUT),
+                          State =
+                              #http11_state{listen = ListenSocket,
+                                            socket = Socket},
+                          http11(State)
+                  end,
+            spawn_link(Fun),
+            {ok, Port};
+        Error ->
+            Error
+    end.
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec destroy_http11(integer()) ->ok.
+%%--------------------------------------------------------------------
+destroy_http11(Port) ->
+   jhn_shttpc:delete(["http://127.0.0.1:",
+                      integer_to_list(Port),
+                      "/jhn_shadow"]).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -658,6 +707,70 @@ parse_application_opt(Key, Op, _) ->
 
 
 callback_name(App) -> binary_to_atom(<<(atom_to_binary(App))/binary, "_app">>).
+
+%%--------------------------------------------------------------------
+%% HTTP11
+%%--------------------------------------------------------------------
+
+http11(State = #http11_state{listen = Listen, socket = Socket, headers = Hs}) ->
+   case gen_tcp:recv(Socket, 0, ?HTTP11_TIMEOUT) of
+       {error, closed} ->
+           {ok, Socket1} = gen_tcp:accept(Listen, ?HTTP11_TIMEOUT),
+           http11(reset_http11(State#http11_state{socket = Socket1}));
+       {ok, {http_error, Error}} ->
+                       ok = gen_tcp:close(Socket),
+           {ok, Socket1} = gen_tcp:accept(Listen, ?HTTP11_TIMEOUT),
+           http11(reset_http11(State#http11_state{socket = Socket1}));
+       {ok, {http_request, 'DELETE', {abs_path, ~"/jhn_shadow"}, _}} ->
+           gen_tcp:close(Socket);
+       {ok, {http_request, Method, URI, {1, 1}}} ->
+           State1 = case Method of
+                        'DELETE' -> State1#http11_state{method = delete};
+                        'GET' -> State1#http11_state{method = get};
+                        'HEAD' -> State1#http11_state{method = head};
+                        'OPTIONS' -> State1#http11_state{method = options};
+                        'POST' -> State1#http11_state{method = post};
+                        'PUT' -> State1#http11_state{method = put};
+                        'TRACE' -> State1#http11_state{method = trace};
+                        ~"CONNECT" -> State1#http11_state{method = connect};
+                        ~"PATCH" -> State1#http11_state{method = patch}
+                    end,
+           State2 = case URI of
+                        '*' -> ~"";
+                        {absoluteURI, _, Host, _, Path} ->
+                            State1#http11_state{host = Host, path = Path};
+                        {abs_path, Path} ->
+                            State1#http11_state{host = Host, path = Path};
+                        {scheme, _, URI0} ->
+                            #{path := Path} = uri_string:parse(URI0),
+                            State1#http11_state{host = Host, path = Path};
+                        URI0 ->
+                            #{path := Path} = uri_string:parse(URI0),
+                            State1#http11_state{host = Host, path = Path}
+                    end,
+           http11(State2);
+       {ok, {http_header, _, _, Field, Value}} ->
+           Field1 = jhn_bstring:to_lower(Field),
+           http11(State#http11_state{headers = [{Field1, Value} | Hs]});
+       {ok, http_eoh} ->
+           case lists:keyfind(~"content-length", 1, Headers) of
+               false -> ok;
+               {_, ~"0"} -> ok;
+               {_, Len} ->
+                   inet:setopts(Socket, [{packet, raw}]),
+                   {ok, Body} =
+                       gen_tcp:recv(Socket, binary_to_integer(Len), ?TIMEOUT),
+                   inet:setopts(Socket, [{packet, http_bin}])
+           end,
+           Answer = application:get_env(paper, mock_answer, 200),
+           case Answer of
+               200 -> gen_tcp:send(Socket, ?REPLY_200);
+               503 -> gen_tcp:send(Socket, ?REPLY_503)
+           end,
+           loop(Socket, LS, none, [])
+   end.
+
+
 
 %%--------------------------------------------------------------------
 %% Logging
