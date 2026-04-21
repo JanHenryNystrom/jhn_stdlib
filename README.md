@@ -54,7 +54,7 @@ Features/Modules
     * Timestamps -- generating/encoding/decoding -- ```jhn_timestamp``` [rfc3339][19], [rfc7231][21]
     * TypeID --  generating/encoding/decoding -- ```jhn_typeid``` [TypeID][49]
     * URI -- encoding/decoding -- ```jhn_uri``` [rfc3986][15]
-    * UUID -- generating/encoding/decoding -- ```jhn_uuid``` [rfc9562][42][rfc8141][45]
+    * UUID -- generating/encoding/decoding -- ```jhn_uuid``` [rfc9562][42], [rfc8141][45]
   * Clients
     * HTTP -- client -- ```jhn_shttpc``` [rfc7230][20], [rfc7231][21], [rfc7538][22], [rfc5789][23], [rfc2818][24]
     * Syslog -- server/client -- ```jhn_syslog``` [rfc5425][25], [rfc5426][26], [rfc6587][27]
@@ -80,6 +80,7 @@ Features/Modules
   * Utility
      * Mocking -- ```jhn_shadow```
      * CA-Certs -- ```jhn_cacerts```
+     * Content type determination -- ```jhn_magic``` [media-types][51]
 
 <a name='deprecated'/>
 
@@ -179,3 +180,4 @@ I know I really should.
   [48]: https://en.wikipedia.org/wiki/Damm_algorithm "Damm algorithm"
   [49]: https://github.com/jetify-com/typeid/tree/main/spec "TypeID Specification (Version 0.3.0)"
   [50]: http://www.ietf.org/rfc/rfc7541.txt "HPACK: Header Compression for HTTP/2"
+  [51]: https://www.iana.org/assignments/media-types/media-types.xhtml "Media Types"
