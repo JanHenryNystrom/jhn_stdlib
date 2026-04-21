@@ -163,10 +163,8 @@ ms(<<_, T/binary>>) ->  ms(T).
 
 
 zip(Z) ->
-    {ok, P} = zip:zip_open(Z, [memory]),
-    {ok, D} = zip:zip_list_dir(P),
-    Names = [Name || #zip_file{name = Name} <- D],
-    zip:zip_close(P),
+    {ok, Files} = zip:list_dir(Z),
+    Names = [Name || #zip_file{name = Name} <- Files],
     case lists:member("[Content_Types].xml", Names) of
         true -> msooxml([hd(string:tokens(N, "/"))  || N <- Names]);
         false -> ~"application/zip"

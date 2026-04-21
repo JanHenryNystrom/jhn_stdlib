@@ -1,8 +1,9 @@
 jhn_stdlib [(γ)][5]
 ==========
 
-A few thought experiments solidified as code: CBOR, HPACK, JSON, MessagePack, syslog,
-URI, IP addresses, Timestamp, UUID, TypeID, mocking, cacerts
+A few thought experiments solidified as code: CBOR, HPACK, JSON, MessagePack,
+syslog, URI, IP addresses, Timestamp, UUID, TypeID, mocking, cacerts,
+media type determination
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
