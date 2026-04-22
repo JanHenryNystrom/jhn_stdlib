@@ -62,6 +62,10 @@
           65,84,120,1,99,96,0,0,0,2,0,1,115,117,1,24,0,0,0,0,
           73,69,78,68,174,66,96,130>>).
 
+-define(WEBP,
+        <<82,73,70,70,22,0,0,0,87,69,66,80,86,80,56,76,10,0,0,0,
+          47,0,0,0,0,69,255,35,250,31>>).
+
 -define(JPEG,
         <<16#FF, 16#D8, 16#FF, 16#E0, 16#00, 16#10, 16#4A, 16#46, 16#49,
           16#46, 16#00, 16#01, 16#01, 16#01, 16#00, 16#48, 16#00, 16#48,
@@ -85,6 +89,15 @@
 -define(BMP,
         <<66, 77, 30, 0, 0, 0, 0, 0, 0, 0, 26, 0, 0, 0, 12, 0,
           0, 0, 1, 0, 1, 0, 1,  0, 24, 0, 0, 0, 255, 0>>).
+
+-define(GIF,
+        <<71,73,70,56,57,97,1,0,1,0,240,0,0,255,255,255,0,0,
+          0,33,249,4,0,0,0,0,0,44,0,0,0,0,1,0,1,0,0,2,2,68,1,
+          0,59>>).
+-define(ICO,
+        <<0,0,1,0,1,0,1,1,0,0,1,0,32,0,48,0,0,0,22,0,0,0,40,
+          0,0,0,1,0,0,0,2,0,0,0,1,0,32,0,0,0,0,0,4,0,0,0,0,0,
+          0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,255,255,255,0,0,0,0>>).
 
 -define(CAL,
         <<"BEGIN:VCALENDAR\n"
@@ -173,6 +186,88 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
+%% check/2
+%%--------------------------------------------------------------------
+check_2_test_() ->
+    [?_test(?assertEqual(jhn_magic:check(Type, B), Result)) ||
+        {Type, B, Result} <-
+            [{~"application/applefile", ?APPLE_SINGLE, true},
+             {~"application/gzip", ?GZIP, true},
+             {~"application/msword", file("file-sample_100kB.doc"), true},
+             {~"application/pdf", ?PDF, true},
+             {~"application/rtf", ?RTF, true},
+             {~"application/vnd.ms-excel",file("file_example_XLS_10.xls"),true},
+             {~"application/vnd.ms-powerpoint",
+              file("file_example_PPT_250kB.ppt"),
+              true},
+             {~"application/vnd.visio",
+              file("MVPSession1SimpleTimeline.vsd"),
+              true},
+             {~"application/xml", ?XML, true},
+             {~"application/xml", ?ATOM, true},
+             {~"application/zip", file("file-sample_100kB.docx"), true},
+             {~"application/zip", file("file_example_XLSX_10.xlsx"), true},
+             {~"application/zip", file("Extlst-test.pptx"), true},
+             {~"image/bmp", ?BMP, true},
+             {~"image/gif", ?GIF, true},
+             {~"image/vnd.microsoft.icon", ?ICO, true},
+             {~"image/jpeg", ?JPEG, true},
+             {~"image/png", ?PNG, true},
+             {~"image/webp", ?WEBP, true},
+             {~"text/calendar", ?CAL, true},
+             {~"text/plain", ~"Foo", false},
+             {~"application/msword", ?MS, false},
+             {[~"application/rtf", ~"application/gzip", ~"application/zip"],
+              ?GZIP,
+              true},
+             {[~"application/rtf", ~"application/gzip", ~"application/zip"],
+              ?ZIP,
+              true},
+             {[~"application/rtf", ~"application/gzip", ~"application/zip"],
+              ?RTF,
+              true},
+             {[~"application/rtf", ~"application/gzip", ~"application/zip"],
+              ?ATOM,
+              false}
+            ]
+    ].
+
+%%--------------------------------------------------------------------
+%% check/3
+%%--------------------------------------------------------------------
+media_check_3_test_() ->
+    [?_test(?assertEqual(jhn_magic:check(Type, B, [{deep, true}]), Result)) ||
+        {Type, B, Result} <-
+            [{~"application/atom+xml", ?ATOM, true},
+             {~"application/pdf", ?PDF, true},
+             {~"application/vnd.ms-visio.drawing.main+xml",
+              file("computer-network.vsdx"),
+              true},
+             {<<"application/"
+                "vnd.openxmlformats-officedocument.wordprocessingml.document">>,
+              file("file-sample_100kB.docx"),
+              true},
+             {<<"application/"
+                "vnd.openxmlformats-officedocument."
+                "presentationml.presentation">>,
+              file("Extlst-test.pptx"),
+              true},
+             {<<"application/"
+                "vnd.openxmlformats-officedocument.spreadsheetml.sheet">>,
+              file("file_example_XLSX_10.xlsx"),
+              true},
+             {~"application/xml", ?XML, true},
+             {~"application/zip", ?ZIP, true},
+             {~"application/zip", ?ZIP_CONTENT_TYPES, true},
+             {[~"application/atom+xml",~"image/bmp",~"image/png"], ?ATOM,true},
+             {[~"image/bmp", ~"application/atom+xml",~"image/png"], ?ATOM,true},
+             {[~"image/bmp",~"image/png", ~"application/atom+xml"], ?ATOM,true},
+             {[~"image/bmp", ~"image/png"], ?ATOM, false}
+            ]
+    ].
+
+
+%%--------------------------------------------------------------------
 %% media_type/1
 %%--------------------------------------------------------------------
 media_type_1_test_() ->
@@ -192,9 +287,11 @@ media_type_1_test_() ->
              {~"application/zip", file("file-sample_100kB.docx")},
              {~"application/zip", file("file_example_XLSX_10.xlsx")},
              {~"application/zip", file("Extlst-test.pptx")},
-             {~"image/bmp", ?BMP},
+             {~"image/gif", ?GIF},
+             {~"image/vnd.microsoft.icon", ?ICO},
              {~"image/jpeg", ?JPEG},
              {~"image/png", ?PNG},
+             {~"image/webp", ?WEBP},
              {~"text/calendar", ?CAL},
              {undefined, ~"Foo"},
              {undefined, ?MS}

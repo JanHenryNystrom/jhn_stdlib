@@ -35,6 +35,8 @@
 %%%    image/bmp                                                       (rfc7903)
 %%%    image/jpeg                                                      (rfc2046)
 %%%    image/png                                    (https://www.w3.org/TR/png/)
+%%%    image/vnd.microsoft.icon
+%%%    image/webp                                                      (rfc9649)
 %%%    text/calendar                                                   (rfc5545)
 %%%
 %%%  The following types requires deeper analysis possibly including
@@ -58,7 +60,8 @@
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% Library functions
--export([media_type/1, media_type/2]).
+-export([check/2, check/3,
+         media_type/1, media_type/2]).
 
 %% Exported types
 -export_type([media_type/0]).
@@ -81,12 +84,41 @@
 -define(GZIP_MAGIC, 16#1F, 16#8B).
 -define(MS_MAGIC, 16#D0, 16#CF, 16#11, 16#E0, 16#A1, 16#B1, 16#1A, 16#E1).
 -define(BMP_MAGIC, 16#42, 16#4D).
+-define(GIF_MAGIC, "GIF8").
+-define(ICO_MAGIC,  16#00, 16#00, 16#01, 16#00).
 -define(JPEG_MAGIC, 16#FF, 16#D8, 16#FF).
 -define(PNG_MAGIC, 16#89, 16#50, 16#4E, 16#47, 16#0D, 16#0A, 16#1A, 16#0A).
+-define(WEBP_MAGIC, "RIFF", _:4/binary, "WEBPVP8").
 
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
+
+%%--------------------------------------------------------------------
+%% Function: check(MediaType(s), File) ->  Boolean
+%% @doc
+%%   Equivalent of calling check(MediaType(s) File, [])
+%% @end
+%%--------------------------------------------------------------------
+-spec check(binary() | [binary()], binary()) -> boolean().
+%%--------------------------------------------------------------------
+check(Types, File) -> check(Types, File, []).
+
+%%--------------------------------------------------------------------
+%% Function: check(MediaType(s), File, Options) -> Boolean
+%% @doc
+%%   The files media type is checked against the type or types provided and
+%%   if they are the same or a member true is returned otherwise false.
+%%
+%%   Options are:
+%%     {deep, boolean()} -> does more expensive analysis default false
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec check(binary() | [binary()], binary(), opts()) -> boolean().
+%%--------------------------------------------------------------------
+check(Types = [_|_], File, Opts) -> lists:member(media_type(File, Opts), Types);
+check(Type = <<_/binary>>, File, Opts) -> Type == media_type(File, Opts).
 
 %%--------------------------------------------------------------------
 %% Function: media_type(File) ->  MediaType.
@@ -98,9 +130,8 @@
 %%--------------------------------------------------------------------
 media_type(File) -> media_type(File, []).
 
-
 %%--------------------------------------------------------------------
-%% Function: media_type(Binary, Options) ->  MediaType or undefined
+%% Function: media_type(File, Options) ->  MediaType or undefined
 %% @doc
 %%   The files media type is returned.
 %%
@@ -131,8 +162,11 @@ gen(<<"PK", 3:8, 4:8, _/binary>>, #opts{deep = false}) -> ~"application/zip";
 gen(XML = <<"<?xml", _/binary>>, #opts{deep = true}) -> xml(XML);
 gen(<<"<?xml", _/binary>>, #opts{deep = false}) -> ~"application/xml";
 gen(<<?BMP_MAGIC, _/binary>>, _) -> ~"image/bmp";
+gen(<<?GIF_MAGIC, _/binary>>, _) -> ~"image/gif";
+gen(<<?ICO_MAGIC, _/binary>>, _) -> ~"image/vnd.microsoft.icon";
 gen(<<?JPEG_MAGIC, _/binary>>, _) -> ~"image/jpeg";
 gen(<<?PNG_MAGIC, _/binary>>, _) -> ~"image/png";
+gen(<<?WEBP_MAGIC, _/binary>>, _) -> ~"image/webp";
 gen(<<"BEGIN:VCALENDAR", _/binary>>, _) -> ~"text/calendar";
 gen(_, _) -> undefined.
 
