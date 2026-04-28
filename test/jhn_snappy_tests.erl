@@ -62,6 +62,13 @@ compress_1_frame_uncompress_1_test_() ->
         T <- [jpeg(fireworks),
               file(alice29), file(html),
               rfc(2732), rfc(2818) | ?TEXTS]
+    ] ++
+    [?_test(
+        ?assertEqual(
+           T,
+           jhn_snappy:uncompress(
+             jhn_snappy:compress(T, [iwa, binary]), [iwa, binary]))) ||
+        T <- [file(html)]
     ].
 
 %%--------------------------------------------------------------------

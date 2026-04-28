@@ -111,9 +111,9 @@ compress(Data = <<_/binary>>, Opts) ->
             {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
             return(gather(Matches1, [Literal, varint(byte_size(Data))]), State);
         State = #state{type = frame} ->
-            return(compress_frame(Data, State, [<<?IDENTIFIER>>]), State);
+            return(compress_frame(frame,Data, State, [<<?IDENTIFIER>>]), State);
         State = #state{type = iwa} ->
-            return(compress_iwa(Data, State, []), State)
+            return(compress_frame(iwa, Data, State, []), State)
     end;
 compress(Data, Opts) ->
     compress(collapse(Data, <<>>), Opts).
@@ -171,40 +171,29 @@ uncompress(Data, Opts) ->
 %% Compress
 %% --------------------------------------------------------------------
 
-compress_frame(Data, State, Acc) when byte_size(Data) =< ?MAX_FRAME ->
+compress_frame(Type, Data, State, Acc) when byte_size(Data) =< ?MAX_FRAME ->
     Matches = compress_lz77d(Data, State),
     {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
     Compressed = gather(Matches1, [Literal, varint(byte_size(Data))]),
     Max = trunc(byte_size(Data) * 0.98),
-    Frame = select_frame(iolist_size(Compressed), Max, Compressed, Data),
+    Frame = frame(Type, iolist_size(Compressed), Max, Compressed, Data),
     lists:reverse([Frame | Acc]);
-compress_frame(<<H:?MAX_FRAME/binary, T/binary>>, State, Acc) ->
+compress_frame(Type, <<H:?MAX_FRAME/binary, T/binary>>, State, Acc) ->
     Matches = compress_lz77d(H, State),
     {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
     Compressed = gather(Matches1, [Literal, varint(byte_size(H))]),
     Size = iolist_size(Compressed),
-    Frame = select_frame(Size, ?MAX_COMPRESSED, Compressed, H),
-    compress_frame(T, State, [Frame | Acc]).
+    Frame = frame(Type, Size, ?MAX_COMPRESSED, Compressed, H),
+    compress_frame(Type, T, State, [Frame | Acc]).
 
-compress_iwa(Data, State, Acc) when byte_size(Data) =< ?MAX_FRAME ->
-    Matches = compress_lz77d(Data, State),
-    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
-    Compressed = gather(Matches1, [Literal, varint(byte_size(Data))]),
-    Frame = [<<?COMPRESSED, (iolist_size(Compressed) + 4):?SIZE>>, Compressed],
-    lists:reverse([Frame | Acc]);
-compress_iwa(<<H:?MAX_FRAME/binary, T/binary>>, State, Acc) ->
-    Matches = compress_lz77d(H, State),
-    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
-    Compressed = gather(Matches1, [Literal, varint(byte_size(H))]),
-    Frame = [<<?COMPRESSED, (iolist_size(Compressed) + 4):?SIZE>>, Compressed],
-    compress_iwa(T, State, [Frame | Acc]).
-
-select_frame(Size, Max, Compressed, Data) when Size < Max ->
+frame(iwa, _, _, Compressed, _) ->
+    [<<?COMPRESSED, (iolist_size(Compressed)):?SIZE>>, Compressed];
+frame(_,Size, Max, Compressed, Data) when Size < Max ->
     [<<?COMPRESSED,
        (iolist_size(Compressed) + 4):?SIZE,
        (checksum(Data)):?CHECK>>,
      Compressed];
-select_frame(_, _, _, Data) ->
+frame(_, _, _, _, Data) ->
     [<<?UNCOMPRESSED, (iolist_size(Data) + 4):?SIZE, (checksum(Data)):?CHECK>>,
      Data].
 
