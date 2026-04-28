@@ -64,13 +64,15 @@
 %% Types
 
 -type block() :: binary().
--type frames() :: iolist() | binary().
+-type frames() :: iodata().
+-type iwa() :: iodata().
 
--type type() :: block | frame.
+-type type() :: block | frame | iwa.
 
 -type match() :: {non_neg_integer(), non_neg_integer(), byte() | -1}.
 
--type opt() :: return_type() |
+-type opt() :: return_type() | type() |
+               {return_type, return_type()} | {type, type()} |
                {search_length, 1..65536} |
                {lookahead_length, 1..64} |
                {type, type()}.
@@ -109,7 +111,9 @@ compress(Data = <<_/binary>>, Opts) ->
             {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
             return(gather(Matches1, [Literal, varint(byte_size(Data))]), State);
         State = #state{type = frame} ->
-            return(compress_frame(Data, State, [<<?IDENTIFIER>>]), State)
+            return(compress_frame(Data, State, [<<?IDENTIFIER>>]), State);
+        State = #state{type = iwa} ->
+            return(compress_iwa(Data, State, []), State)
     end;
 compress(Data, Opts) ->
     compress(collapse(Data, <<>>), Opts).
@@ -144,15 +148,20 @@ uncompress(Frame) -> uncompress(Frame, []).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec uncompress(block() | frames(), [opt()]) ->
+-spec uncompress(block() | frames() | iwa() , [opt()]) ->
           iolist() | binary().
 %%--------------------------------------------------------------------
 uncompress(IoList = [_ | _], Opts) ->
     uncompress(iolist_to_binary(IoList), Opts);
-uncompress(<<?IDENTIFIER, T/binary>>, Opts) ->
-    return(uncompress_frames(T, []), parse_opts(Opts));
-uncompress(Block, _) ->
-    uncompress_block(snappy_drop_varint(Block), <<>>).
+uncompress(Data, Opts) ->
+    case {parse_opts(Opts), Data} of
+        {State, <<?IDENTIFIER, T/binary>>} ->
+            return(uncompress_frames(T, []), State);
+        {State = #state{type = iwa}, _} ->
+            return(uncompress_iwa(Data, []), State);
+        {#state{type = block}, _} ->
+            uncompress_stream(Data)
+    end.
 
 %% ===================================================================
 %% Internal functions.
@@ -163,19 +172,32 @@ uncompress(Block, _) ->
 %% --------------------------------------------------------------------
 
 compress_frame(Data, State, Acc) when byte_size(Data) =< ?MAX_FRAME ->
-     Matches = compress_lz77d(Data, State),
+    Matches = compress_lz77d(Data, State),
     {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
-    Compressed = gather(Matches1, [Literal]),
+    Compressed = gather(Matches1, [Literal, varint(byte_size(Data))]),
     Max = trunc(byte_size(Data) * 0.98),
     Frame = select_frame(iolist_size(Compressed), Max, Compressed, Data),
     lists:reverse([Frame | Acc]);
 compress_frame(<<H:?MAX_FRAME/binary, T/binary>>, State, Acc) ->
     Matches = compress_lz77d(H, State),
     {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
-    Compressed = gather(Matches1, [Literal]),
+    Compressed = gather(Matches1, [Literal, varint(byte_size(H))]),
     Size = iolist_size(Compressed),
     Frame = select_frame(Size, ?MAX_COMPRESSED, Compressed, H),
     compress_frame(T, State, [Frame | Acc]).
+
+compress_iwa(Data, State, Acc) when byte_size(Data) =< ?MAX_FRAME ->
+    Matches = compress_lz77d(Data, State),
+    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
+    Compressed = gather(Matches1, [Literal, varint(byte_size(Data))]),
+    Frame = [<<?COMPRESSED, (iolist_size(Compressed) + 4):?SIZE>>, Compressed],
+    lists:reverse([Frame | Acc]);
+compress_iwa(<<H:?MAX_FRAME/binary, T/binary>>, State, Acc) ->
+    Matches = compress_lz77d(H, State),
+    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
+    Compressed = gather(Matches1, [Literal, varint(byte_size(H))]),
+    Frame = [<<?COMPRESSED, (iolist_size(Compressed) + 4):?SIZE>>, Compressed],
+    compress_iwa(T, State, [Frame | Acc]).
 
 select_frame(Size, Max, Compressed, Data) when Size < Max ->
     [<<?COMPRESSED,
@@ -299,7 +321,7 @@ collapse([H | T], Acc) -> collapse(T, collapse(H, Acc)).
 uncompress_frames(<<>>, Acc) -> lists:reverse(Acc);
 uncompress_frames(<<?COMPRESSED, T/binary>>, Acc) ->
     <<Size:?SIZE, Checksum:?CHECK, B:(Size - 4)/binary, T1/binary>> = T,
-    Data = uncompress_block(B, <<>>),
+    Data = uncompress_stream(B),
     Checksum = checksum(Data),
     uncompress_frames(T1, [Data | Acc]);
 uncompress_frames(<<?UNCOMPRESSED, T/binary>>, Acc) ->
@@ -313,6 +335,16 @@ uncompress_frames(<<Type, T/binary>>, Acc) when Type >= 16#80, Type =< 16#FD ->
     uncompress_frames(T1, Acc);
 uncompress_frames(<<Type, _/binary>>, _) ->
     erlang:error(badarg, [unskippabale_chunk, Type]).
+
+uncompress_iwa(<<>>, Acc) -> lists:reverse(Acc);
+uncompress_iwa(<<?COMPRESSED, T/binary>>, Acc) ->
+    <<Size:?SIZE, B:Size/binary, T1/binary>> = T,
+    Data = uncompress_stream(B),
+    uncompress_iwa(T1, [Data | Acc]);
+uncompress_iwa(_, _) ->
+    erlang:error(badarg, no_compressed_iwa_frame).
+
+uncompress_stream(Data) -> uncompress_block(drop_varint(Data), ~"").
 
 uncompress_block(<<>>, Acc) -> Acc;
 uncompress_block(<<S:6/integer, 0:2/integer, T/binary>>, Acc) ->
@@ -342,16 +374,22 @@ uncompress_copy(Pos, Len, T, Acc) ->
     C2 = binary:part(Acc, Start, Len rem Pos),
     uncompress_block(T, <<Acc/binary, C1/binary, C2/binary>>).
 
-snappy_drop_varint(<<1:1, _:7, T/binary>>) -> snappy_drop_varint(T);
-snappy_drop_varint(<<0:1, _:7, T/binary>>) -> T.
+drop_varint(<<1:1, _:7, T/binary>>) -> drop_varint(T);
+drop_varint(<<0:1, _:7, T/binary>>) -> T.
 
 %% --------------------------------------------------------------------
 %% Common Parts
 %% --------------------------------------------------------------------
 parse_opts(Opts) -> lists:foldl(fun parse_opt/2, #state{}, Opts).
 
+parse_opt(frame, State) -> State#state{type = frame};
+parse_opt(block, State) -> State#state{type = block};
+parse_opt(iwa, State) -> State#state{type = iwa};
+parse_opt(iolist, State) -> State#state{return = iolist};
+parse_opt(binary, State) -> State#state{return = binary};
 parse_opt({type, block}, State) -> State#state{type = block};
 parse_opt({type, frame}, State) -> State#state{type = frame};
+parse_opt({type, iwa}, State) -> State#state{type = iwa};
 parse_opt({return_type, iolist}, State) -> State#state{return = iolist};
 parse_opt({return_type, binary}, State) -> State#state{return = binary};
 parse_opt({search_length, L}, State) when L >= 1024 , L =< 65536 ->
