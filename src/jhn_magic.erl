@@ -41,6 +41,10 @@
 %%%    image/webp                                                      (rfc9649)
 %%%    text/calendar                                                   (rfc5545)
 %%%
+%%%  The following types are not registered with IANA but of interest
+%%%
+%%%    application/x-snappy-framed
+%%%
 %%%  The following types requires deeper analysis possibly including
 %%%  uncompressing the file and are only determined when the {deep, true} option
 %%%  is provided, if not the encapsulating type, e.g., application/zip.
@@ -92,6 +96,7 @@
 -define(JPEG_MAGIC, 16#FF, 16#D8, 16#FF).
 -define(PNG_MAGIC, 16#89, 16#50, 16#4E, 16#47, 16#0D, 16#0A, 16#1A, 16#0A).
 -define(WEBP_MAGIC, "RIFF", _:4/binary, "WEBPVP8").
+-define(SNAPPY_MAGIC, 16#FF, 6:24/integer-little, "sNaPpY").
 
 %% ===================================================================
 %% Library functions.
@@ -161,6 +166,7 @@ gen(<<?MS_MAGIC, T/binary>>, _) -> ms(T);
 gen(<<"%PDF-", _/binary>>, _) -> ~"application/pdf";
 gen(<<"%!PS", _/binary>>, _) -> ~"application/postscript";
 gen(<<"{\rtf", _/binary>>, _) -> ~"application/rtf";
+gen(<<?SNAPPY_MAGIC, _/binary>>, _) -> ~"application/snappy-framed";
 gen(<<"SQLite format 3", _/binary>>, _) -> ~"application/sqlite3";
 gen(ZIP = <<"PK", 3, 4, _/binary>>, #opts{deep = true}) -> zip(ZIP);
 gen(<<"PK", 3, 4, _/binary>>, #opts{deep = false}) -> ~"application/zip";

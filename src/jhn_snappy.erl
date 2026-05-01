@@ -17,6 +17,24 @@
 %%%-------------------------------------------------------------------
 %%% @doc
 %%%
+%%%  A compression lib based on the snappy format using a LZ77 dictionary
+%%%  approach. It will compress/uncompress both the block, framed, and
+%%%  apple framed formats. The snappy framed can also be padded.
+%%%
+%%   https://github.com/google/snappy
+%%%
+%%%  The options for the functions are:
+%%%    return_type: one of iolist or binary default iolist
+%%%    type: one of block/frame/iwa with the default block
+%%%    {search_length, Int}: setting the parameter for the encoding.
+%%%      The length has to be between 1 and 65536 inclusively and the
+%%%      default is 1095.
+%%%    {lookahead_length, Int}: setting the parameter for the encoding.
+%%%      The has to be between 4 and 64 inclusively and the default is 15.
+%%%
+%%%    Both the return_type and type can be provided as the tuple
+%%%    {Option, boolean()} where true will set it to that value.
+%%%
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -24,12 +42,6 @@
 %%%-------------------------------------------------------------------
 -module(jhn_snappy).
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
-
-%%
-%%  https://github.com/google/snappy
-%%  https://github.com/google/snappy/blob/main/framing_format.txt
-%%  https://github.com/google/snappy/blob/main/format_description.txt
-%%
 
 %% Library functions
 -export([compress/1, compress/2, pad/2, pad/3, uncompress/1, uncompress/2]).
@@ -86,9 +98,9 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: compress(Data) -> SnappyBlock
 %% @doc
-%%   
+%%   Equivalent to compress(Data, []).
 %% @end
 %%--------------------------------------------------------------------
 -spec compress(data()) -> block().
@@ -96,9 +108,10 @@
 compress(Data) -> compress(Data, []).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: compress(Data, Options) -> Snappy
 %% @doc
-%%   
+%%   Compresses the data into a snappy block, series of frames or iwa
+%%   frames depending on the options, either as a binary or iolist.
 %% @end
 %%--------------------------------------------------------------------
 -spec compress(data(), [opt()]) ->
@@ -120,9 +133,9 @@ compress(Data, Opts) ->
 
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: pad(SnappyFrames, Size) -> SnappyFrames
 %% @doc
-%%   
+%%   Equivalent to  pad(SnappyFrames, [])
 %% @end
 %%--------------------------------------------------------------------
 -spec pad(frames(), integer()) -> frames().
@@ -130,9 +143,10 @@ compress(Data, Opts) ->
 pad(Frames, Size) -> pad(Frames, Size, []).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: pad(SnappyFrames, Size, Opts) -> SnappyFrames
 %% @doc
-%%   
+%%   Adds pad frame of size Size at the end of the frames reurning a binary
+%%   or iolist (default) depending on the Opts.
 %% @end
 %%--------------------------------------------------------------------
 -spec pad(frames(), integer(), [opt()]) -> frames().
@@ -143,9 +157,9 @@ pad(Frames, Size, Opts) when Size > 4 ->
     return([Frames, Frame], parse_opts(Opts)).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: uncompress(Snappy) -> Data
 %% @doc
-%%   
+%%   Equivalent to uncompress(Snappy, []).
 %% @end
 %%--------------------------------------------------------------------
 -spec uncompress(block() | frames()) -> binary().
@@ -153,9 +167,11 @@ pad(Frames, Size, Opts) when Size > 4 ->
 uncompress(Frame) -> uncompress(Frame, []).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: uncompress(Snappy, Opts) -> Data
 %% @doc
-%%   
+%%   Uncompress a snappy block or sequence of frames or iwa frames depending
+%%   on the options and returning a binary or iolist also depending on the
+%%   options.
 %% @end
 %%--------------------------------------------------------------------
 -spec uncompress(block() | frames() | iwa() , [opt()]) ->

@@ -3,7 +3,7 @@ jhn_stdlib [(γ)][5]
 
 A few thought experiments solidified as code: CBOR, HPACK, JSON, MessagePack,
 syslog, URI, IP addresses, Timestamp, UUID, TypeID, mocking, cacerts,
-media type determination
+media type determination, snappy compression
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
@@ -78,6 +78,8 @@ Features/Modules
        * CRC32-C checksum -- ```jhn_hash:crc32c/1``` [rfc9260][33]
        * xxHash-32 checksum -- ```jhn_hash:xxh32/1```, ```jhn_hash:xxh32/2``` [xxHash][34]
     * Consistent Hashing -- ```jhn_chash:jump/2``` [J. Lamping, Eric Veach][28]
+    * Compression
+       * sNaPpY -- ```jhn_snappy``` [snappy][52]
   * Utility
      * Mocking -- ```jhn_shadow```
      * CA-Certs -- ```jhn_cacerts```
@@ -182,3 +184,4 @@ I know I really should.
   [49]: https://github.com/jetify-com/typeid/tree/main/spec "TypeID Specification (Version 0.3.0)"
   [50]: http://www.ietf.org/rfc/rfc7541.txt "HPACK: Header Compression for HTTP/2"
   [51]: https://www.iana.org/assignments/media-types/media-types.xhtml "Media Types"
+  [52]: https://github.com/google/snappy "snappy"
