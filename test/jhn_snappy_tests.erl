@@ -29,10 +29,10 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% Defines
--define(TEXTS, [<<"TOBEORNOTTOBE">>,
-                <<"YABBADABBADABBADOO">>,
-                <<"AAAAAAAAAAAAAAAAAA">>,
-                <<"abcbbcbaaaaaa">>
+-define(TEXTS, [~"TOBEORNOTTOBE",
+                ~"YABBADABBADABBADOO",
+                ~"AAAAAAAAAAAAAAAAAA",
+                ~"abcbbcbaaaaaa"
                ]).
 
 %% ===================================================================
@@ -53,49 +53,33 @@ compress_1_uncompress_1_test_() ->
 %% compress/1 <-> uncompress/1 Frame
 %%--------------------------------------------------------------------
 compress_1_frame_uncompress_1_test_() ->
+    JPG = jpeg(fireworks),
+    Alice = file(alice29),
+    HTML = file(html),
+    RFC2732 = rfc(2732),
+    RFC2818 = rfc(2818),
+    All = [JPG, Alice, HTML, RFC2732, RFC2818 | ?TEXTS],
     [?_test(
         ?assertEqual(
            T,
            jhn_snappy:uncompress(
              jhn_snappy:compress(T, [{type, frame}, {return_type, binary}]),
-             [{return_type, binary}]))) ||
-        T <- [jpeg(fireworks),
-              file(alice29), file(html),
-              rfc(2732), rfc(2818) | ?TEXTS]
+             [{return_type, binary}]))) || T <- All
     ] ++
     [?_test(
         ?assertEqual(
            T,
            jhn_snappy:uncompress(
-             jhn_snappy:compress(T, [iwa, binary]), [iwa, binary]))) ||
-        T <- [file(html)]
+             jhn_snappy:compress(T, [iwa, binary]),
+             [iwa, binary]))) || T <- All
+    ] ++
+    [?_test(
+        ?assertEqual(
+           T,
+           jhn_snappy:uncompress(
+             jhn_snappy:pad(jhn_snappy:compress(T, [frame, binary]), 64),
+             [binary]))) || T <- [JPG]
     ].
-
-%%--------------------------------------------------------------------
-%% Performance
-%%--------------------------------------------------------------------
-%% performance_test_() ->
-%%     [{timeout, 10,
-%%       ?_test(
-%%          ?assertEqual(
-%%             ok,
-%%             begin
-%%                 {Timec, D} =
-%%                     timer:tc(jhn_snappy, compress, [T, [{min_match, 8}]]),
-%%                 D1 = iolist_to_binary(D),
-%%                 {Timeu, _} = timer:tc(jhn_snappy, uncompress, [D1]),
-%%                 Size = byte_size(T),
-%%                 Percent = trunc(100* (byte_size(D1) / Size)),
-%%                 Speedc = (1000000 / Timec) * (Size / math:pow(2, 20)),
-%%                 Speedu = (1000000 / Timeu) * (Size / math:pow(2, 20)),
-%%                 ?debugFmt("~nsnappy ~p:~p ~p% ~.2..f:~.2..f MB/s ~pBytes~n",
-%%                           [Timec, Timeu, Percent, Speedc, Speedu, Size]),
-%%                 ok
-%%             end))} ||
-%%         T <- [jpeg(fireworks), file(alice29), file(html), rfc(2732), rfc(2818)]
-%%     ].
-
-
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================

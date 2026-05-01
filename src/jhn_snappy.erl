@@ -32,7 +32,7 @@
 %%
 
 %% Library functions
--export([compress/1, compress/2, pad/3, uncompress/1, uncompress/2]).
+-export([compress/1, compress/2, pad/2, pad/3, uncompress/1, uncompress/2]).
 
 %% Defines.
 
@@ -111,13 +111,23 @@ compress(Data = <<_/binary>>, Opts) ->
             {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
             return(gather(Matches1, [Literal, varint(byte_size(Data))]), State);
         State = #state{type = frame} ->
-            return(compress_frame(frame,Data, State, [<<?IDENTIFIER>>]), State);
+            return(compress_frames(frame,Data,State, [<<?IDENTIFIER>>]), State);
         State = #state{type = iwa} ->
-            return(compress_frame(iwa, Data, State, []), State)
+            return(compress_frames(iwa, Data, State, []), State)
     end;
 compress(Data, Opts) ->
     compress(collapse(Data, <<>>), Opts).
 
+
+%%--------------------------------------------------------------------
+%% Function: 
+%% @doc
+%%   
+%% @end
+%%--------------------------------------------------------------------
+-spec pad(frames(), integer()) -> frames().
+%%--------------------------------------------------------------------
+pad(Frames, Size) -> pad(Frames, Size, []).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -171,20 +181,21 @@ uncompress(Data, Opts) ->
 %% Compress
 %% --------------------------------------------------------------------
 
-compress_frame(Type, Data, State, Acc) when byte_size(Data) =< ?MAX_FRAME ->
-    Matches = compress_lz77d(Data, State),
-    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
-    Compressed = gather(Matches1, [Literal, varint(byte_size(Data))]),
+compress_frames(Type, Data, State, Acc) when byte_size(Data) =< ?MAX_FRAME ->
+    Compressed = compress_frame(Data, State),
     Max = trunc(byte_size(Data) * 0.98),
     Frame = frame(Type, iolist_size(Compressed), Max, Compressed, Data),
     lists:reverse([Frame | Acc]);
-compress_frame(Type, <<H:?MAX_FRAME/binary, T/binary>>, State, Acc) ->
-    Matches = compress_lz77d(H, State),
-    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
-    Compressed = gather(Matches1, [Literal, varint(byte_size(H))]),
+compress_frames(Type, <<H:?MAX_FRAME/binary, T/binary>>, State, Acc) ->
+    Compressed = compress_frame(H, State),
     Size = iolist_size(Compressed),
     Frame = frame(Type, Size, ?MAX_COMPRESSED, Compressed, H),
-    compress_frame(Type, T, State, [Frame | Acc]).
+    compress_frames(Type, T, State, [Frame | Acc]).
+
+compress_frame(Data, State) ->
+    Matches = compress_lz77d(Data, State),
+    {Literal, Matches1} = gather_literal(Matches, 0, <<>>),
+    gather(Matches1, [Literal, varint(byte_size(Data))]).
 
 frame(iwa, _, _, Compressed, _) ->
     [<<?COMPRESSED, (iolist_size(Compressed)):?SIZE>>, Compressed];
@@ -333,7 +344,7 @@ uncompress_iwa(<<?COMPRESSED, T/binary>>, Acc) ->
 uncompress_iwa(_, _) ->
     erlang:error(badarg, no_compressed_iwa_frame).
 
-uncompress_stream(Data) -> uncompress_block(drop_varint(Data), ~"").
+uncompress_stream(Data) -> uncompress_block(drop_varint(Data), <<>>).
 
 uncompress_block(<<>>, Acc) -> Acc;
 uncompress_block(<<S:6/integer, 0:2/integer, T/binary>>, Acc) ->
