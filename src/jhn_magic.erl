@@ -27,7 +27,9 @@
 %%%    application/gzip                                                (rfc6713)
 %%%    application/msword
 %%%    application/pdf                                                 (rfc8118)
+%%%    application/postscript                                          (rfc2045)
 %%%    application/rtf
+%%%    application/sqlite3
 %%%    application/vnd.ms-excel
 %%%    application/vnd.ms-powerpoint
 %%%    application/vnd.visio
@@ -44,6 +46,7 @@
 %%%  is provided, if not the encapsulating type, e.g., application/zip.
 %%%
 %%%    application/atom+xml                                            (rfc4287)
+%%%    application/epub+zip            (https://www.w3.org/TR/epub-overview-33/)
 %%%    application/vnd.ms-visio.drawing.main+xml
 %%%    application/vnd.openxmlformats-officedocument.wordprocessingml.document
 %%%    application/
@@ -156,9 +159,11 @@ gen(<<?APPLEFILE_DOUBLE_MAGIC, _/binary>>, _) -> ~"application/applefile";
 gen(<<?GZIP_MAGIC, _/binary>>, _) -> ~"application/gzip";
 gen(<<?MS_MAGIC, T/binary>>, _) -> ms(T);
 gen(<<"%PDF-", _/binary>>, _) -> ~"application/pdf";
+gen(<<"%!PS", _/binary>>, _) -> ~"application/postscript";
 gen(<<"{\rtf", _/binary>>, _) -> ~"application/rtf";
+gen(<<"SQLite format 3", _/binary>>, _) -> ~"application/sqlite3";
 gen(ZIP = <<"PK", 3, 4, _/binary>>, #opts{deep = true}) -> zip(ZIP);
-gen(<<"PK", 3:8, 4:8, _/binary>>, #opts{deep = false}) -> ~"application/zip";
+gen(<<"PK", 3, 4, _/binary>>, #opts{deep = false}) -> ~"application/zip";
 gen(XML = <<"<?xml", _/binary>>, #opts{deep = true}) -> xml(XML);
 gen(<<"<?xml", _/binary>>, #opts{deep = false}) -> ~"application/xml";
 gen(<<?BMP_MAGIC, _/binary>>, _) -> ~"image/bmp";
@@ -195,14 +200,20 @@ ms(<<"Visio", _/binary>>) -> ~"application/vnd.visio";
 ms(<<"Word", _/binary>>) -> ~"application/msword";
 ms(<<_, T/binary>>) ->  ms(T).
 
-
 zip(Z) ->
     {ok, Files} = zip:list_dir(Z),
     Names = [Name || #zip_file{name = Name} <- Files],
-    case lists:member("[Content_Types].xml", Names) of
-        true -> msooxml([hd(string:tokens(N, "/"))  || N <- Names]);
-        false -> ~"application/zip"
+    case zip_category(Names) of
+        zip -> ~"application/zip";
+        msooxml -> msooxml([hd(string:tokens(N, "/"))  || N <- Names]);
+        epub -> epub(Z)
     end.
+
+zip_category([]) -> zip;
+zip_category(["[Content_Types].xml" | _]) -> msooxml;
+zip_category(["mimetype" | _]) -> epub;
+zip_category(["Metadata" | _]) -> apple;
+zip_category([_ | T]) -> zip_category(T).
 
 msooxml([]) -> ~"application/zip";
 msooxml(["word" | _]) ->
@@ -216,3 +227,12 @@ msooxml(["visio" | _]) ->
     ~"application/vnd.ms-visio.drawing.main+xml";
 msooxml([_ | T]) ->
     msooxml(T).
+
+epub(Z) ->
+    {ok, H} = zip:zip_open(Z, [memory]),
+    {ok, {_, MimeType}} = zip:zip_get("mimetype", H),
+    zip:zip_close(H),
+    case MimeType of
+        <<"application/epub+zip", _/binary>> -> ~"application/epub+zip";
+        _ -> ~"application/zip"
+    end.

@@ -81,7 +81,7 @@ Features/Modules
   * Utility
      * Mocking -- ```jhn_shadow```
      * CA-Certs -- ```jhn_cacerts```
-     * Content type determination -- ```jhn_magic``` [media-types][51]
+     * Media type determination -- ```jhn_magic``` [media-types][51]
 
 <a name='deprecated'/>
 
