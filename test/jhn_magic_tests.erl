@@ -56,6 +56,15 @@
      "174\n"
      "%%EOF">>).
 
+-define(POSTSCRIPT,
+        <<"%!PS"
+          "/Courier"
+          "20 selectfont"
+          "72 500 moveto"
+          "(Hello world!) show"
+          "showpage">>).
+
+
 -define(PNG,
         <<137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,
           0,1,0,0,0,1,1,0,0,0,0,55,110,249,36,0,0,0,10,73,68,
@@ -85,6 +94,14 @@
 
 -define(RTF,
         ~"{\rtf1\ansi {\fonttbl\f0\fswiss Helvetica;} \f0\fs24 A RTF.}").
+
+-define(SQLITE3,
+        <<83, 81, 76, 105, 116, 101, 32, 102, 111, 114, 109, 97, 116, 32,
+          51, 0, 16, 0, 1, 1, 12, 64, 32, 32, 0, 0, 0, 1, 0, 0, 0, 1, 0,
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+          46, 110, 186, 13, 0, 0, 0, 0, 15, 244, 0:31912>>).
 
 -define(BMP,
         <<66, 77, 30, 0, 0, 0, 0, 0, 0, 0, 26, 0, 0, 0, 12, 0,
@@ -195,7 +212,9 @@ check_2_test_() ->
              {~"application/gzip", ?GZIP, true},
              {~"application/msword", file("file-sample_100kB.doc"), true},
              {~"application/pdf", ?PDF, true},
+             {~"application/postscript", ?POSTSCRIPT, true},
              {~"application/rtf", ?RTF, true},
+             {~"application/sqlite3", ?SQLITE3, true},
              {~"application/vnd.ms-excel",file("file_example_XLS_10.xls"),true},
              {~"application/vnd.ms-powerpoint",
               file("file_example_PPT_250kB.ppt"),
@@ -228,7 +247,8 @@ check_2_test_() ->
               true},
              {[~"application/rtf", ~"application/gzip", ~"application/zip"],
               ?ATOM,
-              false}
+              false},
+             {~"application/epub+zip", file("minimal.epub"), false}
             ]
     ].
 
@@ -240,6 +260,7 @@ media_check_3_test_() ->
         {Type, B, Result} <-
             [{~"application/atom+xml", ?ATOM, true},
              {~"application/pdf", ?PDF, true},
+             {~"application/postscript", ?POSTSCRIPT, true},
              {~"application/vnd.ms-visio.drawing.main+xml",
               file("computer-network.vsdx"),
               true},
@@ -262,7 +283,8 @@ media_check_3_test_() ->
              {[~"application/atom+xml",~"image/bmp",~"image/png"], ?ATOM,true},
              {[~"image/bmp", ~"application/atom+xml",~"image/png"], ?ATOM,true},
              {[~"image/bmp",~"image/png", ~"application/atom+xml"], ?ATOM,true},
-             {[~"image/bmp", ~"image/png"], ?ATOM, false}
+             {[~"image/bmp", ~"image/png"], ?ATOM, false},
+             {~"application/epub+zip", file("minimal.epub"), true}
             ]
     ].
 
@@ -277,7 +299,9 @@ media_type_1_test_() ->
              {~"application/gzip", ?GZIP},
              {~"application/msword", file("file-sample_100kB.doc")},
              {~"application/pdf", ?PDF},
+             {~"application/postscript", ?POSTSCRIPT},
              {~"application/rtf", ?RTF},
+             {~"application/sqlite3", ?SQLITE3},
              {~"application/vnd.ms-excel", file("file_example_XLS_10.xls")},
              {~"application/vnd.ms-powerpoint",
               file("file_example_PPT_250kB.ppt")},
@@ -294,7 +318,8 @@ media_type_1_test_() ->
              {~"image/webp", ?WEBP},
              {~"text/calendar", ?CAL},
              {undefined, ~"Foo"},
-             {undefined, ?MS}
+             {undefined, ?MS},
+             {~"application/zip", file("minimal.epub")}
             ]
     ].
 
@@ -306,6 +331,7 @@ media_type_2_test_() ->
         {Type, B} <-
             [{~"application/atom+xml", ?ATOM},
              {~"application/pdf", ?PDF},
+             {~"application/postscript", ?POSTSCRIPT},
              {~"application/vnd.ms-visio.drawing.main+xml",
               file("computer-network.vsdx")},
              {<<"application/"
@@ -320,7 +346,9 @@ media_type_2_test_() ->
               file("file_example_XLSX_10.xlsx")},
              {~"application/xml", ?XML},
              {~"application/zip", ?ZIP},
-             {~"application/zip", ?ZIP_CONTENT_TYPES}
+             {~"application/zip", ?ZIP_CONTENT_TYPES},
+             {~"application/epub+zip", file("minimal.epub")},
+             {~"application/zip", file("wrong_type.epub")}
             ]
     ].
 
