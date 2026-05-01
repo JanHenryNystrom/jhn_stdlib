@@ -198,6 +198,8 @@
           245,231,105,117,120,11,0,1,4,0,0,0,0,4,0,0,0,0,80,75,5,
           6,0,0,0,0,2,0,2,0,167,0,0,0,149,0,0,0,0,0>>).
 
+-define(SNAPPY, jhn_snappy:compress(file("rfc2818.txt"), [frame, binary])).
+
 %% ===================================================================
 %% Tests.
 %% ===================================================================
@@ -214,6 +216,7 @@ check_2_test_() ->
              {~"application/pdf", ?PDF, true},
              {~"application/postscript", ?POSTSCRIPT, true},
              {~"application/rtf", ?RTF, true},
+             {~"application/snappy-framed", ?SNAPPY, true},
              {~"application/sqlite3", ?SQLITE3, true},
              {~"application/vnd.ms-excel",file("file_example_XLS_10.xls"),true},
              {~"application/vnd.ms-powerpoint",
@@ -302,6 +305,7 @@ media_type_1_test_() ->
              {~"application/postscript", ?POSTSCRIPT},
              {~"application/rtf", ?RTF},
              {~"application/sqlite3", ?SQLITE3},
+             {~"application/snappy-framed", ?SNAPPY},
              {~"application/vnd.ms-excel", file("file_example_XLS_10.xls")},
              {~"application/vnd.ms-powerpoint",
               file("file_example_PPT_250kB.ppt")},

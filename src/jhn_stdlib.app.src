@@ -28,7 +28,9 @@
  [{description, "Jan Henry Nystrom's standard library,"
    "CBOR, HPACK, JSON, MessagePack, Syslog, URI, IP address, Timestamp, UUID,"
    "TypeID,prefix/range/T-trees, Bloom filters, HTTP client, Magic, "
-   "Mustache rendering,mocking, cacerts, and Server and FSM behaviours"},
+   "Mustache rendering, mocking, cacerts, media type determination, "
+   "snappy compression, "
+   "and Server and FSM behaviours"},
   {vsn, git},
   {registered, []},
   {applications, [kernel, stdlib, compiler]},
