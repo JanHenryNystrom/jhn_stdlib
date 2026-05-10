@@ -287,7 +287,8 @@ media_check_3_test_() ->
              {[~"image/bmp", ~"application/atom+xml",~"image/png"], ?ATOM,true},
              {[~"image/bmp",~"image/png", ~"application/atom+xml"], ?ATOM,true},
              {[~"image/bmp", ~"image/png"], ?ATOM, false},
-             {~"application/epub+zip", file("minimal.epub"), true}
+             {~"application/epub+zip", file("minimal.epub"), true},
+             {~"text/plain", ~"Foo", true}
             ]
     ].
 
@@ -323,7 +324,12 @@ media_type_1_test_() ->
              {~"text/calendar", ?CAL},
              {undefined, ~"Foo"},
              {undefined, ?MS},
-             {~"application/zip", file("minimal.epub")}
+             {~"application/zip", file("minimal.epub")},
+             {~"text/plain", <<16#EF, 16#BB, 16#BF, "Foo">>},
+             {~"text/plain", <<16#FE, 16#FF, "Foo">>},
+             {~"text/plain", <<16#FF, 16#FE, "Foo">>},
+             {~"text/plain", <<16#0, 16#0, 16#FE, 16#FF, "Foo">>},
+             {~"text/plain", <<16#FF, 16#FE, 16#0, 16#0, "Foo">>}
             ]
     ].
 
@@ -331,7 +337,7 @@ media_type_1_test_() ->
 %% media_type/2
 %%--------------------------------------------------------------------
 media_type_2_test_() ->
-    [?_test(?assertEqual(jhn_magic:media_type(B, [{deep, true}]), Type)) ||
+    [?_test(?assertEqual(jhn_magic:media_type(B, [deep]), Type)) ||
         {Type, B} <-
             [{~"application/atom+xml", ?ATOM},
              {~"application/pdf", ?PDF},
@@ -352,7 +358,43 @@ media_type_2_test_() ->
              {~"application/zip", ?ZIP},
              {~"application/zip", ?ZIP_CONTENT_TYPES},
              {~"application/epub+zip", file("minimal.epub")},
-             {~"application/zip", file("wrong_type.epub")}
+             {~"application/zip", file("wrong_type.epub")},
+             {~"text/plain", ~"Foo"},
+             {~"application/octet-stream", <<0, "Foo">>}
+            ]
+    ] ++
+    [?_test(?assertEqual(jhn_magic:media_type(B, Opts), Type)) ||
+        {Type, B, Opts} <-
+            [{~"application/pdf",
+              <<(jhn_blist:duplicate(100, $a))/binary, ?PDF/binary>>,
+             [{relax, true}]},
+             {~"application/postscript",
+              <<(jhn_blist:duplicate(100, $a))/binary, ?POSTSCRIPT/binary>>,
+             [{relax, true}]},
+             {undefined,
+              <<(jhn_blist:duplicate(1024, $a))/binary, ?PDF/binary>>,
+              [relax, {deep, false}]},
+             {~"application/pdf",
+              <<(jhn_blist:duplicate(1024, $a))/binary, ?PDF/binary>>,
+              [relax, deep]},
+             {~"application/postscript",
+              <<(jhn_blist:duplicate(1024, $a))/binary, ?POSTSCRIPT/binary>>,
+              [relax, deep]},
+             {~"text/plain",
+              <<(jhn_blist:duplicate(1024, $a))/binary, ?PDF/binary>>,
+              [deep]},
+             {undefined,
+              <<(jhn_blist:duplicate(255, $a))/binary, "foo">>,
+              [relax]},
+             {~"text/plain",
+              <<(jhn_blist:duplicate(1024, $a))/binary>>,
+              [relax, deep]},
+             {~"text/plain",
+              <<(jhn_blist:duplicate(1024, $a))/binary>>,
+              [{relax, true}, {deep, true}]},
+             {~"application/octet-stream",
+              <<(jhn_blist:duplicate(1024, $a))/binary, 0, "foo">>,
+              [relax, deep]}
             ]
     ].
 

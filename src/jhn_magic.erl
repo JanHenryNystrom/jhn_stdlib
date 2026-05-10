@@ -46,8 +46,9 @@
 %%%    application/x-snappy-framed
 %%%
 %%%  The following types requires deeper analysis possibly including
-%%%  uncompressing the file and are only determined when the {deep, true} option
-%%%  is provided, if not the encapsulating type, e.g., application/zip.
+%%%  uncompressing the file and are only determined when the deep or
+%%%  {deep, true} option is provided, if not the encapsulating type, e.g.,
+%%%   application/zip.
 %%%
 %%%    application/atom+xml                                            (rfc4287)
 %%%    application/epub+zip            (https://www.w3.org/TR/epub-overview-33/)
@@ -56,6 +57,17 @@
 %%%    application/
 %%%      vnd.openxmlformats-officedocument.presentationml.presentation
 %%%    application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+%%%    text/plain                                                     (rfc2046])
+%%%
+%%%  The following types are relaxed in that they might contain "non-standard"
+%%%  content as a ^D at the start of the file due to historical reasons
+%%%  and are only determined when the relax or {relax, true} option is
+%%%  provided, if not undefined might be returned.
+%%%  This will only scan a maximum 1024 octets of the data unless deep option
+%%%  is set.
+%%%
+%%%    application/pdf                                                 (rfc8118)
+%%%    application/postscript                                          (rfc2045)
 %%%
 %%%    So far only a few types are supported but more will be added.
 %%%
@@ -77,13 +89,15 @@
 -include_lib("stdlib/include/zip.hrl").
 
 %% Records
--record(opts, {deep = false  :: boolean()}).
+-record(opts, {deep  = false :: boolean(),
+               relax = false :: boolean()
+              }).
 
 %% Types
 -type media_type() :: binary().
 
 -type opts() :: [opt()].
--type opt() :: {atom(), _}.
+-type opt() :: deep | relax | {deep, boolean()} | {relax, boolean()}.
 
 %% Defines
 -define(APPLEFILE_SINGLE_MAGIC, 16#00, 16#05, 16#16, 16#00).
@@ -97,6 +111,17 @@
 -define(PNG_MAGIC, 16#89, 16#50, 16#4E, 16#47, 16#0D, 16#0A, 16#1A, 16#0A).
 -define(WEBP_MAGIC, "RIFF", _:4/binary, "WEBPVP8").
 -define(SNAPPY_MAGIC, 16#FF, 6:24/integer-little, "sNaPpY").
+-define(HUMAN_READABLE(X), X > 7, X < 14;
+                           X =:= 27;
+                           X > 31, X < 127;
+                           X == 133;
+                           X > 159).
+-define(UTF8_BOM, 16#EF, 16#BB, 16#BF).
+-define(UTF16BE_BOM, 16#FE, 16#FF).
+-define(UTF16LE_BOM, 16#FF, 16#FE).
+-define(UTF32BE_BOM, 16#0, 16#0, 16#FE, 16#FF).
+-define(UTF32LE_BOM, 16#FF, 16#FE, 16#0, 16#0).
+
 
 %% ===================================================================
 %% Library functions.
@@ -157,7 +182,10 @@ media_type(File, Opts) -> gen(File, lists:foldr(fun opt/2, #opts{}, Opts)).
 %% Internal functions.
 %% ===================================================================
 
-opt({deep, Bool}, Opts) when is_boolean(Bool) -> Opts#opts{deep = Bool}.
+opt({deep, Bool}, Opts) when is_boolean(Bool) -> Opts#opts{deep = Bool};
+opt({relax, Bool}, Opts) when is_boolean(Bool) -> Opts#opts{relax = Bool};
+opt(deep, Opts) -> Opts#opts{deep = true};
+opt(relax, Opts) -> Opts#opts{relax = true}.
 
 gen(<<?APPLEFILE_SINGLE_MAGIC, _/binary>>, _) -> ~"application/applefile";
 gen(<<?APPLEFILE_DOUBLE_MAGIC, _/binary>>, _) -> ~"application/applefile";
@@ -179,8 +207,15 @@ gen(<<?JPEG_MAGIC, _/binary>>, _) -> ~"image/jpeg";
 gen(<<?PNG_MAGIC, _/binary>>, _) -> ~"image/png";
 gen(<<?WEBP_MAGIC, _/binary>>, _) -> ~"image/webp";
 gen(<<"BEGIN:VCALENDAR", _/binary>>, _) -> ~"text/calendar";
+gen(<<?UTF32BE_BOM, _/binary>>, _) -> ~"text/plain";
+gen(<<?UTF32LE_BOM, _/binary>>, _) -> ~"text/plain";
+gen(<<?UTF8_BOM, _/binary>>, _) -> ~"text/plain";
+gen(<<?UTF16BE_BOM, _/binary>>, _) -> ~"text/plain";
+gen(<<?UTF16LE_BOM, _/binary>>, _) -> ~"text/plain";
+gen(Data, #opts{deep = true, relax = true}) -> deep_relax_scan(Data, true);
+gen(TEXT, #opts{deep = true}) -> deep_scan(TEXT);
+gen(Data, #opts{relax = true}) -> relax_scan(Data, 1024);
 gen(_, _) -> undefined.
-
 
 xml(XML) ->
     case xml_type(XML) of
@@ -242,3 +277,22 @@ epub(Z) ->
         <<"application/epub+zip", _/binary>> -> ~"application/epub+zip";
         _ -> ~"application/zip"
     end.
+
+deep_scan(<<>>) -> ~"text/plain";
+deep_scan(<<H, T/binary>>) when ?HUMAN_READABLE(H) -> deep_scan(T);
+deep_scan(_) -> ~"application/octet-stream".
+
+deep_relax_scan(<<>>, true) -> ~"text/plain";
+deep_relax_scan(<<>>, false) -> ~"application/octet-stream";
+deep_relax_scan(<<"%PDF-", _/binary>>, _) -> ~"application/pdf";
+deep_relax_scan(<<"%!PS", _/binary>>, _) -> ~"application/postscript";
+deep_relax_scan(<<H, T/binary>>, F) when ?HUMAN_READABLE(H) ->
+    deep_relax_scan(T, F);
+deep_relax_scan(<<_, T/binary>>, _) ->
+    deep_relax_scan(T, false).
+
+relax_scan(<<>>, _) -> undefined;
+relax_scan(_, 0) -> undefined;
+relax_scan(<<"%PDF-", _/binary>>, _) -> ~"application/pdf";
+relax_scan(<<"%!PS", _/binary>>, _) -> ~"application/postscript";
+relax_scan(<<_, T/binary>>, N) -> relax_scan(T, N - 1).
