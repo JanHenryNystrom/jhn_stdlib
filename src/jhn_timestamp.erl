@@ -19,6 +19,7 @@
 %%%  A timestamp library based on:
 %%%    Date and Time on the Internet: Timestamps                       (rfc3339)
 %%%    Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content   (rfc7231)
+%%%    Date and time format                                            (iso8601)
 %%%
 %%%  The timestamp is represented as follows:
 %%%
@@ -54,6 +55,13 @@
 %%%  The fraction and offset parts are optional and defaults to 0 and Z.
 %%%  The precision of the fraction is default seconds, hence default fraction 0.
 %%%
+%%%  N.B. can only decode a subset of valid iso8601 timestamps, with or without
+%%%       separators and can have parts omitted from the least significant to
+%%%       the more significant and timezone may be omitted (defaults to Z).
+%%%       Date parts defaults to 1 and time ones to zero. The extended,
+%%%       week and, ordinal formats are not supported. And only fractionals
+%%%       for seconds.
+%%%
 %%% @end
 %%%
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -76,6 +84,7 @@
         {precision = seconds  :: precision(),
          continue = false     :: boolean(),
          rfc7231 = false      :: boolean(),
+         iso8601 = false      :: boolean(),
          return_type = iolist :: return_type()}).
 
 %% Types
@@ -108,7 +117,7 @@
 
 -type return_type() :: iolist | binary | list | posix | datetime.
 
--type opt() :: precision() | rfc7231 | return_type() | continue.
+-type opt() :: precision() | rfc7231 | iso8601 | return_type() | continue.
 
 %% Defines
 -define(SECONDS_PER_MINUTE, 60).
@@ -117,6 +126,8 @@
 -define(DAYS_PER_YEAR, 365).
 -define(DAYS_PER_LEAP_YEAR, 366).
 -define(EPOCH, 62167219200).
+
+-define(DIGIT(C), C >= 48, C =< 57).
 
 %% ===================================================================
 %% Library functions.
@@ -177,17 +188,21 @@ valid(Time) -> valid(Time, #opts{}).
 %% Function: valid(TimeStamp, Options) -> Boolean.
 %% @doc
 %%   Validates that a timestamp is correct in the format of
-%%   a rfc3339 or rfc7231 binary; posix integer; datetime or a stamp map.
+%%   a rfc3339, rfc7231 or iso8601 binary; posix integer; datetime or a
+%%   stamp map.
+%%
 %%   Options are:
 %%     seconds (default) -> second precision
 %%     milli -> milli second precision
 %%     micro -> micro second precision
 %%     nano -> nano second precision
 %%     rfc7231 -> rfc7231 format of the binary
+%%     iso8601 -> iso8601 format of the binary
 %%
-%%     N.B. for binary format in rfc7231 format the rfc7231 options must
-%%          provided and any precision other than seconds that must be
-%%          provided as an option otherwise the answer may be false.
+%%     N.B. for binary format in rfc7231 or iso8601 format the rfc7231 or
+%%          iso8601 options must be provided and any precision other than
+%%          seconds that must be provided as an option otherwise the answer
+%%          may be false.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -292,6 +307,7 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%     micro -> micro second precision
 %%     nano -> nano second precision
 %%     rfc7231 -> the binary is a rfc7231 compatible
+%%     iso8601 -> the binary is a iso8601 compatible
 %%     continue -> all remaining indata is returned when decoding a binary
 %% @end
 %%--------------------------------------------------------------------
@@ -300,6 +316,7 @@ decode(Binary) -> decode(Binary, #opts{}).
 %%--------------------------------------------------------------------
 decode(D = {{_,_,_}, {_, _, _}}, #opts{precision = P}) -> decode_datetime(D, P);
 decode(Binary, Opts = #opts{rfc7231 = true}) -> decode_rfc7231(Binary, Opts);
+decode(Binary, Opts = #opts{iso8601 = true}) -> decode_iso8601(Binary, Opts);
 decode(Binary, Opts = #opts{rfc7231 = false}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> decode(Binary, parse_opts(Opts, #opts{})).
 
@@ -534,6 +551,55 @@ decode_rfc7231(B, #opts{continue = Continue}) ->
         false -> Stamp
     end.
 
+decode_iso8601(B, #opts{continue = Continue}) ->
+    {StampX, BX} =
+        case decode_iso8601_part(4, $-, 1, B) of
+            {partial, Year, Month, Day, B1} ->
+                {#{year => Year, month => Month, day => Day,
+                   hour => 0, minute => 0, second => 0,
+                   offset => 'Z', fraction => 0}, B1};
+            {complete, Year, Month, Day, <<$T, B1/binary>>} ->
+                case decode_iso8601_part(2, $:, 0, B1) of
+                    {partial, Hour, Minute, Second, B2} ->
+                        {#{year => Year, month => Month, day => Day,
+                           hour => Hour, minute => Minute, second => Second,
+                           offset => 'Z', fraction => 0}, B2};
+                    {complete, Hour, Minute, Second, B2} ->
+                        {Fraction, Offset, B3} = get_fraction(B2),
+                        {#{year => Year, month => Month, day => Day,
+                           hour => Hour, minute => Minute, second => Second,
+                           offset => Offset, fraction => Fraction}, B3}
+                end;
+            {complete, Year, Month, Day, B1} ->
+                {#{year => Year, month => Month, day => Day,
+                   hour => 0, minute => 0, second => 0,
+                   offset => 'Z', fraction => 0}, B1}
+    end,
+    case Continue of
+        true -> {StampX, BX};
+        false -> StampX
+    end.
+
+
+decode_iso8601_part(N, Sep, D, B) ->
+    case decode_digit(N, B, [], []) of
+        {P1, <<Sep, B1/binary>>} ->
+            {P2, B2} = get_digit(2, B1, [], []),
+            case get_digit(2, B2, Sep,  []) of
+                no -> {partial, P1, P2, D, B2};
+                {P3, B3} -> {complete, P1, P2, P3, B3}
+            end;
+        {P1, B1} ->
+            case get_digit(2, B1, [], []) of
+                no -> {partial, P1, D, D, B1};
+                {P2, B2} ->
+                    case get_digit(2, B2, [], []) of
+                        no -> {partial, P1, P2, D, B2};
+                        {P3, B3} -> {complete, P1, P2, P3, B3}
+                end
+            end
+    end.
+
 skip_day(<<_:3/binary, ", ", T/binary>>) -> T.
 
 decode_month(<<"Jan ", T/binary>>) -> {1, T};
@@ -553,6 +619,15 @@ decode_digit(0, Binary, Skip, Acc) ->
     {list_to_integer(lists:reverse(Acc)), skip(Skip, Binary)};
 decode_digit(N, <<H, T/binary>>, Skip, Acc) ->
     decode_digit(N - 1, T, Skip, [H | Acc]).
+
+get_digit(N, <<Sep, Binary/binary>>, Sep, Acc) ->
+    get_digit(N, Binary, [], Acc);
+get_digit(0, Binary, [], Acc) ->
+    {list_to_integer(lists:reverse(Acc)), Binary};
+get_digit(N, <<H, T/binary>>, [], Acc) when ?DIGIT(H) ->
+    get_digit(N - 1, T, [], [H | Acc]);
+get_digit(_, _, _, _) ->
+    no.
 
 skip([], Binary) -> Binary;
 skip([H, _], <<H, T/binary>>) -> T;
@@ -582,6 +657,47 @@ decode_offset(B, Fraction, Sign) ->
         {'+', 0, 0} -> {Fraction, 'Z', B2};
         _ ->
             {Fraction, #{sign => Sign, hours => Hours, minutes => Minutes}, B2}
+    end.
+
+get_fraction(<<"Z", T/binary>>) -> {0, 'Z', T};
+get_fraction(<<"z", T/binary>>) -> {0, 'Z', T};
+get_fraction(<<"+", T/binary>>) -> get_offset(T, 0, '+');
+get_fraction(<<"-", T/binary>>) -> get_offset(T, 0, '-');
+get_fraction(<<".", T/binary>>) -> get_fraction(T, []);
+get_fraction(<<",", T/binary>>) -> get_fraction(T, []);
+get_fraction(T) -> {0, 'Z', T}.
+
+get_fraction(<<"Z", T/binary>>, Acc) ->
+    {list_to_integer(lists:reverse(Acc)), 'Z', T};
+get_fraction(<<"z", T/binary>>, Acc) ->
+    {list_to_integer(lists:reverse(Acc)), 'Z', T};
+get_fraction(<<"+", T/binary>>, Acc) ->
+    get_offset(T, list_to_integer(lists:reverse(Acc)), '+');
+get_fraction(<<"-", T/binary>>, Acc) ->
+    get_offset(T, list_to_integer(lists:reverse(Acc)), '-');
+get_fraction(<<H, T/binary>>, Acc) when ?DIGIT(H) ->
+    get_fraction(T, [H | Acc]);
+get_fraction(T, Acc) ->
+    {list_to_integer(lists:reverse(Acc)), 'Z', T}.
+
+get_offset(B, Fraction, Sign) ->
+    {Hours1, Minutes1, B3} =
+        case get_digit(2, B, [], []) of
+            {Hours, <<$:, B1/binary>>} ->
+                {Minutes, B2} = decode_digit(2, B1, [], []),
+                {Hours, Minutes, B2};
+            {Hours, B1} ->
+                case get_digit(2, B1, [], []) of
+                    no -> {Hours, 0, B1};
+                    {Minutes, B2} -> {Hours, Minutes, B2}
+                end
+        end,
+    case {Sign, Hours1, Minutes1} of
+        {'+', 0, 0} -> {Fraction, 'Z', B3};
+        _ ->
+            {Fraction,
+             #{sign => Sign, hours => Hours1, minutes => Minutes1},
+             B3}
     end.
 
 decode_posix(Seconds, Fraction) ->
@@ -680,4 +796,5 @@ parse_opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 parse_opt(posix, Opts) -> Opts#opts{return_type = posix};
 parse_opt(datetime, Opts) -> Opts#opts{return_type = datetime};
 parse_opt(rfc7231, Opts) -> Opts#opts{rfc7231 = true};
+parse_opt(iso8601, Opts) -> Opts#opts{iso8601 = true};
 parse_opt(_, _) -> erlang:error(badarg).
