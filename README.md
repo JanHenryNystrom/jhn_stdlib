@@ -52,7 +52,7 @@ Features/Modules
     * Syslog -- encoding/decoding  -- ```jhn_syslog``` [rfc5424][13], [rfc5427][14], [rfc6012][29]
   * Standards
     * IP Addresses -- encoding/decoding -- ```jhn_ip_addr``` [rfc4291][16], [rfc5952][17], [rfc4632][18]
-    * Timestamps -- generating/encoding/decoding -- ```jhn_timestamp``` [rfc3339][19], [rfc7231][21][iso8601][53]
+    * Timestamps -- generating/encoding/decoding -- ```jhn_timestamp``` [rfc3339][19], [rfc7231][21], [iso8601][53]
     * TypeID --  generating/encoding/decoding -- ```jhn_typeid``` [TypeID][49]
     * URI -- encoding/decoding -- ```jhn_uri``` [rfc3986][15]
     * UUID -- generating/encoding/decoding -- ```jhn_uuid``` [rfc9562][42], [rfc8141][45]
