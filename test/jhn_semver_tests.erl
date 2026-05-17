@@ -8,7 +8,10 @@ encode_1_test_() ->
     [?_test(?assertEqual(jhn_semver:encode(B), Version)) ||
         {Version, B} <-
             [{~"0.0.0", #{major => 0, minor => 0, patch => 0}},
-             {~"1.0.0", #{major => 1, minor => 0, patch => 0}}
+             {~"1.0.0", #{major => 1, minor => 0, patch => 0}},
+             {~"1.0.0-alpha.13.beta",
+              #{major => 1, minor => 0, patch => 0,
+                pre_release => [~"alpha", 13, ~"beta"]}}
             ]
     ].
 
@@ -20,20 +23,26 @@ decode_1_test_() ->
              {~"1.0", #{major => 1, minor => 0, patch => 0}},
              {~"1", #{major => 1, minor => 0, patch => 0}},
              {~"1.0.0-alpha",
-              #{major => 1, minor => 0, patch => 0, pre_release => ~"alpha"}},
+              #{major => 1, minor => 0, patch => 0, pre_release => [~"alpha"]}},
+             {~"1.0.0-alpha.beta",
+              #{major => 1, minor => 0, patch => 0,
+                pre_release => [~"alpha", ~"beta"]}},
+             {~"1.0.0-alpha.13.beta",
+              #{major => 1, minor => 0, patch => 0,
+                pre_release => [~"alpha", 13, ~"beta"]}},
              {~"1.0-alpha",
-              #{major => 1, minor => 0, patch => 0, pre_release => ~"alpha"}},
+              #{major => 1, minor => 0, patch => 0, pre_release => [~"alpha"]}},
              {~"1-alpha",
-              #{major => 1, minor => 0, patch => 0, pre_release => ~"alpha"}},
+              #{major => 1, minor => 0, patch => 0, pre_release => [~"alpha"]}},
              {~"1.0.0-alpha+123",
               #{major => 1, minor => 0, patch => 0,
-                pre_release => ~"alpha", build => ~"123"}},
+                pre_release => [~"alpha"], build => ~"123"}},
              {~"1.0-alpha+123",
               #{major => 1, minor => 0, patch => 0,
-                pre_release => ~"alpha", build => ~"123"}},
+                pre_release => [~"alpha"], build => ~"123"}},
              {~"1-alpha+123",
               #{major => 1, minor => 0, patch => 0,
-                pre_release => ~"alpha", build => ~"123"}},
+                pre_release => [~"alpha"], build => ~"123"}},
              {~"1.0.0+1.2.3",
               #{major => 1, minor => 0, patch => 0, build => ~"1.2.3"}},
              {~"1.0+123",

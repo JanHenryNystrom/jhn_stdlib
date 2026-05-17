@@ -22,8 +22,8 @@
 -type version_map()   :: #{major       := major(),
                            minor       := minor(),
                            patch       := patch(),
-                           pre_release => binary(),
-                           build       => binary()}.
+                           pre_release => pre_release(),
+                           build       => build()}.
 -type version_plist() :: jhn_plist:plist().
 -type version_tuple() :: {major(), minor(), patch()} |
                          {major(), minor(), patch(), pre_release(), undefined} |
@@ -33,7 +33,7 @@
 -type major()       :: non_neg_integer().
 -type minor()       :: non_neg_integer().
 -type patch()       :: non_neg_integer().
--type pre_release() :: binary().
+-type pre_release() :: [binary() | integer()].
 -type build()       :: binary().
 
 -type comparison() :: lt | gt | equal.
@@ -85,9 +85,9 @@ encode({Major, Minor, Patch, Pre, Build}) ->
           integer_to_binary(Patch)],
     PB = case {Pre, Build} of
              {undefined, undefined} -> [];
-             {Pre, undefined} -> [$-, Pre];
+             {Pre, undefined} -> [$-, encode_pre(Pre, [], [])];
              {undefined, Build} -> [$+, Build];
-             {Pre, Build} -> [$-, Pre, $+, Build]
+             {Pre, Build} -> [$-, encode_pre(Pre, [], []), $+, Build]
          end,
     iolist_to_binary([SV | PB]).
 
@@ -148,7 +148,17 @@ return(M = #{major := Major, minor := Minor, patch := Patch}, tuple) ->
     end.
 
 %% ===================================================================
-%% Dencoding
+%% Encoding
+%% ===================================================================
+
+encode_pre([], _, Acc) ->  lists:reverse(Acc);
+encode_pre([H | T], Sep, Acc) when is_integer(H) ->
+    encode_pre(T, $\., [integer_to_binary(H), Sep | Acc]);
+encode_pre([H | T], Sep, Acc) ->
+    encode_pre(T, $\., [H, Sep | Acc]).
+
+%% ===================================================================
+%% Decoding
 %% ===================================================================
 
 decode_strict(B) ->
@@ -156,7 +166,7 @@ decode_strict(B) ->
     {Minor, <<$., B2/binary>>} = digits(B1),
     case digits(B2) of
         {Patch, <<$-, B3/binary>>} ->
-            case pre_release(B3, <<>>) of
+            case pre_release(B3) of
                 {Pre, B4} ->
                     {#{major => Major, minor => Minor, patch => Patch,
                        pre_release => Pre},
@@ -188,7 +198,7 @@ decode_relaxed(B) ->
                             {#{major => Major, minor => Minor, patch => Patch},
                              <<>>};
                         {Patch, <<$-, B3/binary>>} ->
-                            case pre_release(B3, <<>>) of
+                            case pre_release(B3) of
                                 {Pre, B4} ->
                                     {#{major => Major,
                                        minor => Minor,
@@ -213,7 +223,7 @@ decode_relaxed(B) ->
                              B3}
                     end;
                 {Minor, <<$-, B2/binary>>} ->
-                    case pre_release(B2, <<>>) of
+                    case pre_release(B2) of
                         {Pre, B3} ->
                             {#{major => Major, minor => Minor, patch => 0,
                                pre_release => Pre},
@@ -232,7 +242,7 @@ decode_relaxed(B) ->
                     {#{major => Major, minor => Minor, patch => 0}, B2}
             end;
         {Major, <<$-, B1/binary>>} ->
-            case pre_release(B1, <<>>) of
+            case pre_release(B1) of
                 {Pre, B2} ->
                     {#{major => Major, minor => 0, patch => 0,
                        pre_release => Pre},
@@ -256,14 +266,28 @@ digits(<<>>, Acc) -> {list_to_integer(lists:reverse(Acc)), <<>>};
 digits(<<H, T/binary>>, Acc) when ?DIGIT(H) -> digits(T, [H | Acc]);
 digits(T, Acc) -> {list_to_integer(lists:reverse(Acc)), T}.
 
-pre_release(<<>>, Acc) -> {Acc, <<>>};
-pre_release(<<H, T/binary>>, Acc) when ?CHAR(H) ->
-    pre_release(T, <<Acc/binary, H>>);
-pre_release(<<$+, T/binary>>, Acc) ->
+pre_release(B) -> pre_release(B, [], true, <<>>).
+
+
+
+pre_release(<<>>, P, I, Acc = <<_, _/binary>>) ->
+    {lists:reverse([numeric(Acc, I) | P]), <<>>};
+pre_release(<<$\., H, T/binary>>, P, I, Acc) when ?DIGIT(H) ->
+    pre_release(T, [numeric(Acc, I) | P], true, <<H>>);
+pre_release(<<H, T/binary>>, P, true, Acc) when ?DIGIT(H) ->
+    pre_release(T, P, true, <<Acc/binary, H>>);
+pre_release(<<$\., H, T/binary>>, P, I, Acc) when ?CHAR(H) ->
+    pre_release(T, [numeric(Acc, I) | P], true, <<H>>);
+pre_release(<<H, T/binary>>, P, _, Acc) when ?CHAR(H) ->
+    pre_release(T, P, false, <<Acc/binary, H>>);
+pre_release(<<$+, T/binary>>, P, I, Acc) ->
     {Build, T1} = build(T, <<>>),
-    {Acc, Build, T1};
-pre_release(T, Acc) ->
-    {Acc, T}.
+    {lists:reverse([numeric(Acc, I) | P]), Build, T1};
+pre_release(T, P, I, Acc) ->
+    {lists:reverse([numeric(Acc, I) | P]), T}.
+
+numeric(B, true) -> binary_to_integer(B);
+numeric(B, false) -> B.
 
 build(<<>>, Acc) -> {Acc, <<>>};
 build(<<$\., H, T/binary>>, Acc) when ?CHAR(H) ->
