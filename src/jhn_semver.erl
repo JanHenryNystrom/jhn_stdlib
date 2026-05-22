@@ -1,7 +1,7 @@
 -module(jhn_semver).
 -export([decode/1, decode/2, encode/1,
-         compare/2, between/3, check/3,
-         bump/2
+         compare/2, between/3, check/1, check/3,
+         bump/2, set_label/2
         ]).
 
 -define(DIGIT(C), C >= 48, C =< 57).
@@ -11,14 +11,17 @@
                  C >= 65, C =< 90;
                  C >= 97, C =< 122).
 
+-define(NON_DIGIT(C), C < 48; C > 58).
+
 -record(opts,
         {strict = false :: boolean(),
          continue = false :: boolean(),
          return_type = map :: version()
         }).
 
--type version() :: version_map() | version_plist() | version_tuple().
+-type bin_ver() :: binary() | version().
 
+-type version()       :: version_map() | version_plist() | version_tuple().
 -type version_map()   :: #{major       := major(),
                            minor       := minor(),
                            patch       := patch(),
@@ -36,11 +39,23 @@
 -type pre_release() :: [binary() | integer()].
 -type build()       :: binary().
 
--type comparison() :: lt | gt | equal.
+-type difference() :: lt | gt | eq.
+
+-type comparator() :: '<' | '=<' | '>' | '>=' | '=' | '~>'.
+-type limit()      :: '~>'.
+-type comparison() :: {comparator(), bin_ver(), bin_ver()}.
+-type operation()  :: comparison() |
+                      {operator(), operation()} |
+                      {operator(), operation(), operation()}.
+-type operator()   :: '&' | ';' | '!'.
+
+-type part() :: major | minor| patch.
 
 -type opt() :: strict | map | plist | tuple | continue |
                {strict, boolean()} | {continue, boolean()} |
                {return_type, map | plist | tuple}.
+
+-type label() :: pre_release | build.
 
 %% ===================================================================
 %% Library functions.
@@ -92,14 +107,12 @@ encode({Major, Minor, Patch, Pre, Build}) ->
     iolist_to_binary([SV | PB]).
 
 %%--------------------------------------------------------------------
--spec compare(version() | binary(), version() | binary()) -> comparison().
+-spec compare(bin_ver(), bin_ver()) -> difference().
 %%--------------------------------------------------------------------
 compare(V1, V2) -> do_compare(normalize(V1), normalize(V2)).
 
 %%--------------------------------------------------------------------
--spec between(version() | binary(),
-              version() | binary(),
-              version() | binary()) -> boolean().
+-spec between(bin_ver(), bin_ver(), bin_ver()) -> boolean().
 %%--------------------------------------------------------------------
 between(V1, V2, V3) ->
     V1N = normalize(V1),
@@ -115,14 +128,56 @@ between(V1, V2, V3) ->
     end.
 
 %%--------------------------------------------------------------------
--spec check(version() | binary(), version() | binary(), atom()) -> version().
+-spec check(operation()) -> boolean().
 %%--------------------------------------------------------------------
-check(_V1, _V2, _Check) -> tbd.
+check({'!', O}) -> not check(O);
+check({'&', O1, O2}) -> check(O1) andalso check(O2);
+check({';', O1, O2}) -> check(O1) orelse check(O2);
+check({Comparator, V1, V2}) -> check(Comparator, V1, V2).
 
 %%--------------------------------------------------------------------
--spec bump(atom(), version() | binary()) -> version().
+-spec check(comparator(), bin_ver(), bin_ver()) -> boolean();
+           (limit(), bin_ver(), binary()) -> boolean.
 %%--------------------------------------------------------------------
-bump(major, _V) -> tbd.
+%% '<' | '=<' | '>' | '>=' | '=' | '~>'.
+check('<',V1, V2) -> compare(V1, V2) == lt;
+check('=<',V1, V2) -> not compare(V1, V2) == gt;
+check('>', V1, V2) -> compare(V1, V2) == gt;
+check('>=',V1, V2) -> not compare(V1, V2) == lt;
+check('=', V1, V2) -> compare(V1, V2) == eq;
+check('~>', V1, V2) ->
+    NV1 = normalize(V1),
+    NV2 = normalize(V2),
+    case do_compare(NV1, NV2) of
+        gt -> false;
+        _ ->
+            NUV2 = normalize(decode_upper_limit(V2)),
+            case do_compare(NV1, NUV2) of
+                lt -> true;
+                _ -> false
+            end
+    end.
+
+%%--------------------------------------------------------------------
+-spec bump(part(), bin_ver()) -> version().
+%%--------------------------------------------------------------------
+bump(Part, V) ->
+    #{major := Major, minor := Minor, patch := Patch} = ensure_map(V),
+    case Part of
+        major -> #{major => Major + 1, minor => 0, patch => 0};
+        minor -> #{major => Major, minor => Minor + 1, patch => 0};
+        patch -> #{major => Major, minor => Minor, patch => Patch + 1}
+    end.
+
+%%--------------------------------------------------------------------
+-spec set_label(label(), bin_ver()) -> version().
+%%--------------------------------------------------------------------
+set_label(Label, L) ->
+    M = ensure_map(L),
+    case Label of
+        pre_release -> maps:remove(build, M#{pre_release => L});
+        build -> M#{build => L}
+    end.
 
 %% ===================================================================
 %% Internal functions.
@@ -181,7 +236,9 @@ decode_strict(B) ->
             {#{major => Major, minor => Minor, patch => Patch,
                build => Build},
              B4};
-        {Patch, B4} ->
+        {Patch, <<>>} ->
+            {#{major => Major, minor => Minor, patch => Patch}, <<>>};
+        {Patch, B4 = <<H, _/binary>>} when ?NON_DIGIT(H) ->
             {#{major => Major, minor => Minor, patch => Patch}, B4}
     end.
 
@@ -268,8 +325,6 @@ digits(T, Acc) -> {list_to_integer(lists:reverse(Acc)), T}.
 
 pre_release(B) -> pre_release(B, [], true, <<>>).
 
-
-
 pre_release(<<>>, P, I, Acc = <<_, _/binary>>) ->
     {lists:reverse([numeric(Acc, I) | P]), <<>>};
 pre_release(<<$\., H, T/binary>>, P, I, Acc) when ?DIGIT(H) ->
@@ -286,7 +341,8 @@ pre_release(<<$+, T/binary>>, P, I, Acc) ->
 pre_release(T, P, I, Acc) ->
     {lists:reverse([numeric(Acc, I) | P]), T}.
 
-numeric(B, true) -> binary_to_integer(B);
+numeric([$0], true) -> 0;
+numeric(B = <<H, _/binary>>, true) when ?POS_DIGIT(H) -> binary_to_integer(B);
 numeric(B, false) -> B.
 
 build(<<>>, Acc) -> {Acc, <<>>};
@@ -301,10 +357,10 @@ drop_v(<<$v, T/binary>>) -> T;
 drop_v(T) -> T.
 
 %% ===================================================================
-%% Comparison
+%% Compare
 %% ===================================================================
 
-do_compare(V, V) -> equal;
+do_compare(V, V) -> eq;
 do_compare({V, P1}, {V, P2}) ->
     case {P1, P2} of
         {_, undefined} -> lt;
@@ -325,3 +381,33 @@ normalize(Map = #{major := Major, minor := Minor, patch := Patch}) ->
         Pre -> {{Major, Minor, Patch}, Pre}
     end;
 normalize(PList = [_|_]) -> normalize(maps:from_list(PList)).
+
+decode_upper_limit(B) ->
+    case digits(drop_v(B)) of
+        {Major, <<$., B1/binary>>} ->
+            case digits(B1) of
+                {Minor, <<$., _/binary>>} -> {Major, Minor + 1, 0};
+                _ -> {Major + 1, 0, 0}
+            end;
+        {Major, _} ->
+            {Major + 1, 0, 0}
+    end.
+
+%% ===================================================================
+%% Misc
+%% ===================================================================
+
+ensure_map(V = #{}) -> V;
+ensure_map(V = [_ | _]) -> maps:from_list(V);
+ensure_map(V = <<_/binary>>) -> decode(V);
+ensure_map({Mj, Mi, P}) -> #{major => Mj, minor => Mi, patch => P};
+ensure_map({Mj, Mi, P, Pre, B}) ->
+    case {Pre, B} of
+        {undefined, undefined} -> #{major => Mj, minor => Mi, patch => P};
+        {undefined, _} -> #{major => Mj, minor => Mi, patch => P, build => B};
+        {_, undefined} ->
+            #{major => Mj, minor => Mi, patch => P, pre_release => Pre};
+        _ ->
+            #{major => Mj, minor => Mi, patch => P,
+              pre_release => Pre, build => B}
+    end.

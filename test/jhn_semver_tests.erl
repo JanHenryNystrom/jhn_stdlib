@@ -64,8 +64,8 @@ decode_2_test_() ->
 compare_2_test_() ->
     [?_test(?assertEqual(jhn_semver:compare(A, B), Result)) ||
         {A, B, Result} <-
-            [{~"0.0.0", #{major => 0, minor => 0, patch => 0}, equal},
-             {~"1.0.0", #{major => 1, minor => 0, patch => 0}, equal}
+            [{~"0.0.0", #{major => 0, minor => 0, patch => 0}, eq},
+             {~"1.0.0", #{major => 1, minor => 0, patch => 0}, eq}
             ]
     ].
 
