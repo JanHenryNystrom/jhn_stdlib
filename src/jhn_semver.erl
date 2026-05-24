@@ -16,7 +16,7 @@
 -record(opts,
         {strict = false :: boolean(),
          continue = false :: boolean(),
-         return_type = map :: version()
+         return_type = map :: map | plist | tuple
         }).
 
 -type bin_ver() :: binary() | version().
@@ -140,10 +140,10 @@ check({Comparator, V1, V2}) -> check(Comparator, V1, V2).
            (limit(), bin_ver(), binary()) -> boolean.
 %%--------------------------------------------------------------------
 %% '<' | '=<' | '>' | '>=' | '=' | '~>'.
-check('<',V1, V2) -> compare(V1, V2) == lt;
-check('=<',V1, V2) -> not compare(V1, V2) == gt;
+check('<', V1, V2) -> compare(V1, V2) == lt;
+check('=<', V1, V2) -> not (compare(V1, V2) == gt);
 check('>', V1, V2) -> compare(V1, V2) == gt;
-check('>=',V1, V2) -> not compare(V1, V2) == lt;
+check('>=', V1, V2) -> not (compare(V1, V2) == lt);
 check('=', V1, V2) -> compare(V1, V2) == eq;
 check('~>', V1, V2) ->
     NV1 = normalize(V1),
@@ -195,7 +195,7 @@ parse_opt({return_type, tuple} ,Opts) -> Opts#opts{return_type = tuple};
 parse_opt({return_type, plist}, Opts) -> Opts#opts{return_type = plist}.
 
 return(M, map) ->  M;
-return(M, plist) -> map:to_list(M);
+return(M, plist) -> maps:to_list(M);
 return(M = #{major := Major, minor := Minor, patch := Patch}, tuple) ->
     case {maps:get(pre_release, M, undefined), maps:get(build, M, undefined)} of
         {undefined, undefined} -> {Major, Minor, Patch};
@@ -332,7 +332,7 @@ pre_release(<<$\., H, T/binary>>, P, I, Acc) when ?DIGIT(H) ->
 pre_release(<<H, T/binary>>, P, true, Acc) when ?DIGIT(H) ->
     pre_release(T, P, true, <<Acc/binary, H>>);
 pre_release(<<$\., H, T/binary>>, P, I, Acc) when ?CHAR(H) ->
-    pre_release(T, [numeric(Acc, I) | P], true, <<H>>);
+    pre_release(T, [numeric(Acc, I) | P], false, <<H>>);
 pre_release(<<H, T/binary>>, P, _, Acc) when ?CHAR(H) ->
     pre_release(T, P, false, <<Acc/binary, H>>);
 pre_release(<<$+, T/binary>>, P, I, Acc) ->
@@ -341,7 +341,7 @@ pre_release(<<$+, T/binary>>, P, I, Acc) ->
 pre_release(T, P, I, Acc) ->
     {lists:reverse([numeric(Acc, I) | P]), T}.
 
-numeric([$0], true) -> 0;
+numeric(<<"0">>, true) -> 0;
 numeric(B = <<H, _/binary>>, true) when ?POS_DIGIT(H) -> binary_to_integer(B);
 numeric(B, false) -> B.
 
