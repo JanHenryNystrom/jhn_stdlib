@@ -53,7 +53,7 @@
          decode/2, decode/3]).
 
 %% Types
--type algo() :: standard | z85.
+-type algo() :: standard | crockford | z85.
 -type base() :: 32 | 45 | 85.
 -type alfabet() :: standard | hex | geohash.
 -type opt()     :: return_type() | {return_type, return_type()} |
@@ -114,12 +114,47 @@
          $n, $p, $q, $r, $s, $t, $u, $v, $w, $x,
          $y, $z}).
 -define(B32GEO_DECODE,
-        {u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,
-         u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,0,1,2,3,4,5,6,7,8,9,u,u,
-         u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,
-         u,u,u,u,u,u,u,u,10,11,12,13,14,15,16,u,17,18,u,19,20,u,21,
-         22,23,24,25,26,27,28,29,30,31}).
+        {u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,
+         0,1,2,3,4,5,6,7,8,9,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         10,11,12,13,14,15,16,
+         u,
+         17,18,
+         u,
+         19,20,
+         u,
+         21,22,23,24,25,26,27,28,29,30,31}).
 
+%% B32Crockford
+-define(B32CROCKFORD_ALFABET,
+        {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
+         $A, $B, $C, $D, $E, $F, $G, $H, $J, $K,
+         $M, $N, $P, $Q, $R, $S, $T, $V, $W, $X,
+         $Y, $Z}).
+-define(B32CROCKFORD_DECODE,
+        {u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,u,u,u,
+         u,u,u,u,u,u,u,
+         0,1,2,3,4,5,6,7,8,9,
+         u,u, u,u,u,u,u,
+         10,11,12,13,14,15,16,17,
+         u,
+         18,19,
+         u,
+         20,21,
+         u,
+         22,23,24,25,26,
+         u,
+         27,28,29,30,31}).
 %% B45
 -define(B45_ALFABET,
         {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
@@ -240,12 +275,15 @@ opt({alfabet, standard}, Opts) -> Opts#opts{alfabet = standard};
 opt({alfabet, hex}, Opts) -> Opts#opts{alfabet = hex};
 opt({alfabet, geohash}, Opts) -> Opts#opts{alfabet = geohash};
 opt({algo, standard}, Opts) -> Opts#opts{algo = standard};
+opt({algo, crockford}, Opts) -> Opts#opts{algo = crockford};
 opt({algo, z85}, Opts) -> Opts#opts{algo = z85}.
 
 %% --------------------------------------------------------------------
 %% Encode
 %% --------------------------------------------------------------------
 
+do_encode(32, B, #opts{algo = crockford}) ->
+    encode_crockford(B, ?B32CROCKFORD_ALFABET, []);
 do_encode(32, B, #opts{alfabet = standard}) ->
     encode_b32(B, ?B32_ALFABET, []);
 do_encode(32, B, #opts{alfabet = hex}) ->
@@ -305,6 +343,50 @@ encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:5, H:5, T/binary>>, Alfa, Acc) ->
            element(G + 1, Alfa),
            element(H + 1, Alfa)],
     encode_b32(T, Alfa, [Elt | Acc]).
+
+%% --------------------------------------------------------------------
+
+%% crockford
+encode_crockford(<<>>, _, Acc) -> lists:reverse(Acc);
+encode_crockford(<<A:5, B:3>>, Alfabet, Acc) ->
+    <<B1:5>> = <<B:3, 0:2>>,
+    Elt = [element(A + 1, Alfabet), element(B1 + 1, Alfabet)],
+    encode_crockford(<<>>, Alfabet, [Elt | Acc]);
+encode_crockford(<<A:5, B:5, C:5, D:1>>, Alfabet, Acc) ->
+    <<D1:5>> = <<D:1, 0:4>>,
+    Elt = [element(A + 1, Alfabet),
+           element(B + 1, Alfabet),
+           element(C + 1, Alfabet),
+           element(D1 + 1, Alfabet)],
+    encode_crockford(<<>>, Alfabet, [Elt | Acc]);
+encode_crockford(<<A:5, B:5, C:5, D:5, E:4>>, Alfabet, Acc) ->
+    <<E1:5>> = <<E:4, 0:1>>,
+    Elt = [element(A + 1, Alfabet),
+           element(B + 1, Alfabet),
+           element(C + 1, Alfabet),
+           element(D + 1, Alfabet),
+           element(E1 + 1, Alfabet)],
+    encode_crockford(<<>>, Alfabet, [Elt | Acc]);
+encode_crockford(<<A:5, B:5, C:5, D:5, E:5, F:5, G:2>>, Alfabet, Acc) ->
+    <<G1:5>> = <<G:2, 0:3>>,
+    Elt = [element(A + 1, Alfabet),
+           element(B + 1, Alfabet),
+           element(C + 1, Alfabet),
+           element(D + 1, Alfabet),
+           element(E + 1, Alfabet),
+           element(F + 1, Alfabet),
+           element(G1 + 1, Alfabet)],
+    encode_crockford(<<>>, Alfabet, [Elt | Acc]);
+encode_crockford(<<A:5, B:5, C:5, D:5, E:5,F:5,G:5,H:5,T/binary>>,Alfa, Acc) ->
+    Elt = [element(A + 1, Alfa),
+           element(B + 1, Alfa),
+           element(C + 1, Alfa),
+           element(D + 1, Alfa),
+           element(E + 1, Alfa),
+           element(F + 1, Alfa),
+           element(G + 1, Alfa),
+           element(H + 1, Alfa)],
+    encode_crockford(T, Alfa, [Elt | Acc]).
 
 %% --------------------------------------------------------------------
 
