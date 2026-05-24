@@ -27,11 +27,11 @@
 %%%      b32geo - https://github.com/nesterenko-kv/geohash/blob/main/README.md
 %%%               https://en.wikipedia.org/wiki/Geohash
 %%%               https://en.wikipedia.org/wiki/Base32
-%%%  z-base-32
-%%%       https://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
-%%%
 %%%  Crockford
 %%%    https://datatracker.ietf.org/doc/draft-crockford-davis-base32-for-humans/
+%%%
+%%%  z-base-32
+%%%       https://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
 %%%
 %%%
 %%%
@@ -67,6 +67,7 @@
                return_type = iolist   :: return_type()
               }).
 
+
 %% Defines
 
 %% B32
@@ -76,10 +77,17 @@
          $U, $V, $W, $X, $Y, $Z, $2, $3, $4, $5,
          $6, $7}).
 -define(B32_DECODE,
-        {u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,
-         u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,26,27,28,29,30,31,u,
-         u,u,u,u,u,u,u,u,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,
-         18,19,20,21,22,23,24,25}).
+        {u, u, u, u, u, u, u, u, u, u,
+         u, u, u, u, u, u, u, u, u, u,
+         u, u, u, u, u, u, u, u, u, u,
+         u, u, u, u, u, u, u, u, u, u,
+         u, u, u, u, u, u, u, u, u,
+         26, 27, 28, 29, 30, 31,
+         u, u, u, u, u, u, u, u, u,
+         0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+         10, 11, 12, 13, 14, 15, 16,
+         17, 18, 19, 20, 21, 22, 23,
+         24, 25}).
 
 %% B32hex
 -define(B32HEX_ALFABET,
@@ -88,10 +96,16 @@
          $K, $L, $M, $N, $O, $P, $Q, $R, $S, $T,
          $U, $V}).
 -define(B32HEX_DECODE,
-        {u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,
-         u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,0,1,2,3,4,5,6,7,8,9,u,u,
-         u,u,u,u,u,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,
-         26,27,28,29,30,31}).
+        {u, u, u, u, u, u, u, u, u, u,
+         u, u, u, u, u, u, u, u, u, u,
+         u, u, u, u, u, u, u, u, u, u,
+         u, u, u, u, u, u, u, u, u, u,
+         u, u, u, u, u, u, u,
+         0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+         u, u,  u, u, u, u, u,
+         10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+         20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+         30, 31}).
 
 %% B32geo
 -define(B32GEO_ALFABET,
@@ -115,9 +129,15 @@
          $+, $-, $\., $\/, $:
         }).
 -define(B45_DECODE,
-        {36, u, u, u, 37, 38, u, u, u, u, 39, 40, u, 41, 42,
-         43, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 44, u, u, u, u, u,
-         u, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+        {36,
+         u, u, u,
+         37, 38,
+         u, u, u, u,
+         39, 40,
+         u,
+         41, 42, 43, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 44,
+         u, u, u, u, u, u,
+         10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
          23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35}).
 
 %% Z85
