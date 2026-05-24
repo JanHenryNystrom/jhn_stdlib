@@ -38,8 +38,8 @@
 %%% Base 45 default standard, standard
 %%% b45 - The Base45 Data Encoding - rfc9285
 %%%
-%%% Base 85 default z85, standard
-%%% z85 - ZeroMQ spec:32/Z85
+%%% Base 85 default z85?, standard
+%%% z85 - ZeroMQ spec:32/Z85 - https://rfc.zeromq.org/spec/32/
 %%%
 %%% @end
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -53,16 +53,16 @@
          decode/2, decode/3]).
 
 %% Types
--type algo() :: standard | hex | z85.
+-type algo() :: standard | z85.
 -type base() :: 32 | 45 | 85.
 -type alfabet() :: standard | hex | geohash.
 -type opt()     :: return_type() | {return_type, return_type()} |
-                   {alpfabet, alfabet()}.
+                   {alpfabet, alfabet()} | {algo, algo()}.
 
 -type return_type() :: iolist | binary.
 
 %% Records
--record(opts, {algo = standard :: algo(),
+-record(opts, {algo        = standard :: algo(),
                alfabet     = standard :: alfabet() ,
                return_type = iolist   :: return_type()
               }).
@@ -178,9 +178,9 @@
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec encode(algo(), iodata()) -> iolist().
+-spec encode(base(), iodata()) -> iolist().
 %%--------------------------------------------------------------------
-encode(Algo, Data) -> encode(Algo, Data, []).
+encode(Base, Data) -> encode(Base, Data, []).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -188,13 +188,13 @@ encode(Algo, Data) -> encode(Algo, Data, []).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec encode(algo(), iodata(), [opt()]) -> iolist().
+-spec encode(base(), iodata(), [opt()]) -> iolist().
 %%--------------------------------------------------------------------
-encode(Algo, Data = [_ | _], Opts) ->
-    encode(Algo, iolist_to_binary(Data), Opts);
-encode(Algo, Data = <<_/binary>>, Opts) ->
+encode(Base, Data = [_ | _], Opts) ->
+    encode(Base, iolist_to_binary(Data), Opts);
+encode(Base, Data = <<_/binary>>, Opts) ->
     Opts1 = #opts{return_type = Return} = lists:foldr(fun opt/2, #opts{}, Opts),
-    Result = do_encode(Algo, Data, Opts1),
+    Result = do_encode(Base, Data, Opts1),
     case Return of
         iolist -> Result;
         binary -> iolist_to_binary(Result)
@@ -206,9 +206,9 @@ encode(Algo, Data = <<_/binary>>, Opts) ->
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec decode(algo(), iodata()) -> iolist().
+-spec decode(base(), iodata()) -> iolist().
 %%--------------------------------------------------------------------
-decode(Algo, Data) -> decode(Algo, Data, []).
+decode(Base, Data) -> decode(Base, Data, []).
 
 %%--------------------------------------------------------------------
 %% Function: 
@@ -216,13 +216,13 @@ decode(Algo, Data) -> decode(Algo, Data, []).
 %%   
 %% @end
 %%--------------------------------------------------------------------
--spec decode(algo(), iodata(), [opt()]) -> iolist().
+-spec decode(base(), iodata(), [opt()]) -> iolist().
 %%--------------------------------------------------------------------
-decode(Algo, Data = [_ | _], Opts) ->
-    decode(Algo, iolist_to_binary(Data), Opts);
-decode(Algo, Data = <<_/binary>>, Opts) ->
+decode(Base, Data = [_ | _], Opts) ->
+    decode(Base, iolist_to_binary(Data), Opts);
+decode(Base, Data = <<_/binary>>, Opts) ->
     Opts1 = #opts{return_type = Return} = lists:foldr(fun opt/2, #opts{}, Opts),
-    Result = do_decode(Algo, Data, Opts1),
+    Result = do_decode(Base, Data, Opts1),
     case Return of
         iolist -> Result;
         binary -> iolist_to_binary(Result)
@@ -238,18 +238,26 @@ opt({return_type, iolist}, Opts) -> Opts#opts{return_type = iolist};
 opt({return_type, binary}, Opts) -> Opts#opts{return_type = binary};
 opt({alfabet, standard}, Opts) -> Opts#opts{alfabet = standard};
 opt({alfabet, hex}, Opts) -> Opts#opts{alfabet = hex};
-opt({alfabet, geohash}, Opts) -> Opts#opts{alfabet = geohash}.
+opt({alfabet, geohash}, Opts) -> Opts#opts{alfabet = geohash};
+opt({algo, standard}, Opts) -> Opts#opts{algo = standard};
+opt({algo, z85}, Opts) -> Opts#opts{algo = z85}.
 
 %% --------------------------------------------------------------------
 %% Encode
 %% --------------------------------------------------------------------
 
-do_encode(b32, B, #opts{alfabet = standard}) -> encode_b32(B, ?B32_ALFABET, []);
-do_encode(b32, B, #opts{alfabet = hex}) -> encode_b32(B, ?B32HEX_ALFABET, []);
-do_encode(b32, B, #opts{alfabet = geohash}) ->
+do_encode(32, B, #opts{alfabet = standard}) ->
+    encode_b32(B, ?B32_ALFABET, []);
+do_encode(32, B, #opts{alfabet = hex}) ->
+    encode_b32(B, ?B32HEX_ALFABET, []);
+do_encode(32, B, #opts{alfabet = geohash}) ->
     encode_b32(B, ?B32GEO_ALFABET, []);
-do_encode(b45, B, _) -> encode_b45(B, []);
-do_encode(z85, B, _) when (byte_size(B) rem 4) == 0 -> encode_z85(B, []).
+do_encode(45, B, _) ->
+    encode_b45(B, []);
+do_encode(85, B, #opts{algo = z85}) when (byte_size(B) rem 4) == 0 ->
+    encode_z85(B, []).
+
+%% --------------------------------------------------------------------
 
 %% b32
 encode_b32(<<>>, _, Acc) -> lists:reverse(Acc);
@@ -298,7 +306,6 @@ encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:5, H:5, T/binary>>, Alfa, Acc) ->
            element(H + 1, Alfa)],
     encode_b32(T, Alfa, [Elt | Acc]).
 
-
 %% --------------------------------------------------------------------
 
 %% b45
@@ -314,6 +321,7 @@ encode_b45(<<A:16, T/binary>>, Acc) ->
     encode_b45(T, [[C, D, E] | Acc]).
 
 e_b45(X) -> element(X, ?B45_ALFABET).
+
 %% --------------------------------------------------------------------
 
 %% Z85
@@ -322,18 +330,23 @@ encode_z85(<<A, B, C, D, T/binary>>, Acc) ->
     V = (((((A * 256) + B) * 256) + C) * 256) + D,
     Es = [element((V div Div) rem 85 + 1, ?Z85_ALFABET) || Div <- ?Z85_85],
     encode_z85(T, [Es | Acc]).
+
 %% --------------------------------------------------------------------
 
 %% --------------------------------------------------------------------
 %% Decode
 %% --------------------------------------------------------------------
 
-do_decode(b32, B, #opts{alfabet = standard}) -> decode_b32(B, ?B32_DECODE, []);
-do_decode(b32, B, #opts{alfabet = hex}) -> decode_b32(B, ?B32HEX_DECODE, []);
-do_decode(b32, B, #opts{alfabet = geohash}) ->
+do_decode(32, B, #opts{alfabet = standard}) ->
+    decode_b32(B, ?B32_DECODE, []);
+do_decode(32, B, #opts{alfabet = hex}) ->
+    decode_b32(B, ?B32HEX_DECODE, []);
+do_decode(32, B, #opts{alfabet = geohash}) ->
     decode_b32(B, ?B32GEO_DECODE, []);
-do_decode(b45, B45, _) -> decode_b45(B45, []);
-do_decode(z85, Z85, _) when (byte_size(Z85) rem 5) == 0 -> decode_z85(Z85, []).
+do_decode(45, B45, _) ->
+    decode_b45(B45, []);
+do_decode(85, Z85, #opts{algo = z85}) when (byte_size(Z85) rem 5) == 0 ->
+    decode_z85(Z85, []).
 
 %% b32
 decode_b32(<<>>, _, Acc) -> lists:reverse(Acc);
@@ -387,6 +400,7 @@ decode_b45(<<C, D, E, T/binary>>, Acc) ->
     decode_b45(T, [[A, B] | Acc]).
 
 d_b45(C) -> element(C - 31, ?B45_DECODE).
+
 %% --------------------------------------------------------------------
 
 %% Z85
@@ -396,4 +410,5 @@ decode_z85(<<A, B, C, D, E, T/binary>>, Acc) ->
     decode_z85(T, [[(V div Div) rem 256 || Div <- ?Z85_256] | Acc]).
 
 d_z85(V, Pre) -> (Pre * 85) + element(V - 31, ?Z85_DECODE).
+
 %% --------------------------------------------------------------------
