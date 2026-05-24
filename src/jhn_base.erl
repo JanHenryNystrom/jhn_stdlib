@@ -31,11 +31,11 @@
 %%%    https://datatracker.ietf.org/doc/draft-crockford-davis-base32-for-humans/
 %%%
 %%%  Clockwork
+%%%       https://github.com/szktty/go-clockwork-base32
 %%%
 %%%  z-base-32
-%%%       https://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
-%%%
-%%%
+%%%    https://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
+%%%    Does not support binary/iolist deoding since it returns a bitstring only
 %%%
 %%% Base 45 default standard, standard
 %%% b45 - The Base45 Data Encoding - rfc9285
@@ -55,7 +55,7 @@
          decode/2, decode/3]).
 
 %% Types
--type algo() :: standard | crockford | z85.
+-type algo() :: standard | crockford | clockwork | zbase | z85.
 -type base() :: 32 | 45 | 85.
 -type alfabet() :: standard | hex | geohash.
 -type opt()     :: return_type() | {return_type, return_type()} |
@@ -157,6 +157,19 @@
          22,23,24,25,26,
          u,
          27,28,29,30,31}).
+
+%% B32Z
+-define(B32Z_ALFABET,
+        {$y, $b, $n, $d, $r, $f, $g, $8, $e,
+         $j, $k, $m, $c, $p, $q, $x, $o, $t,
+         $1, $u, $w, $i, $s, $z, $a, $3, $4,
+         $5, $h, $7, $6, $9}).
+-define(B32Z_DECODE,
+        {u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,
+   u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,18,u,25,26,27,30,29,7,
+   31,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,
+   u,u,u,u,u,u,u,u,u,u,u,24,1,12,3,8,5,6,28,21,9,10,u,11,2,16,
+   13,14,4,22,17,19,u,20,15,0,23}).
 %% B45
 -define(B45_ALFABET,
         {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
@@ -222,14 +235,14 @@ encode(Base, Data) -> encode(Base, Data, []).
 %%--------------------------------------------------------------------
 %% Function: 
 %% @doc
-%%   
+%%   May have to spec to handle bistrings
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(base(), iodata(), [opt()]) -> iolist().
 %%--------------------------------------------------------------------
 encode(Base, Data = [_ | _], Opts) ->
     encode(Base, iolist_to_binary(Data), Opts);
-encode(Base, Data = <<_/binary>>, Opts) ->
+encode(Base, Data, Opts) ->
     Opts1 = #opts{return_type = Return} = lists:foldr(fun opt/2, #opts{}, Opts),
     Result = do_encode(Base, Data, Opts1),
     case Return of
@@ -278,6 +291,8 @@ opt({alfabet, hex}, Opts) -> Opts#opts{alfabet = hex};
 opt({alfabet, geohash}, Opts) -> Opts#opts{alfabet = geohash};
 opt({algo, standard}, Opts) -> Opts#opts{algo = standard};
 opt({algo, crockford}, Opts) -> Opts#opts{algo = crockford};
+opt({algo, clockwork}, Opts) -> Opts#opts{algo = clockwork};
+opt({algo, zbase}, Opts) -> Opts#opts{algo = zbase};
 opt({algo, z85}, Opts) -> Opts#opts{algo = z85}.
 
 %% --------------------------------------------------------------------
@@ -285,45 +300,65 @@ opt({algo, z85}, Opts) -> Opts#opts{algo = z85}.
 %% --------------------------------------------------------------------
 
 do_encode(32, B, #opts{algo = crockford}) ->
-    encode_b32(B, ?B32CROCKFORD_ALFABET, false, []);
+    encode_b32(B, ?B32CROCKFORD_ALFABET, false, false, []);
+do_encode(32, B, #opts{algo = clockwork}) ->
+    encode_b32(B, ?B32CROCKFORD_ALFABET, false, false, []);
+do_encode(32, B, #opts{algo = zbase}) ->
+    encode_zbase(B, []);
 do_encode(32, B, #opts{alfabet = standard}) ->
-    encode_b32(B, ?B32_ALFABET, true, []);
+    encode_b32(B, ?B32_ALFABET, false, true, []);
 do_encode(32, B, #opts{alfabet = hex}) ->
-    encode_b32(B, ?B32HEX_ALFABET, true, []);
+    encode_b32(B, ?B32HEX_ALFABET, false, true, []);
 do_encode(32, B, #opts{alfabet = geohash}) ->
-    encode_b32(B, ?B32GEO_ALFABET, true, []);
+    encode_b32(B, ?B32GEO_ALFABET, false, true, []);
 do_encode(45, B, _) ->
     encode_b45(B, []);
 do_encode(85, B, #opts{algo = z85}) when (byte_size(B) rem 4) == 0 ->
     encode_z85(B, []).
 
 %% --------------------------------------------------------------------
-
 %% b32
-encode_b32(<<>>, _, _, Acc) -> lists:reverse(Acc);
-encode_b32(<<A:5, B:3>>, Alfabet, P, Acc) ->
+encode_b32(<<>>, _, _, _, Acc) -> lists:reverse(Acc);
+encode_b32(<<A:5, B:3>>, Alfabet, S, P, Acc) ->
     <<B1:5>> = <<B:3, 0:2>>,
-    encode_b32(<<>>, Alfabet, P, [e_b32(Alfabet, [A, B1], P, 6) | Acc]);
-encode_b32(<<A:5, B:5, C:5, D:1>>, Alfabet, P, Acc) ->
+    encode_b32(<<>>, Alfabet, S, P, [e_b32(Alfabet, [A, B1], P, 6) | Acc]);
+encode_b32(<<A:5, B:5, C:5, D:1>>, Alfabet, S, P, Acc) ->
     <<D1:5>> = <<D:1, 0:4>>,
-    encode_b32(<<>>, Alfabet, P, [e_b32(Alfabet, [A, B, C, D1], P, 4) | Acc]);
-encode_b32(<<A:5, B:5, C:5, D:5, E:4>>, Alfabet, P, Acc) ->
+    encode_b32(<<>>, Alfabet, S, P, [e_b32(Alfabet, [A, B, C, D1], P,4) | Acc]);
+encode_b32(<<A:5, B:5, C:5, D:5, E:4>>, Alfabet, S, P, Acc) ->
     <<E1:5>> = <<E:4, 0:1>>,
-    encode_b32(<<>>, Alfabet, P, [e_b32(Alfabet, [A, B, C, D, E1], P, 3) |Acc]);
-encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:2>>, Alfabet, P, Acc) ->
+    encode_b32(<<>>, Alfabet, S, P, [e_b32(Alfabet, [A, B, C, D,E1],P,3) |Acc]);
+encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:2>>, Alfabet, S, P, Acc) ->
     <<G1:5>> = <<G:2, 0:3>>,
     Elt = e_b32(Alfabet, [A, B, C, D, E, F, G1], P, 1),
-    encode_b32(<<>>, Alfabet, P, [Elt | Acc]);
-encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:5, H:5, T/binary>>, Alfa, P,Acc) ->
+    encode_b32(<<>>, Alfabet, S, P, [Elt | Acc]);
+encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:5, H:5,T/binary>>, Alfa,S,P,Acc) ->
     Elt = e_b32(Alfa, [A, B, C, D, E, F, G, H], P, 0),
-    encode_b32(T, Alfa, P, [Elt | Acc]).
+    encode_b32(T, Alfa, S, P, [Elt | Acc]).
 
 e_b32(Alfabet, Parts, false, _) -> [element(X + 1, Alfabet) || X <- Parts];
 e_b32(Alfabet, Parts, true, Pad) ->
     [[element(X + 1, Alfabet) || X <- Parts], lists:duplicate(Pad, $=)].
 
 %% --------------------------------------------------------------------
+%% zbase
+encode_zbase(<<>>, Acc) -> lists:reverse(Acc);
+encode_zbase(<<A:1>>, Acc) ->
+    <<A1:5>> = <<A:1, 0:4>>,
+    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALFABET) | Acc]);
+encode_zbase(<<A:2>>, Acc) ->
+    <<A1:5>> = <<A:2, 0:3>>,
+    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALFABET) | Acc]);
+encode_zbase(<<A:3>>, Acc) ->
+    <<A1:5>> = <<A:3, 0:2>>,
+    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALFABET) | Acc]);
+encode_zbase(<<A:4>>, Acc) ->
+    <<A1:5>> = <<A:4, 0:1>>,
+    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALFABET) | Acc]);
+encode_zbase(<<A:5, T/bits>>, Acc) ->
+    encode_zbase(T, [element(A + 1, ?B32Z_ALFABET) | Acc]).
 
+%% --------------------------------------------------------------------
 %% b45
 encode_b45(<<>>, Acc) -> lists:reverse(Acc);
 encode_b45(<<A>>, Acc) ->
@@ -355,6 +390,10 @@ encode_z85(<<A, B, C, D, T/binary>>, Acc) ->
 
 do_decode(32, B, #opts{algo = crockford}) ->
     decode_b32(crockford_filtermap(B, <<>>), ?B32CROCKFORD_DECODE, []);
+do_decode(32, B, #opts{algo = clockwork}) ->
+    decode_b32(clockwork_filtermap(B, <<>>), ?B32CROCKFORD_DECODE, []);
+do_decode(32, B, #opts{algo = zbase}) ->
+    decode_zbase(B, <<>>);
 do_decode(32, B, #opts{alfabet = standard}) ->
     decode_b32(B, ?B32_DECODE, []);
 do_decode(32, B, #opts{alfabet = hex}) ->
@@ -366,6 +405,7 @@ do_decode(45, B45, _) ->
 do_decode(85, Z85, #opts{algo = z85}) when (byte_size(Z85) rem 5) == 0 ->
     decode_z85(Z85, []).
 
+%% --------------------------------------------------------------------
 %% b32
 decode_b32(<<>>, _, Acc) -> lists:reverse(Acc);
 %% With padding 
@@ -382,7 +422,7 @@ decode_b32(<<A, B, C, D, E, F, G, $=>>, Alfabet, Acc) ->
     <<G1:2, 0:3>> = <<(element(G, Alfabet)):5>>,
     Elt = d_b32(Alfabet, [A, B, C, D, E, F], <<G1:2>>),
     decode_b32(<<>>, Alfabet, [Elt | Acc]);
-%% Without padding 
+%% Without padding
 decode_b32(<<A, B>>, Alfabet, Acc) ->
     <<B1:3, 0:2>> = <<(element(B, Alfabet)):5>>,
     decode_b32(<<>>, Alfabet, [d_b32(Alfabet, [A], <<B1:3>>) | Acc]);
@@ -405,7 +445,6 @@ d_b32(Alfabet, Parts, End) ->
     << (<< <<(element(X, Alfabet)):5>> || X <- Parts>>)/bits, End/bits>>.
 
 %% --------------------------------------------------------------------
-
 %% crockford
 
 crockford_filtermap(<<>>, Acc) -> Acc;
@@ -438,7 +477,44 @@ crockford_filtermap(<<H, T/binary>>, Acc) when H >= 97, H =< 122 ->
     crockford_filtermap(T, <<Acc/binary, (H - 32)>>).
 
 %% --------------------------------------------------------------------
+%% clockwork
 
+clockwork_filtermap(<<>>, Acc) -> Acc;
+clockwork_filtermap(<<$0>>, Acc) -> Acc;
+%%  Map
+%%  -> 0
+clockwork_filtermap(<<$0, T/binary>>, Acc) ->
+    clockwork_filtermap(T, <<Acc/binary, $0>>);
+clockwork_filtermap(<<$O, T/binary>>, Acc) ->
+    clockwork_filtermap(T, <<Acc/binary, $0>>);
+clockwork_filtermap(<<$o, T/binary>>, Acc) ->
+    clockwork_filtermap(T, <<Acc/binary, $0>>);
+%%  -> 1
+clockwork_filtermap(<<$1, T/binary>>, Acc) ->
+    clockwork_filtermap(T, <<Acc/binary, $1>>);
+clockwork_filtermap(<<$I, T/binary>>, Acc) ->
+    clockwork_filtermap(T, <<Acc/binary, $1>>);
+clockwork_filtermap(<<$L, T/binary>>, Acc) ->
+    clockwork_filtermap(T, <<Acc/binary, $1>>);
+clockwork_filtermap(<<$i, T/binary>>, Acc) ->
+    clockwork_filtermap(T, <<Acc/binary, $1>>);
+clockwork_filtermap(<<$l, T/binary>>, Acc) ->
+    clockwork_filtermap(T, <<Acc/binary, $1>>);
+%% -> Uppercase
+clockwork_filtermap(<<H, T/binary>>, Acc)
+  when H >= 50, H =< 57; H >= 65, H =< 90 ->
+    clockwork_filtermap(T, <<Acc/binary, H>>);
+clockwork_filtermap(<<H, T/binary>>, Acc) when H >= 97, H =< 122 ->
+    clockwork_filtermap(T, <<Acc/binary, (H - 32)>>).
+
+%% --------------------------------------------------------------------
+%% zbase
+decode_zbase(<<>>, Acc) -> Acc;
+decode_zbase(<<A, T/bits>>, Acc) ->
+    <<_:3, A1:5>> = <<(element(A, ?B32Z_DECODE)):8>>,
+    decode_zbase(T, <<Acc/bits, A1:5>>).
+
+%% --------------------------------------------------------------------
 %% B45
 decode_b45(<<>>, Acc) -> lists:reverse(Acc);
 decode_b45(<<C, D>>, Acc) ->
@@ -451,7 +527,6 @@ decode_b45(<<C, D, E, T/binary>>, Acc) ->
 d_b45(C) -> element(C - 31, ?B45_DECODE).
 
 %% --------------------------------------------------------------------
-
 %% Z85
 decode_z85(<<>>, Acc) -> lists:reverse(Acc);
 decode_z85(<<A, B, C, D, E, T/binary>>, Acc) ->
