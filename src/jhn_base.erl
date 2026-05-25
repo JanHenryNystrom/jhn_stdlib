@@ -17,8 +17,7 @@
 %%% @doc
 %%%  A binary data encodinglibrary providing support for a number of
 %%%  bases, algorithms and alphabets.
-%%%  If nothing else is specified the "standard" algorithm is used (with
-%%%  the exception of base85 where only the z85 algorithm currently provided).
+%%%  If nothing else is specified the "standard" algorithm is used .
 %%%  The algorithm and alphabet to use in encoding or decoding can be specified
 %%%  with options provided to encode/3 and decode/3. Further options are the
 %%%  for the return values of either an iolist or binary, with the exception of
@@ -40,13 +39,16 @@
 %%%  Clockwork: https://github.com/szktty/go-clockwork-base32
 %%%    * The clockwork algorithm (clockwork)
 %%%
-%%%  Z-Base-32: 
+%%%  Z-Base-32:
 %%%    https://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
 %%%    * The Z-Base-32 algorithm (zbase)
 %%%    Does not support binary/iolist deoding since it returns a bitstring only
 %%%
 %%%  rfc9285: The Base45 Data Encoding
 %%%     * Base 45 standard algorithm (standard)
+%%%
+%%%  Ascii85: https://en.wikipedia.org/wiki/Ascii85
+%%%     * The Base85 algorithm
 %%%
 %%%  ZeroMQ spec:32/Z85: https://rfc.zeromq.org/spec/32/
 %%%     * The ZeroMQ base85 algorithm (z85)
@@ -63,7 +65,13 @@
          decode/2, decode/3]).
 
 %% Types
--type algo() :: standard | crockford | clockwork | zbase | z85.
+-type algo() ::
+        %% base85, base45, base85
+        standard |
+        %% base32
+        crockford | clockwork | zbase |
+        %% base85
+        z85.
 -type base() :: 32 | 45 | 85.
 -type alphabet() :: standard | hex | geohash.
 -type opt()     :: return_type() | {return_type, return_type()} |
@@ -336,7 +344,10 @@ do_encode(32, B, #opts{alphabet = geohash}) ->
 do_encode(45, B, _) ->
     encode_b45(B, []);
 do_encode(85, B, #opts{algo = z85}) when (byte_size(B) rem 4) == 0 ->
-    encode_z85(B, []).
+    encode_z85(B, []);
+do_encode(85, B, _) when (byte_size(B) rem 4) == 0 ->
+    encode_b85(B, []).
+
 
 %% --------------------------------------------------------------------
 %% b32
@@ -396,15 +407,22 @@ encode_b45(<<A:16, T/binary>>, Acc) ->
 e_b45(X) -> element(X, ?B45_ALPHABET).
 
 %% --------------------------------------------------------------------
+%% b85
+encode_b85(<<>>, Acc) -> lists:reverse(Acc);
+encode_b85(<<0:32, T/binary>>, Acc) ->
+    encode_b85(T, [$z | Acc]);
+encode_b85(<<A, B, C, D, T/binary>>, Acc) ->
+    V = (((((A * 256) + B) * 256) + C) * 256) + D,
+    Es = [(V div Div) rem 85 + 33 || Div <- ?Z85_85],
+    encode_b85(T, [Es | Acc]).
 
+%% --------------------------------------------------------------------
 %% Z85
 encode_z85(<<>>, Acc) -> lists:reverse(Acc);
 encode_z85(<<A, B, C, D, T/binary>>, Acc) ->
     V = (((((A * 256) + B) * 256) + C) * 256) + D,
     Es = [element((V div Div) rem 85 + 1, ?Z85_ALPHABET) || Div <- ?Z85_85],
     encode_z85(T, [Es | Acc]).
-
-%% --------------------------------------------------------------------
 
 %% --------------------------------------------------------------------
 %% Decode
@@ -425,7 +443,9 @@ do_decode(32, B, #opts{alphabet = geohash}) ->
 do_decode(45, B45, _) ->
     decode_b45(B45, []);
 do_decode(85, Z85, #opts{algo = z85}) when (byte_size(Z85) rem 5) == 0 ->
-    decode_z85(Z85, []).
+    decode_z85(Z85, []);
+do_decode(85, B85, _) when (byte_size(B85) rem 5) == 0 ->
+    decode_b85(remove_whitespace(B85, <<>>), []).
 
 %% --------------------------------------------------------------------
 %% b32
@@ -547,6 +567,19 @@ decode_b45(<<C, D, E, T/binary>>, Acc) ->
     decode_b45(T, [[A, B] | Acc]).
 
 d_b45(C) -> element(C - 31, ?B45_DECODE).
+
+%% --------------------------------------------------------------------
+%% B85
+decode_b85(<<>>, Acc) -> lists:reverse(Acc);
+decode_b85(<<$z, T/binary>>, Acc) ->
+    decode_b85(T, [<<0:32>> | T]);
+decode_b85(<<A, B, C, D, E, T/binary>>, Acc) ->
+    V = lists:foldl(fun d_b85/2, 0, [A, B, C, D, E]),
+    decode_b85(T, [[(V div Div) rem 256 || Div <- ?Z85_256] | Acc]).
+
+d_b85(V, Pre) -> (Pre * 85) + V - 33.
+
+remove_whitespace(B) -> B.
 
 %% --------------------------------------------------------------------
 %% Z85
