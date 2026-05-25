@@ -3,7 +3,7 @@ jhn_stdlib [(γ)][5]
 
 A few thought experiments solidified as code: CBOR, HPACK, JSON, MessagePack,
 syslog, URI, IP addresses, Timestamp, UUID, TypeID, mocking, cacerts,
-media type determination, snappy compression
+media type determination, snappy compression, Base32, Base45, Base85
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
@@ -51,6 +51,9 @@ Features/Modules
     * MessagePack -- encoding/decoding -- ```jhn_msgpack``` [MessagePack][12]/Erlang
     * Syslog -- encoding/decoding  -- ```jhn_syslog``` [rfc5424][13], [rfc5427][14], [rfc6012][29]
   * Standards
+    * Base32 -- encoding/decoding -- ```jhn_base``` [rfc4648][54], [Base32Wiki][55], [Crockford][56], [Clockwork][57], [Z-Base-32][58]
+    * Base45 -- encoding/decoding -- ```jhn_base``` [rfc9285][59]
+    * Base85 -- encoding/decoding -- ```jhn_base``` [ZeroMQ spec:32/Z85][60]
     * IP Addresses -- encoding/decoding -- ```jhn_ip_addr``` [rfc4291][16], [rfc5952][17], [rfc4632][18]
     * Timestamps -- generating/encoding/decoding -- ```jhn_timestamp``` [rfc3339][19], [rfc7231][21], [iso8601][53]
     * TypeID --  generating/encoding/decoding -- ```jhn_typeid``` [TypeID][49]
@@ -186,3 +189,10 @@ I know I really should.
   [51]: https://www.iana.org/assignments/media-types/media-types.xhtml "Media Types"
   [52]: https://github.com/google/snappy "snappy"
   [53]: https://en.wikipedia.org/wiki/ISO_8601 "ISO 8601"
+  [54]: http://www.ietf.org/rfc/rfc4648.txt "The Base16, Base32, and Base64 Data Encodings"
+  [55]: https://en.wikipedia.org/wiki/Base32 "Base32"
+  [56]: https://datatracker.ietf.org/doc/draft-crockford-davis-base32-for-humans/ "Base32 for Humans"
+  [57]: https://github.com/szktty/go-clockwork-base32 "Clockwork Base32 for Go"
+  [58]: https://philzimmermann.com/docs/human-oriented-base-32-encoding.txt "human-oriented base-32 encoding"
+  [59]: http://www.ietf.org/rfc/rfc9285.txt "The Base45 Data Encoding"
+  [60]: https://rfc.zeromq.org/spec/32 "32/Z85"

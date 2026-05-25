@@ -29,7 +29,8 @@
    "CBOR, HPACK, JSON, MessagePack, Syslog, URI, IP address, Timestamp, UUID,"
    "TypeID,prefix/range/T-trees, Bloom filters, HTTP client, Magic, "
    "Mustache rendering, mocking, cacerts, media type determination, "
-   "snappy compression, "
+   "snappy compression, Base32(hex, Geohash, Crockford, Clockwork, Z-Base-32), "
+   "Base45, Base85(Z85), "
    "and Server and FSM behaviours"},
   {vsn, git},
   {registered, []},
