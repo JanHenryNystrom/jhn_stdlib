@@ -1,6 +1,41 @@
--module(jhn_base_tests).
+%%==============================================================================
+%% Copyright 2026 Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%% http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%==============================================================================
 
+%%%-------------------------------------------------------------------
+%%% @doc
+%%%   eunit unit tests for the jhn_base library module.
+%%% @end
+%%%
+%% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%% @copyright (C) 2026, Jan Henry Nystrom <JanHenryNystrom@gmail.com>
+%%%-------------------------------------------------------------------
+-module(jhn_base_tests).
+-copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
+
+%% Includes
 -include_lib("eunit/include/eunit.hrl").
+
+
+%% ===================================================================
+%% Tests.
+%% ===================================================================
+
+%% ===================================================================
+%% Encoding
+%% ===================================================================
 
 encode_2_test_() ->
     [?_test(?assertEqual(iolist_to_binary(jhn_base:encode(E, B)), Result)) ||
@@ -22,13 +57,13 @@ encode_2_test_() ->
 encode_3_test_() ->
     [?_test(?assertEqual(jhn_base:encode(E, B, O), Result)) ||
         {E, O, Result, B} <-
-            [{32, [{alfabet, hex}, binary], ~"", ~""},
-             {32, [{alfabet, hex}, binary], ~"CO======", ~"f"},
-             {32, [{alfabet, hex}, binary], ~"CPNG====", ~"fo"},
-             {32, [{alfabet, hex}, binary], ~"CPNMU===", ~"foo"},
-             {32, [{alfabet, hex}, binary], ~"CPNMUOG=", ~"foob"},
-             {32, [{alfabet, hex}, binary], ~"CPNMUOJ1", ~"fooba"},
-             {32, [{alfabet, hex}, binary], ~"CPNMUOJ1E8======", ~"foobar"},
+            [{32, [{alphabet, hex}, binary], ~"", ~""},
+             {32, [{alphabet, hex}, binary], ~"CO======", ~"f"},
+             {32, [{alphabet, hex}, binary], ~"CPNG====", ~"fo"},
+             {32, [{alphabet, hex}, binary], ~"CPNMU===", ~"foo"},
+             {32, [{alphabet, hex}, binary], ~"CPNMUOG=", ~"foob"},
+             {32, [{alphabet, hex}, binary], ~"CPNMUOJ1", ~"fooba"},
+             {32, [{alphabet, hex}, binary], ~"CPNMUOJ1E8======", ~"foobar"},
              {32, [{algo, crockford}, binary], ~"CR", ~"f"},
              {32, [{algo, crockford}, binary], ~"CSQG", ~"fo"},
              {32, [{algo, crockford}, binary], ~"CSQPY", ~"foo"},
@@ -68,6 +103,10 @@ encode_3_test_() ->
             ]
     ].
 
+%% ===================================================================
+%% Decoding
+%% ===================================================================
+
 decode_2_test_() ->
     [?_test(?assertEqual(iolist_to_binary(jhn_base:decode(E, B)), Result)) ||
         {E, Result, B} <-
@@ -86,13 +125,13 @@ decode_2_test_() ->
 decode_3_test_() ->
     [?_test(?assertEqual(jhn_base:decode(E, B, O), Result)) ||
         {E, O, Result, B} <-
-            [{32, [{alfabet, hex}, binary], ~"", ~""},
-             {32, [{alfabet, hex}, binary], ~"f", ~"CO======"},
-             {32, [{alfabet, hex}, binary], ~"fo", ~"CPNG===="},
-             {32, [{alfabet, hex}, binary], ~"foo", ~"CPNMU==="},
-             {32, [{alfabet, hex}, binary], ~"foob", ~"CPNMUOG="},
-             {32, [{alfabet, hex}, binary], ~"fooba", ~"CPNMUOJ1"},
-             {32, [{alfabet, hex}, binary], ~"foobar", ~"CPNMUOJ1E8======"},
+            [{32, [{alphabet, hex}, binary], ~"", ~""},
+             {32, [{alphabet, hex}, binary], ~"f", ~"CO======"},
+             {32, [{alphabet, hex}, binary], ~"fo", ~"CPNG===="},
+             {32, [{alphabet, hex}, binary], ~"foo", ~"CPNMU==="},
+             {32, [{alphabet, hex}, binary], ~"foob", ~"CPNMUOG="},
+             {32, [{alphabet, hex}, binary], ~"fooba", ~"CPNMUOJ1"},
+             {32, [{alphabet, hex}, binary], ~"foobar", ~"CPNMUOJ1E8======"},
              {32, [{algo, crockford}, binary], ~"f", ~"CR"},
              {32, [{algo, crockford}, binary], ~"fo", ~"CSQG"},
              {32, [{algo, crockford}, binary], ~"foo", ~"CSQPY"},
@@ -134,15 +173,19 @@ decode_3_test_() ->
             ]
     ].
 
+%% ===================================================================
+%% Encoding/Decoding
+%% ===================================================================
+
 encode_3_decode_3_test_() ->
     [?_test(?assertEqual(jhn_base:decode(E, jhn_base:encode(E, B, O), O), B)) ||
         {E, O, B} <-
-            [{32, [{alfabet, hex}, binary], ~""},
-             {32, [{alfabet, hex}, binary], ~"f"},
-             {32, [{alfabet, hex}, binary], ~"fo"},
-             {32, [{alfabet, hex}, binary], ~"foo"},
-             {32, [{alfabet, hex}, binary], ~"foob"},
-             {32, [{alfabet, hex}, binary], ~"fooba"},
-             {32, [{alfabet, hex}, binary], ~"foobar"}
+            [{32, [{alphabet, hex}, binary], ~""},
+             {32, [{alphabet, hex}, binary], ~"f"},
+             {32, [{alphabet, hex}, binary], ~"fo"},
+             {32, [{alphabet, hex}, binary], ~"foo"},
+             {32, [{alphabet, hex}, binary], ~"foob"},
+             {32, [{alphabet, hex}, binary], ~"fooba"},
+             {32, [{alphabet, hex}, binary], ~"foobar"}
             ]
     ].

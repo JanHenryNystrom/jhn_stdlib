@@ -15,33 +15,41 @@
 %%==============================================================================
 %%%-------------------------------------------------------------------
 %%% @doc
-%%%  A binary data encodinglibrary providing a bumber of algorithms
+%%%  A binary data encodinglibrary providing support for a number of
+%%%  bases, algorithms and alphabets.
+%%%  If nothing else is specified the "standard" algorithm is used (with
+%%%  the exception of base85 where only the z85 algorithm currently provided).
+%%%  The algorithm and alphabet to use in encoding or decoding can be specified
+%%%  with options provided to encode/3 and decode/3. Further options are the
+%%%  for the return values of either an iolist or binary, with the exception of
+%%%  the Z-Base-32 algorithm that returns a bitstring.
 %%%
-%%% Base 32 default standard, standard
-%%%  Aglorithm standard
-%%%    Alfabet standard
-%%%      b32 - The Base16, Base32, and Base64 Data Encodings - rfc4648
-%%%    Alfabet hex
-%%%      b32hex - The Base16, Base32, and Base64 Data Encodings - rfc4648
-%%%    Alfabet
-%%%      b32geo - https://github.com/nesterenko-kv/geohash/blob/main/README.md
-%%%               https://en.wikipedia.org/wiki/Geohash
-%%%               https://en.wikipedia.org/wiki/Base32
-%%%  Crockford
+%%%  The following documents are the base for the library
+%%%
+%%%  rfc4648: The Base16, Base32, and Base64 Data Encodings
+%%%   * Base32 standard algorithm (standard)
+%%%   * Base32 standard and hex alphabets (standard, hex)
+%%%
+%%%  The Base32 wikipage: https://en.wikipedia.org/wiki/Base32
+%%%   * The Geohash alphabet (geohash)
+%%%
+%%%  Crockford's Base32:
 %%%    https://datatracker.ietf.org/doc/draft-crockford-davis-base32-for-humans/
+%%%    * Crockford base32 algorithm (crockford)
 %%%
-%%%  Clockwork
-%%%       https://github.com/szktty/go-clockwork-base32
+%%%  Clockwork: https://github.com/szktty/go-clockwork-base32
+%%%    * The clockwork algorithm (clockwork)
 %%%
-%%%  z-base-32
+%%%  Z-Base-32: 
 %%%    https://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
+%%%    * The Z-Base-32 algorithm (zbase)
 %%%    Does not support binary/iolist deoding since it returns a bitstring only
 %%%
-%%% Base 45 default standard, standard
-%%% b45 - The Base45 Data Encoding - rfc9285
+%%%  rfc9285: The Base45 Data Encoding
+%%%     * Base 45 standard algorithm (standard)
 %%%
-%%% Base 85 default z85?, standard
-%%% z85 - ZeroMQ spec:32/Z85 - https://rfc.zeromq.org/spec/32/
+%%%  ZeroMQ spec:32/Z85: https://rfc.zeromq.org/spec/32/
+%%%     * The ZeroMQ base85 algorithm (z85)
 %%%
 %%% @end
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -57,23 +65,22 @@
 %% Types
 -type algo() :: standard | crockford | clockwork | zbase | z85.
 -type base() :: 32 | 45 | 85.
--type alfabet() :: standard | hex | geohash.
+-type alphabet() :: standard | hex | geohash.
 -type opt()     :: return_type() | {return_type, return_type()} |
-                   {alpfabet, alfabet()} | {algo, algo()}.
+                   {alpfabet, alphabet()} | {algo, algo()}.
 
 -type return_type() :: iolist | binary.
 
 %% Records
 -record(opts, {algo        = standard :: algo(),
-               alfabet     = standard :: alfabet() ,
+               alphabet     = standard :: alphabet() ,
                return_type = iolist   :: return_type()
               }).
-
 
 %% Defines
 
 %% B32
--define(B32_ALFABET,
+-define(B32_ALPHABET,
         {$A, $B, $C, $D, $E, $F, $G, $H, $I, $J,
          $K, $L, $M, $N, $O, $P, $Q, $R, $S, $T,
          $U, $V, $W, $X, $Y, $Z, $2, $3, $4, $5,
@@ -92,7 +99,7 @@
          24, 25}).
 
 %% B32hex
--define(B32HEX_ALFABET,
+-define(B32HEX_ALPHABET,
         {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
          $A, $B, $C, $D, $E, $F, $G, $H, $I, $J,
          $K, $L, $M, $N, $O, $P, $Q, $R, $S, $T,
@@ -110,7 +117,7 @@
          30, 31}).
 
 %% B32geo
--define(B32GEO_ALFABET,
+-define(B32GEO_ALPHABET,
         {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
          $b, $c, $d, $e, $f, $g, $h, $j, $k, $m,
          $n, $p, $q, $r, $s, $t, $u, $v, $w, $x,
@@ -135,7 +142,7 @@
          21,22,23,24,25,26,27,28,29,30,31}).
 
 %% B32Crockford
--define(B32CROCKFORD_ALFABET,
+-define(B32CROCKFORD_ALPHABET,
         {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
          $A, $B, $C, $D, $E, $F, $G, $H, $J, $K,
          $M, $N, $P, $Q, $R, $S, $T, $V, $W, $X,
@@ -159,7 +166,7 @@
          27,28,29,30,31}).
 
 %% B32Z
--define(B32Z_ALFABET,
+-define(B32Z_ALPHABET,
         {$y, $b, $n, $d, $r, $f, $g, $8, $e,
          $j, $k, $m, $c, $p, $q, $x, $o, $t,
          $1, $u, $w, $i, $s, $z, $a, $3, $4,
@@ -171,7 +178,7 @@
    u,u,u,u,u,u,u,u,u,u,u,24,1,12,3,8,5,6,28,21,9,10,u,11,2,16,
    13,14,4,22,17,19,u,20,15,0,23}).
 %% B45
--define(B45_ALFABET,
+-define(B45_ALPHABET,
         {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
          $A, $B, $C, $D, $E, $F, $G, $H, $I, $J,
          $K, $L, $M, $N, $O, $P, $Q, $R, $S, $T,
@@ -191,7 +198,7 @@
          23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35}).
 
 %% Z85
--define(Z85_ALFABET,
+-define(Z85_ALPHABET,
         {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
          $a, $b, $c, $d, $e, $f, $g, $h, $i, $j,
          $k, $l, $m, $n, $o, $p, $q, $r, $s, $e,
@@ -217,15 +224,15 @@
 -define(Z85_85, [52200625, 614125,  7225, 85, 1]).
 -define(Z85_256, [16777216, 65536, 256, 1]).
 
-
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: encode(Base, Data) -> Encoded
 %% @doc
-%%   
+%%   Encodes the data as an iolist using Base default algorithm and alphabet,
+%%   equivalent to encode(Base, Data, []).
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(base(), iodata()) -> iolist().
@@ -233,12 +240,19 @@
 encode(Base, Data) -> encode(Base, Data, []).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: encode(Base, Data, Opts) -> Encoded
 %% @doc
-%%   May have to spec to handle bistrings
+%%   Encodes the data as an iolist or binary according to  the Base.
+%%   Options
+%%     binary : returns a binary,
+%%     iolist : returns an iolist (default)
+%%     {return_type, binary | iolist}: returns what is specified
+%%     {algo, Algo}: uses the algorithm Algo for encoding
+%%     {alphabet, A}: uses the alphabet for the encoding, must be
+%%                    compatible with the algorithm (no checks are done).
 %% @end
 %%--------------------------------------------------------------------
--spec encode(base(), iodata(), [opt()]) -> iolist().
+-spec encode(base(), iodata()| bitstring(), [opt()]) -> iolist().
 %%--------------------------------------------------------------------
 encode(Base, Data = [_ | _], Opts) ->
     encode(Base, iolist_to_binary(Data), Opts);
@@ -251,22 +265,30 @@ encode(Base, Data, Opts) ->
     end.
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: decode(Base, Encoded) -> Data
 %% @doc
-%%   
+%%   Decodes the data as an iolist using Base default algorithm and alphabet,
+%%   equivalent to decode(Base, Encoded, []).
 %% @end
 %%--------------------------------------------------------------------
--spec decode(base(), iodata()) -> iolist().
+-spec decode(base(), iodata()) -> iolist() | bitstring().
 %%--------------------------------------------------------------------
 decode(Base, Data) -> decode(Base, Data, []).
 
 %%--------------------------------------------------------------------
-%% Function: 
+%% Function: decode(Base, Encoded, Opts) -> Data
 %% @doc
-%%   
+%%   Decodes the data as an iolist, bitstring or binary according to  the Base.
+%%   Options
+%%     binary : returns a binary, not viable for Z-Base-32
+%%     iolist : returns an iolist (default)
+%%     {return_type, binary | iolist}: returns what is specified
+%%     {algo, Algo}: uses the algorithm Algo for decoding
+%%     {alphabet, A}: uses the alphabet for the decoding, must be
+%%                    compatible with the algorithm (no checks are done).
 %% @end
 %%--------------------------------------------------------------------
--spec decode(base(), iodata(), [opt()]) -> iolist().
+-spec decode(base(), iodata(), [opt()]) -> iolist() | bitstring().
 %%--------------------------------------------------------------------
 decode(Base, Data = [_ | _], Opts) ->
     decode(Base, iolist_to_binary(Data), Opts);
@@ -286,9 +308,9 @@ opt(iolist, Opts) -> Opts#opts{return_type = iolist};
 opt(binary, Opts) -> Opts#opts{return_type = binary};
 opt({return_type, iolist}, Opts) -> Opts#opts{return_type = iolist};
 opt({return_type, binary}, Opts) -> Opts#opts{return_type = binary};
-opt({alfabet, standard}, Opts) -> Opts#opts{alfabet = standard};
-opt({alfabet, hex}, Opts) -> Opts#opts{alfabet = hex};
-opt({alfabet, geohash}, Opts) -> Opts#opts{alfabet = geohash};
+opt({alphabet, standard}, Opts) -> Opts#opts{alphabet = standard};
+opt({alphabet, hex}, Opts) -> Opts#opts{alphabet = hex};
+opt({alphabet, geohash}, Opts) -> Opts#opts{alphabet = geohash};
 opt({algo, standard}, Opts) -> Opts#opts{algo = standard};
 opt({algo, crockford}, Opts) -> Opts#opts{algo = crockford};
 opt({algo, clockwork}, Opts) -> Opts#opts{algo = clockwork};
@@ -300,17 +322,17 @@ opt({algo, z85}, Opts) -> Opts#opts{algo = z85}.
 %% --------------------------------------------------------------------
 
 do_encode(32, B, #opts{algo = crockford}) ->
-    encode_b32(B, ?B32CROCKFORD_ALFABET, false, false, []);
+    encode_b32(B, ?B32CROCKFORD_ALPHABET, false, false, []);
 do_encode(32, B, #opts{algo = clockwork}) ->
-    encode_b32(B, ?B32CROCKFORD_ALFABET, false, false, []);
+    encode_b32(B, ?B32CROCKFORD_ALPHABET, false, false, []);
 do_encode(32, B, #opts{algo = zbase}) ->
     encode_zbase(B, []);
-do_encode(32, B, #opts{alfabet = standard}) ->
-    encode_b32(B, ?B32_ALFABET, false, true, []);
-do_encode(32, B, #opts{alfabet = hex}) ->
-    encode_b32(B, ?B32HEX_ALFABET, false, true, []);
-do_encode(32, B, #opts{alfabet = geohash}) ->
-    encode_b32(B, ?B32GEO_ALFABET, false, true, []);
+do_encode(32, B, #opts{alphabet = standard}) ->
+    encode_b32(B, ?B32_ALPHABET, false, true, []);
+do_encode(32, B, #opts{alphabet = hex}) ->
+    encode_b32(B, ?B32HEX_ALPHABET, false, true, []);
+do_encode(32, B, #opts{alphabet = geohash}) ->
+    encode_b32(B, ?B32GEO_ALPHABET, false, true, []);
 do_encode(45, B, _) ->
     encode_b45(B, []);
 do_encode(85, B, #opts{algo = z85}) when (byte_size(B) rem 4) == 0 ->
@@ -319,44 +341,44 @@ do_encode(85, B, #opts{algo = z85}) when (byte_size(B) rem 4) == 0 ->
 %% --------------------------------------------------------------------
 %% b32
 encode_b32(<<>>, _, _, _, Acc) -> lists:reverse(Acc);
-encode_b32(<<A:5, B:3>>, Alfabet, S, P, Acc) ->
+encode_b32(<<A:5, B:3>>, Alphabet, S, P, Acc) ->
     <<B1:5>> = <<B:3, 0:2>>,
-    encode_b32(<<>>, Alfabet, S, P, [e_b32(Alfabet, [A, B1], P, 6) | Acc]);
-encode_b32(<<A:5, B:5, C:5, D:1>>, Alfabet, S, P, Acc) ->
+    encode_b32(<<>>, Alphabet, S, P, [e_b32(Alphabet, [A, B1], P, 6) | Acc]);
+encode_b32(<<A:5, B:5, C:5, D:1>>, Alphabet, S, P, Acc) ->
     <<D1:5>> = <<D:1, 0:4>>,
-    encode_b32(<<>>, Alfabet, S, P, [e_b32(Alfabet, [A, B, C, D1], P,4) | Acc]);
-encode_b32(<<A:5, B:5, C:5, D:5, E:4>>, Alfabet, S, P, Acc) ->
+    encode_b32(<<>>, Alphabet, S, P, [e_b32(Alphabet, [A, B, C, D1], P,4)|Acc]);
+encode_b32(<<A:5, B:5, C:5, D:5, E:4>>, Alphabet, S, P, Acc) ->
     <<E1:5>> = <<E:4, 0:1>>,
-    encode_b32(<<>>, Alfabet, S, P, [e_b32(Alfabet, [A, B, C, D,E1],P,3) |Acc]);
-encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:2>>, Alfabet, S, P, Acc) ->
+    encode_b32(<<>>, Alphabet, S, P, [e_b32(Alphabet, [A, B,C, D,E1],P,3)|Acc]);
+encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:2>>, Alphabet, S, P, Acc) ->
     <<G1:5>> = <<G:2, 0:3>>,
-    Elt = e_b32(Alfabet, [A, B, C, D, E, F, G1], P, 1),
-    encode_b32(<<>>, Alfabet, S, P, [Elt | Acc]);
-encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:5, H:5,T/binary>>, Alfa,S,P,Acc) ->
-    Elt = e_b32(Alfa, [A, B, C, D, E, F, G, H], P, 0),
-    encode_b32(T, Alfa, S, P, [Elt | Acc]).
+    Elt = e_b32(Alphabet, [A, B, C, D, E, F, G1], P, 1),
+    encode_b32(<<>>, Alphabet, S, P, [Elt | Acc]);
+encode_b32(<<A:5, B:5, C:5, D:5, E:5, F:5, G:5, H:5,T/binary>>,Alpha,S,P,Acc) ->
+    Elt = e_b32(Alpha, [A, B, C, D, E, F, G, H], P, 0),
+    encode_b32(T, Alpha, S, P, [Elt | Acc]).
 
-e_b32(Alfabet, Parts, false, _) -> [element(X + 1, Alfabet) || X <- Parts];
-e_b32(Alfabet, Parts, true, Pad) ->
-    [[element(X + 1, Alfabet) || X <- Parts], lists:duplicate(Pad, $=)].
+e_b32(Alphabet, Parts, false, _) -> [element(X + 1, Alphabet) || X <- Parts];
+e_b32(Alphabet, Parts, true, Pad) ->
+    [[element(X + 1, Alphabet) || X <- Parts], lists:duplicate(Pad, $=)].
 
 %% --------------------------------------------------------------------
 %% zbase
 encode_zbase(<<>>, Acc) -> lists:reverse(Acc);
 encode_zbase(<<A:1>>, Acc) ->
     <<A1:5>> = <<A:1, 0:4>>,
-    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALFABET) | Acc]);
+    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALPHABET) | Acc]);
 encode_zbase(<<A:2>>, Acc) ->
     <<A1:5>> = <<A:2, 0:3>>,
-    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALFABET) | Acc]);
+    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALPHABET) | Acc]);
 encode_zbase(<<A:3>>, Acc) ->
     <<A1:5>> = <<A:3, 0:2>>,
-    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALFABET) | Acc]);
+    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALPHABET) | Acc]);
 encode_zbase(<<A:4>>, Acc) ->
     <<A1:5>> = <<A:4, 0:1>>,
-    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALFABET) | Acc]);
+    encode_zbase(<<>>, [element(A1 + 1, ?B32Z_ALPHABET) | Acc]);
 encode_zbase(<<A:5, T/bits>>, Acc) ->
-    encode_zbase(T, [element(A + 1, ?B32Z_ALFABET) | Acc]).
+    encode_zbase(T, [element(A + 1, ?B32Z_ALPHABET) | Acc]).
 
 %% --------------------------------------------------------------------
 %% b45
@@ -371,7 +393,7 @@ encode_b45(<<A:16, T/binary>>, Acc) ->
     E = e_b45(A div 45 div 45 + 1),
     encode_b45(T, [[C, D, E] | Acc]).
 
-e_b45(X) -> element(X, ?B45_ALFABET).
+e_b45(X) -> element(X, ?B45_ALPHABET).
 
 %% --------------------------------------------------------------------
 
@@ -379,7 +401,7 @@ e_b45(X) -> element(X, ?B45_ALFABET).
 encode_z85(<<>>, Acc) -> lists:reverse(Acc);
 encode_z85(<<A, B, C, D, T/binary>>, Acc) ->
     V = (((((A * 256) + B) * 256) + C) * 256) + D,
-    Es = [element((V div Div) rem 85 + 1, ?Z85_ALFABET) || Div <- ?Z85_85],
+    Es = [element((V div Div) rem 85 + 1, ?Z85_ALPHABET) || Div <- ?Z85_85],
     encode_z85(T, [Es | Acc]).
 
 %% --------------------------------------------------------------------
@@ -394,11 +416,11 @@ do_decode(32, B, #opts{algo = clockwork}) ->
     decode_b32(clockwork_filtermap(B, <<>>), ?B32CROCKFORD_DECODE, []);
 do_decode(32, B, #opts{algo = zbase}) ->
     decode_zbase(B, <<>>);
-do_decode(32, B, #opts{alfabet = standard}) ->
+do_decode(32, B, #opts{alphabet = standard}) ->
     decode_b32(B, ?B32_DECODE, []);
-do_decode(32, B, #opts{alfabet = hex}) ->
+do_decode(32, B, #opts{alphabet = hex}) ->
     decode_b32(B, ?B32HEX_DECODE, []);
-do_decode(32, B, #opts{alfabet = geohash}) ->
+do_decode(32, B, #opts{alphabet = geohash}) ->
     decode_b32(B, ?B32GEO_DECODE, []);
 do_decode(45, B45, _) ->
     decode_b45(B45, []);
@@ -409,40 +431,40 @@ do_decode(85, Z85, #opts{algo = z85}) when (byte_size(Z85) rem 5) == 0 ->
 %% b32
 decode_b32(<<>>, _, Acc) -> lists:reverse(Acc);
 %% With padding 
-decode_b32(<<A, B, $=, $=, $=,$=, $=, $=>>, Alfabet, Acc) ->
-    <<B1:3, 0:2>> = <<(element(B, Alfabet)):5>>,
-    decode_b32(<<>>, Alfabet, [d_b32(Alfabet, [A], <<B1:3>>) | Acc]);
-decode_b32(<<A, B, C, D, $=, $=, $=, $=>>, Alfabet, Acc) ->
-    <<D1:1, 0:4>> = <<(element(D, Alfabet)):5>>,
-    decode_b32(<<>>, Alfabet, [d_b32(Alfabet, [A, B, C], <<D1:1>>) | Acc]);
-decode_b32(<<A, B, C, D, E, $=, $=, $=>>, Alfabet, Acc) ->
-    <<E1:4, 0:1>> = <<(element(E, Alfabet)):5>>,
-    decode_b32(<<>>, Alfabet, [d_b32(Alfabet, [A, B, C, D], <<E1:4>>) | Acc]);
-decode_b32(<<A, B, C, D, E, F, G, $=>>, Alfabet, Acc) ->
-    <<G1:2, 0:3>> = <<(element(G, Alfabet)):5>>,
-    Elt = d_b32(Alfabet, [A, B, C, D, E, F], <<G1:2>>),
-    decode_b32(<<>>, Alfabet, [Elt | Acc]);
+decode_b32(<<A, B, $=, $=, $=,$=, $=, $=>>, Alphabet, Acc) ->
+    <<B1:3, 0:2>> = <<(element(B, Alphabet)):5>>,
+    decode_b32(<<>>, Alphabet, [d_b32(Alphabet, [A], <<B1:3>>) | Acc]);
+decode_b32(<<A, B, C, D, $=, $=, $=, $=>>, Alphabet, Acc) ->
+    <<D1:1, 0:4>> = <<(element(D, Alphabet)):5>>,
+    decode_b32(<<>>, Alphabet, [d_b32(Alphabet, [A, B, C], <<D1:1>>) | Acc]);
+decode_b32(<<A, B, C, D, E, $=, $=, $=>>, Alphabet, Acc) ->
+    <<E1:4, 0:1>> = <<(element(E, Alphabet)):5>>,
+    decode_b32(<<>>, Alphabet, [d_b32(Alphabet, [A, B, C, D], <<E1:4>>) | Acc]);
+decode_b32(<<A, B, C, D, E, F, G, $=>>, Alphabet, Acc) ->
+    <<G1:2, 0:3>> = <<(element(G, Alphabet)):5>>,
+    Elt = d_b32(Alphabet, [A, B, C, D, E, F], <<G1:2>>),
+    decode_b32(<<>>, Alphabet, [Elt | Acc]);
 %% Without padding
-decode_b32(<<A, B>>, Alfabet, Acc) ->
-    <<B1:3, 0:2>> = <<(element(B, Alfabet)):5>>,
-    decode_b32(<<>>, Alfabet, [d_b32(Alfabet, [A], <<B1:3>>) | Acc]);
-decode_b32(<<A, B, C, D>>, Alfabet, Acc) ->
-    <<D1:1, 0:4>> = <<(element(D, Alfabet)):5>>,
-    decode_b32(<<>>, Alfabet, [d_b32(Alfabet, [A, B, C], <<D1:1>>) | Acc]);
-decode_b32(<<A, B, C, D, E>>, Alfabet, Acc) ->
-    <<E1:4, 0:1>> = <<(element(E, Alfabet)):5>>,
-    decode_b32(<<>>, Alfabet, [d_b32(Alfabet, [A, B, C, D], <<E1:4>>) | Acc]);
-decode_b32(<<A, B, C, D, E, F, G>>, Alfabet, Acc) ->
-    <<G1:2, 0:3>> = <<(element(G, Alfabet)):5>>,
-    Elt = d_b32(Alfabet, [A, B, C, D, E, F], <<G1:2>>),
-    decode_b32(<<>>, Alfabet, [Elt | Acc]);
+decode_b32(<<A, B>>, Alphabet, Acc) ->
+    <<B1:3, 0:2>> = <<(element(B, Alphabet)):5>>,
+    decode_b32(<<>>, Alphabet, [d_b32(Alphabet, [A], <<B1:3>>) | Acc]);
+decode_b32(<<A, B, C, D>>, Alphabet, Acc) ->
+    <<D1:1, 0:4>> = <<(element(D, Alphabet)):5>>,
+    decode_b32(<<>>, Alphabet, [d_b32(Alphabet, [A, B, C], <<D1:1>>) | Acc]);
+decode_b32(<<A, B, C, D, E>>, Alphabet, Acc) ->
+    <<E1:4, 0:1>> = <<(element(E, Alphabet)):5>>,
+    decode_b32(<<>>, Alphabet, [d_b32(Alphabet, [A, B, C, D], <<E1:4>>) | Acc]);
+decode_b32(<<A, B, C, D, E, F, G>>, Alphabet, Acc) ->
+    <<G1:2, 0:3>> = <<(element(G, Alphabet)):5>>,
+    Elt = d_b32(Alphabet, [A, B, C, D, E, F], <<G1:2>>),
+    decode_b32(<<>>, Alphabet, [Elt | Acc]);
 %% Recursive
-decode_b32(<<A, B, C, D, E, F, G, H, T/binary>>, Alfabet, Acc) ->
-    Elt = d_b32(Alfabet, [A, B, C, D, E, F, G, H], <<>>),
-    decode_b32(T, Alfabet, [Elt | Acc]).
+decode_b32(<<A, B, C, D, E, F, G, H, T/binary>>, Alphabet, Acc) ->
+    Elt = d_b32(Alphabet, [A, B, C, D, E, F, G, H], <<>>),
+    decode_b32(T, Alphabet, [Elt | Acc]).
 
-d_b32(Alfabet, Parts, End) ->
-    << (<< <<(element(X, Alfabet)):5>> || X <- Parts>>)/bits, End/bits>>.
+d_b32(Alphabet, Parts, End) ->
+    << (<< <<(element(X, Alphabet)):5>> || X <- Parts>>)/bits, End/bits>>.
 
 %% --------------------------------------------------------------------
 %% crockford
