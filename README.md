@@ -51,7 +51,7 @@ Features/Modules
     * MessagePack -- encoding/decoding -- ```jhn_msgpack``` [MessagePack][12]/Erlang
     * Syslog -- encoding/decoding  -- ```jhn_syslog``` [rfc5424][13], [rfc5427][14], [rfc6012][29]
   * Standards
-    * Base32 -- encoding/decoding -- ```jhn_base``` [rfc4648][54], [Base32Wiki][55][Crocford][56][Clockwork][57][Z-Base-32][58]
+    * Base32 -- encoding/decoding -- ```jhn_base``` [rfc4648][54], [Base32Wiki][55], [Crocford][56], [Clockwork][57], [Z-Base-32][58]
     * Base45 -- encoding/decoding -- ```jhn_base``` [rfc9285][59]
     * Base85 -- encoding/decoding -- ```jhn_base``` [ZeroMQ spec:32/Z85][60]
     * IP Addresses -- encoding/decoding -- ```jhn_ip_addr``` [rfc4291][16], [rfc5952][17], [rfc4632][18]
