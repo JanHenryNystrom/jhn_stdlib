@@ -128,7 +128,7 @@ request(Req, State) ->
 
 message(load, State = #state{interval = Interval}) ->
     erlang:send_after(Interval, self(), load),
-    load(),
+    try load() catch _:_ -> ok end,
     {hibernate, State};
 message(Msg, State) ->
     unexpected(message, Msg),
@@ -143,6 +143,14 @@ do_fetch() ->
         #{status := {200, _}, body := Body} ->
             [element(2, Cert) || Cert <- public_key:pem_decode(Body)];
         #{status := {_, Error}} ->
+            Report = #{message => ~"Load error",
+                       pid => self(),
+                       id => jhn_cacerts,
+                       ca_site => ?CASITE,
+                       error => Error},
+            logger:log(warning, Report),
+            fetch_local();
+        {error, Error} ->
             Report = #{message => ~"Load error",
                        pid => self(),
                        id => jhn_cacerts,
