@@ -367,6 +367,52 @@ decode_2_test_() ->
         D <- ?TENTHZB].
 
 %%--------------------------------------------------------------------
+%% rfc5545 Durations
+%%--------------------------------------------------------------------
+
+rfc5545_decode_1_test_() ->
+    [{B, ?_test(?assertEqual(M, jhn_timestamp:decode(B)))} ||
+        {M, B} <-
+            [%% Weeks format
+             {#{sign => '+', weeks => 17}, ~"P17W"},
+             {#{sign => '+', weeks => 17}, ~"+P17W"},
+             {#{sign => '-', weeks => 17}, ~"-P17W"},
+             {#{sign => '-', weeks => 17}, ~"-P17Whepp"},
+             %% Days format
+             {#{sign => '+', days => 1, hours => 1, minutes => 1, seconds => 1},
+              ~"P01DT01H01M01S"}
+            ]
+    ].
+
+%%--------------------------------------------------------------------
+%% iso8601 Durations
+%%--------------------------------------------------------------------
+
+%% iso8601_decode_3_test_() ->
+%%     [{B, ?_test(?assertEqual(M, jhn_timestamp:decode(B, [iso8601)))} ||
+%%         {M, B} <-
+%%             [%% Weeks format
+%%              {#{sign => '+', weeks => 17}, ~"P17W"},
+%%              {#{sign => '+', weeks => 17}, ~"+P17W"},
+%%              {#{sign => '-', weeks => 17}, ~"-P17W"},
+%%              {#{sign => '-', weeks => 17}, ~"-P17Whepp"},
+%%              %% Days format
+%%              {#{sign => '+', days => 1}, ~"P1D"}
+%%             ]
+%%     ].
+
+%% iso8601_encode_3_test_() ->
+%%     [{B, ?_test(?assertEqual(B, jhn_timestamp:encode(M, [iso8601])))} ||
+%%         {M, B} <-
+%%             [%% Weeks format
+%%              {#{sign => '+', weeks => 17}, ~"P17W"},
+%%              {#{sign => '-', weeks => 17}, ~"-P17W"},
+%%              %% Days format
+%%              {#{sign => '+', days => 1}, ~"P1D"}
+%%             ]
+%%     ].
+
+%%--------------------------------------------------------------------
 %% rfc7231
 %%--------------------------------------------------------------------
 rfc7231_test_() ->

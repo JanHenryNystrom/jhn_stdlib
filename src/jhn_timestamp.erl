@@ -18,6 +18,7 @@
 %%% @doc
 %%%  A timestamp library based on:
 %%%    Date and Time on the Internet: Timestamps                       (rfc3339)
+%%%    Internet Calendaring and Scheduling Core Object Specification   (rfc5545)
 %%%    Hypertext Transfer Protocol (HTTP/1.1): Semantics and Content   (rfc7231)
 %%%    Date and time format                                            (iso8601)
 %%%
@@ -55,6 +56,30 @@
 %%%  The fraction and offset parts are optional and defaults to 0 and Z.
 %%%  The precision of the fraction is default seconds, hence default fraction 0.
 %%%
+%%%  The Duration is represented as follows:
+%%%
+%%%  duration  :  #{weeks   => 0..99} |
+%%%               #{days    => 0..99,
+%%%                 hours   => hour(),
+%%%                 minute  => minute(),
+%%%                 seconds => second()}
+%%%
+%%%
+%%%
+%%%
+%%%  The durations are based on the rfc5545 3.3.6 with a postive or negative
+%%%  oveduration in either weeks or days with optional time or simply time
+%%%
+%%%  iso8601_duration : #{years   := pos_integer(),
+%%%                       months  := 0..11,
+%%%                       weeks   := 0..52,
+%%%                       days    := 0..365,
+%%%                       hours   := hour()
+%%%                       minutes := minute()
+%%%                       seconds := second()
+%%%
+%%%
+%%%
 %%%  N.B. can only decode a subset of valid iso8601 timestamps, with or without
 %%%       separators and can have parts omitted from the least significant to
 %%%       the more significant and timezone may be omitted (defaults to Z).
@@ -74,7 +99,9 @@
 -export([gen/0, gen/1,
          valid/1, valid/2,
          encode/1, encode/2,
-         decode/1, decode/2]).
+         decode/1, decode/2,
+         shift/2, shift/3
+        ]).
 
 %% Exported types
 -export_type([posix/0, stamp/0, datetime/0]).
@@ -114,6 +141,20 @@
 -type datetime() :: {{year(), month(), day()}, {hour(), minute(), second()}}.
 
 -type precision() :: seconds | milli | micro | nano.
+
+-type duration() :: #{weeks   => non_neg_integer()} |
+                    #{days    => non_neg_integer(),
+                      hours   => hour(),
+                      minute  => minute(),
+                      seconds => second()}.
+
+-type iso8601_duration() :: #{years   := pos_integer(),
+                              months  := 0..11,
+                              weeks   := 0..52,
+                              days    := 0..365,
+                              hours   := hour(),
+                              minutes := minute(),
+                              seconds := second()}.
 
 -type return_type() :: iolist | binary | list | posix | datetime.
 
@@ -320,6 +361,28 @@ decode(Binary, Opts = #opts{iso8601 = true}) -> decode_iso8601(Binary, Opts);
 decode(Binary, Opts = #opts{rfc7231 = false}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> decode(Binary, parse_opts(Opts, #opts{})).
 
+%%--------------------------------------------------------------------
+-spec shift(binary() | posix() | datetime(),
+            binary() | duration() | iso8601_duration()) ->
+          stamp() | {stamp(), binary()}.
+%%--------------------------------------------------------------------
+shift(Stamp, Duration) -> shift(Stamp, Duration).
+
+%%--------------------------------------------------------------------
+-spec shift(binary() | posix() | datetime(),
+            binary() | duration() | iso8601_duration(),
+            [opt()] | #opts{}) ->
+          stamp() | {stamp(), binary()}.
+%%--------------------------------------------------------------------
+shift(Stamp, Duration, Opts) when is_list(Opts) ->
+    shift(Stamp, Duration, parse_opts(Opts, #opts{}));
+shift(Stamp = #{}, Duration = #{}, _) ->
+    do_shift(Stamp, Duration);
+shift(Stamp = #{}, Duration, Opts) ->
+    shift(Stamp, decode(Duration, Opts), Opts);
+shift(Stamp, Duration = #{}, Opts) ->
+    shift(decode(Stamp, Opts), Duration).
+
 %% ===================================================================
 %% Internal functions.
 %% ===================================================================
@@ -373,9 +436,9 @@ valid_weekday(WD, #{year := Y, month := M, day := D}) ->
 
 do_encode(D = {{_, _, _}, {_, _, _}}, Opts = #opts{precision = P}) ->
     do_encode(decode_datetime(D, P), Opts);
-do_encode(Map = #{}, #opts{return_type = datetime, precision = Precision}) ->
-    encode_datetime(Map, Precision);
-do_encode(Map, #opts{return_type = posix, precision = P}) ->
+do_encode(Map = #{year := _}, #opts{return_type = datetime, precision = P}) ->
+    encode_datetime(Map, P);
+do_encode(Map = #{year := _}, #opts{return_type = posix, precision = P}) ->
     #{year := Year, month := Month, day := Day,
       hour := Hour, minute := Minute, second := Second} = Map,
     'Z' = maps:get(offset, Map, 'Z'),
@@ -391,7 +454,7 @@ do_encode(Map, #opts{return_type = posix, precision = P}) ->
         micro -> Seconds * 1000000 + Fraction;
         nano -> Seconds * 1000000000 + Fraction
     end;
-do_encode(Map = #{}, #opts{precision = Precision, rfc7231 = RFC7231}) ->
+do_encode(Map = #{year := _}, #opts{precision = Precision,rfc7231 = RFC7231}) ->
     #{year := Year, month := Month, day := Day,
       hour := Hour, minute := Minute, second := Second} = Map,
     Fraction = case {Precision, maps:get(fraction, Map, 0)} of
@@ -418,6 +481,30 @@ do_encode(Map = #{}, #opts{precision = Precision, rfc7231 = RFC7231}) ->
              integer_to_binary(Year), " ",
              pad(Hour), $:, pad(Minute), $:, pad(Second), " GMT"]
     end;
+do_encode(Map = #{weeks := Weeks}, _) ->
+    case maps:keys(Map) -- [weeks, sign] of
+        [] ->
+            Sign = case maps:get(sign, Map, '+') of
+                       '+' -> [];
+                       '-' -> $-
+                   end,
+            [Sign, $P, integer_to_binary(Weeks), $W];
+        _ ->
+            erlang:error(badarg, Map)
+    end;
+do_encode(Map = #{}, _) ->
+    Sign = case maps:get(sign, Map, '+') of
+                       '+' -> [];
+                       '-' -> $-
+                   end,
+    Time = [int_or_empty(hours, Map, $H),
+            int_or_empty(minutes, Map, $M),
+            int_or_empty(seconds, Map, $S)],
+    Time1 = case Time of
+                [[], [], []] -> [];
+                _ -> [$T, Time]
+            end,
+    [Sign, $P | [int_or_empty(days, Map, $D) | Time1]];
 do_encode(Seconds, Opts = #opts{precision = seconds}) ->
     do_encode(decode_posix(Seconds, 0), Opts);
 do_encode(Milli, Opts = #opts{precision = milli}) ->
@@ -426,6 +513,12 @@ do_encode(Micro, Opts = #opts{precision = micro}) ->
     do_encode(decode_posix(Micro div 1000_000, Micro rem 1000_000), Opts);
 do_encode(Nano, Opts = #opts{precision = nano}) ->
     do_encode(decode_posix(Nano div 1000_000_000, Nano rem 1000_000_000), Opts).
+
+int_or_empty(Key, Map, Letter) ->
+    case maps:get(Key, Map, []) of
+        [] -> [];
+        I -> [integer_to_binary(I), Letter]
+    end.
 
 days(Year, Month, Day) ->
     year1(Year) + month_days(Month) + leap(Year, Month) + Day - 1.
@@ -512,6 +605,9 @@ encode_datetime(Stamp, nano) ->
 %% Decoding
 %% ===================================================================
 
+do_decode(<<$-, $P, B/binary>>, Opts) -> decode_duration(B, '-', Opts);
+do_decode(<<$+, $P, B/binary>>, Opts) -> decode_duration(B, '+', Opts);
+do_decode(<<$P, B/binary>>, Opts) -> decode_duration(B, '+', Opts);
 do_decode(B, #opts{continue = Continue}) when is_binary(B) ->
     {Year, B1} = decode_digit(4, B, $-, []),
     {Month, B2} = decode_digit(2, B1, $-, []),
@@ -535,6 +631,91 @@ do_decode(Micro, #opts{precision = micro}) ->
     decode_posix(Micro div 1000_000, Micro rem 1000_000);
 do_decode(Nano, #opts{precision = nano}) ->
     decode_posix(Nano div 1000_000_000, Nano rem 1000_000_000).
+
+decode_duration(<<$T, T/binary>>, Sign, #opts{continue = Continue}) ->
+    {H, T1} = decode_digit(2, T, $H, []),
+    {M, T2} = decode_digit(2, T1, $M, []),
+    {S, T3} = decode_digit(2, T2, $S, []),
+    Duration =
+        #{sign => Sign, days => 0, hours => H, minutes => M, seconds => S},
+    case Continue of
+        true -> {Duration, T3};
+        false -> Duration
+    end;
+decode_duration(B, Sign, #opts{continue = Continue}) ->
+    {Duration, T0} =
+        case get_digit(2, B, [], []) of
+            {Weeks, <<$W, T/binary>>} -> {#{sign => Sign, weeks => Weeks}, T};
+            {D, <<$D, $T, T/binary>>} ->
+                {H, T1} = decode_digit(2, T, $H, []),
+                {M, T2} = decode_digit(2, T1, $M, []),
+                {S, T3} = decode_digit(2, T2, $S, []),
+                {#{sign => Sign, days => D,
+                   hours => H, minutes => M, seconds => S},
+                 T3}
+        end,
+    case Continue of
+        true -> {Duration, T0};
+        false -> Duration
+    end.
+
+%% decode_duration(<<$T, T/binary>>, Sign, #opts{continue = Continue}) ->
+%%     {Duration, T0} = get_time(T),
+%%     case Continue of
+%%         true -> {Duration#{sign => Sign}, T0};
+%%         false -> Duration#{sign => Sign}
+%%     end;
+%% decode_duration(B, Sign, #opts{continue = Continue}) ->
+%%     {Duration0, T0} =
+%%         case get_duration_digit(B, []) of
+%%             {W, <<$W, T/binary>>} -> {#{sign => Sign, weeks => W}, T};
+%%             {D, <<$D, $T, T/binary>>} ->
+%%                 {Duration, T1} = get_time(T),
+%%                 {Duration#{sign => Sign, days => D}, T1};
+%%             {D, <<$D, T/binary>>} ->
+%%                 {#{sign => Sign, days => D}, T}
+%%         end,
+%%     case Continue of
+%%         true -> {Duration0, T0};
+%%         false -> Duration0
+%%     end.
+
+get_time(<<>>) -> {#{}, <<>>};
+get_time(B) ->
+    case get_duration_digit(B, []) of
+        {H,<<$H, T/binary>>} ->
+            case get_duration_digit(T, []) of
+                {M, <<$M, T1/binary>>} ->
+                    case get_duration_digit(T1, []) of
+                        {S, <<$S, T2/binary>>} ->
+                            {#{hours => H, minutes => M, seconds => S}, T2};
+                        _ ->
+                            {#{hours => H, minutes => M}, T1}
+                    end;
+                {S, <<$S, T1/binary>>} ->
+                    {#{hours => H, seconds => S}, T1};
+                _ ->
+                    {#{hours => H}, T}
+            end;
+        {M, <<$M, T/binary>>} ->
+            case get_duration_digit(T, []) of
+                {S, <<$S, T1/binary>>} ->
+                    {#{minutes => M, seconds => S}, T1};
+                _ ->
+                    {#{minutes => M}, T}
+            end;
+        {S, <<$S, T/binary>>} ->
+            {#{seconds => S}, T};
+        _ ->
+            {#{}, B}
+    end.
+
+get_duration_digit(<<>>, []) -> {none, <<>>};
+get_duration_digit(<<>>, Acc) -> {list_to_integer(lists:reverse(Acc)), <<>>};
+get_duration_digit(<<H, T/binary>>, Acc) when ?DIGIT(H) ->
+    get_duration_digit(T, [H | Acc]);
+get_duration_digit(T, Acc) ->
+    {list_to_integer(lists:reverse(Acc)), T}.
 
 decode_rfc7231(B, #opts{continue = Continue}) ->
     {Day, B1} = decode_digit(2, skip_day(B), $\s, []),
@@ -777,6 +958,17 @@ decode_datetime({{Y, M, D}, {H, Mi, FS}}, nano) ->
     #{year => Y, month => M, day => D,
       hour => H, minute => Mi, second => S,
       fraction => F}.
+
+%% ===================================================================
+%% Mutate
+%% ===================================================================
+
+do_shift(_, _) -> tbd.
+
+%% ===================================================================
+%% Compare
+%% ===================================================================
+
 
 %% ===================================================================
 %% Common parts
