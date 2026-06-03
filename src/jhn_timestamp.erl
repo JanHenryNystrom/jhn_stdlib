@@ -59,7 +59,8 @@
 %%%  The Duration is represented as follows:
 %%%
 %%%  duration  :  #{weeks   => 0..99} |
-%%%               #{days    => 0..99,
+%%%               #{sign    := '+' | '-',
+%%%                 days    => 0..99,
 %%%                 hours   => hour(),
 %%%                 minute  => minute(),
 %%%                 seconds => second()}
@@ -70,7 +71,8 @@
 %%%  The durations are based on the rfc5545 3.3.6 with a postive or negative
 %%%  oveduration in either weeks or days with optional time or simply time
 %%%
-%%%  iso8601_duration : #{years   := pos_integer(),
+%%%  iso8601_duration : #{sign    := '+' | '-',
+%%%                       years   := pos_integer(),
 %%%                       months  := 0..11,
 %%%                       weeks   := 0..52,
 %%%                       days    := 0..365,
@@ -100,7 +102,9 @@
          valid/1, valid/2,
          encode/1, encode/2,
          decode/1, decode/2,
+%%         convert/3,
          shift/2, shift/3
+%%        , diff/2, diff/3
         ]).
 
 %% Exported types
@@ -362,26 +366,26 @@ decode(Binary, Opts = #opts{rfc7231 = false}) -> do_decode(Binary, Opts);
 decode(Binary, Opts) -> decode(Binary, parse_opts(Opts, #opts{})).
 
 %%--------------------------------------------------------------------
--spec shift(binary() | posix() | datetime(),
-            binary() | duration() | iso8601_duration()) ->
+-spec shift(binary() | duration() | iso8601_duration() | integer(),
+            binary() | posix() | datetime()) ->
           stamp() | {stamp(), binary()}.
 %%--------------------------------------------------------------------
-shift(Stamp, Duration) -> shift(Stamp, Duration).
+shift(Duration, Stamp) -> shift(Stamp, Duration, []).
 
 %%--------------------------------------------------------------------
--spec shift(binary() | posix() | datetime(),
-            binary() | duration() | iso8601_duration(),
+-spec shift(binary() | duration() | iso8601_duration() | integer(),
+            binary() | posix() | datetime(),
             [opt()] | #opts{}) ->
           stamp() | {stamp(), binary()}.
 %%--------------------------------------------------------------------
-shift(Stamp, Duration, Opts) when is_list(Opts) ->
-    shift(Stamp, Duration, parse_opts(Opts, #opts{}));
-shift(Stamp = #{}, Duration = #{}, _) ->
-    do_shift(Stamp, Duration);
-shift(Stamp = #{}, Duration, Opts) ->
-    shift(Stamp, decode(Duration, Opts), Opts);
-shift(Stamp, Duration = #{}, Opts) ->
-    shift(decode(Stamp, Opts), Duration).
+shift(Duration, Stamp, Opts) when is_list(Opts) ->
+    shift(Duration, Stamp, parse_opts(Opts, #opts{}));
+shift(Duration, Stamp = #{},Opts) when is_map(Duration); is_integer(Duration) ->
+    do_shift(Duration, Stamp, Opts);
+shift(Duration, Stamp, Opts) when is_map(Duration); is_integer(Duration) ->
+    shift(Duration, decode(Stamp, Opts), Opts);
+shift(Duration, Stamp, Opts) ->
+    shift(decode(Duration, Opts), Stamp, Opts).
 
 %% ===================================================================
 %% Internal functions.
@@ -492,19 +496,26 @@ do_encode(Map = #{weeks := Weeks}, _) ->
         _ ->
             erlang:error(badarg, Map)
     end;
-do_encode(Map = #{}, _) ->
+do_encode(Map = #{days := D, hours := H, minutes := M, seconds := S}, _) ->
     Sign = case maps:get(sign, Map, '+') of
                        '+' -> [];
                        '-' -> $-
                    end,
-    Time = [int_or_empty(hours, Map, $H),
-            int_or_empty(minutes, Map, $M),
-            int_or_empty(seconds, Map, $S)],
-    Time1 = case Time of
-                [[], [], []] -> [];
-                _ -> [$T, Time]
-            end,
-    [Sign, $P | [int_or_empty(days, Map, $D) | Time1]];
+    [Sign, $P, D, $D, $T, H, $H, M, $M, S, $S];
+%% do_encode(Map = #{years := Years}, _) ->
+%%     #{days := D, }
+%%     Sign = case maps:get(sign, Map, '+') of
+%%                        '+' -> [];
+%%                        '-' -> $-
+%%                    end,
+%%     Time = [int_or_empty(hours, Map, $H),
+%%             int_or_empty(minutes, Map, $M),
+%%             int_or_empty(seconds, Map, $S)],
+%%     Time1 = case Time of
+%%                 [[], [], []] -> [];
+%%                 _ -> [$T, Time]
+%%             end,
+%%     [Sign, $P | [int_or_empty(days, Map, $D) | Time1]];
 do_encode(Seconds, Opts = #opts{precision = seconds}) ->
     do_encode(decode_posix(Seconds, 0), Opts);
 do_encode(Milli, Opts = #opts{precision = milli}) ->
@@ -963,7 +974,28 @@ decode_datetime({{Y, M, D}, {H, Mi, FS}}, nano) ->
 %% Mutate
 %% ===================================================================
 
-do_shift(_, _) -> tbd.
+do_shift(Duration = #{}, Stamp, Opts = #opts{precision = Precision}) ->
+    #{sign := Sign, days := D, hours := H, minutes := M, seconds := S} =
+        Duration,
+    Secs = D * H + H * 3600 + M * 60 + S,
+    TS = encode(Stamp, [posix]),
+    Posix =
+        case {Sign, Precision} of
+            {'+', seconds} -> TS + Secs;
+            {'+', milli} -> TS + Secs * 1000;
+            {'+', micco} -> TS + Secs * 1000_000;
+            {'+', nano} -> TS + Secs * 1000_000_000;
+            {'-', seconds} -> TS + Secs;
+            {'-', milli} -> TS + Secs * 1000;
+            {'-', micco} -> TS + Secs * 1000_000;
+            {'-', nano} -> TS + Secs * 1000_000_000
+        end,
+    case Opts#opts.return_type of
+        posix -> Posix;
+        _ -> encode(Posix, Opts)
+    end.
+
+
 
 %% ===================================================================
 %% Compare
