@@ -79,14 +79,14 @@
 
 %% Types
 -type algo() ::
-        %% base32, base45, base85
+        %% base32, base45, base58, base85
         standard |
         %% base32
         crockford | clockwork | zbase |
         %% base85
         z85.
 -type base() :: 32 | 45 | 58 | 85.
--type alphabet() :: standard | hex | geohash.
+-type alphabet() :: standard | hex | geohash | flickr | ripple.
 -type opt()     :: return_type() | {return_type, return_type()} |
                    {alpfabet, alphabet()} | {algo, algo()}.
 
