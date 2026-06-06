@@ -30,7 +30,7 @@
    "TypeID,prefix/range/T-trees, Bloom filters, HTTP client, Magic, "
    "Mustache rendering, mocking, cacerts, media type determination, "
    "snappy compression, Base32(hex, Geohash, Crockford, Clockwork, Z-Base-32), "
-   "Base45, Base85(Z85), "
+   "Base45, Base58(Bitcoin, Flickr, Ripple), Base85(Z85, IPv6), "
    "and Server and FSM behaviours"},
   {vsn, git},
   {registered, []},

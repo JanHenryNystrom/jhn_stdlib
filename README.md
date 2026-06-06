@@ -3,7 +3,7 @@ jhn_stdlib [(γ)][5]
 
 A few thought experiments solidified as code: CBOR, HPACK, JSON, MessagePack,
 syslog, URI, IP addresses, Timestamp, UUID, TypeID, mocking, cacerts,
-media type determination, snappy compression, Base32, Base45, Base85
+media type determination, snappy compression, Base32, Base45, Base58, Base85
 
   * [Introduction](#introduction)
   * [Behaviours](#behaviours)
@@ -53,7 +53,8 @@ Features/Modules
   * Standards
     * Base32 -- encoding/decoding -- ```jhn_base``` [rfc4648][54], [Base32Wiki][55], [Crockford][56], [Clockwork][57], [Z-Base-32][58]
     * Base45 -- encoding/decoding -- ```jhn_base``` [rfc9285][59]
-    * Base85 -- encoding/decoding -- ```jhn_base``` [ZeroMQ spec:32/Z85][60]
+    * Base58 -- encoding/decoding -- ```jhn_base``` [Base58][61], [Flickr][62], [Ripple][63]
+    * Base85 -- encoding/decoding -- ```jhn_base``` [Ascii85Wiki][64], [ZeroMQ spec:32/Z85][60], [rfc1924][65]
     * IP Addresses -- encoding/decoding -- ```jhn_ip_addr``` [rfc4291][16], [rfc5952][17], [rfc4632][18]
     * Timestamps -- generating/encoding/decoding -- ```jhn_timestamp``` [rfc3339][19], [rfc7231][21], [iso8601][53]
     * TypeID --  generating/encoding/decoding -- ```jhn_typeid``` [TypeID][49]
@@ -196,3 +197,8 @@ I know I really should.
   [58]: https://philzimmermann.com/docs/human-oriented-base-32-encoding.txt "human-oriented base-32 encoding"
   [59]: http://www.ietf.org/rfc/rfc9285.txt "The Base45 Data Encoding"
   [60]: https://rfc.zeromq.org/spec/32 "32/Z85"
+  [61]: https://datatracker.ietf.org/doc/html/draft-msporny-base58-03 "The Base58 Encoding Scheme"
+  [62]: https://www.flickr.com/groups/51035612836@N01/discuss/72157616713786392 "Base58 flickr alphabet"
+  [63]: https://xrpl.org/docs/references/protocol/data-types/base58-encodings "base58 Encodings"
+  [64]: https://en.wikipedia.org/wiki/Ascii85 "Ascii85"
+  [65]: http://www.ietf.org/rfc/rfc1924.txt "A Compact Representation of IPv6 Addresses"
