@@ -28,6 +28,21 @@
 %% Includes
 -include_lib("eunit/include/eunit.hrl").
 
+-define(HOBBE,
+        <<"Man is distinguished, not only by his reason, but by this"
+          " singular passion from other animals, which is a lust of the"
+          " mind, that by a perseverance of delight in the continued and"
+          " indefatigable generation of knowledge, exceeds the short"
+          " vehemence of any carnal pleasure.">>).
+
+-define(HOBBE85,
+        <<"9jqo^BlbD-BleB1DJ+*+F(f,q/0JhKF<GL>Cj@.4Gp$d7F!,L7@<6@)"
+          "/0JDEF<G%<+EV:2F!,O<DJ+*.@<*K0@<6L(Df-\\0Ec5e;DffZ(EZee."
+          "Bl.9pF\"AGXBPCsi+DGm>@3BB/F*&OCAfu2/AKYi(DIb:@FD,*)+C]U"
+          "=@3BN#EcYf8ATD3s@q?d$AftVqCh[NqF<G:8+EV:.+Cf>-FD5W8ARlo"
+          "lDIal(DId<j@<?3r@:F%a+D58'ATD4$Bl@l3De:,-DJs`8ARoFb/0JM"
+          "K@qB4^F!,R<AKZ&-DfTqBG%G>uD.RTpAKYo'+CT/5+Cei#DII?(E,9)oF*2M7/c">>).
+
 
 %% ===================================================================
 %% Tests.
@@ -50,6 +65,12 @@ encode_2_test_() ->
              {45, ~"BB8", ~"AB"},
              {45, ~"%69 VD92EX0", ~"Hello!!"},
              {45, ~"A2", <<100>>},
+             {58, ~"2NEpo7TZRRrLZSi2U", ~"Hello World!"},
+             {58,
+              ~"USm3fpXnKG5EUBx2ndxBDMPVciP5hGey2Jh4NDv6gmeo1LkMeiKrLJUUBk6Z",
+              ~"The quick brown fox jumps over the lazy dog."},
+             {58, ~"11233QC4", binary:decode_hex(~"0000287fb4cd")},
+             {85, ?HOBBE85, ?HOBBE},
              {85, ~"87cURDc^jt", ~"HelloWor"},
              {85, ~"z", <<0:32>>}
             ]
@@ -98,10 +119,22 @@ encode_3_test_() ->
               [{algo, zbase}, binary],
               ~"6im54d",
               <<1029041987:30>>},
+             {58,
+              [{alphabet, flickr}, binary],
+              ~"brXijP",
+              <<16#01, 16#98, 16#B9, 16#A1, 16#0F>>},
+             {58,
+              [{alphabet, ripple}, binary],
+              ~"p4NFofTZRRiLZS5p7",
+              ~"Hello World!"},
              {85,
               [{algo, z85}, binary],
               ~"HelloWorld",
-              <<16#86, 16#4F, 16#D2, 16#6F, 16#B5, 16#59, 16#F7, 16#5B>>}
+              <<16#86, 16#4F, 16#D2, 16#6F, 16#B5, 16#59, 16#F7, 16#5B>>},
+             {85,
+              [{algo, ipv6}, binary],
+              ~"4)+k&C#VzJ4br>0wv%Yp",
+              ~"1080:0:0:0:8:800:200C:417A"}
             ]
     ].
 
@@ -121,7 +154,8 @@ decode_2_test_() ->
              {45, ~"AB", ~"BB8"},
              {45, <<100>>, ~"A2"},
              {45, ~"Hello!!", ~"%69 VD92EX0"},
-             {85, ~"HelloWor", ~"87cURDc^jt"}
+             {85, ~"HelloWor", ~"87cURDc^jt"},
+             {85, ?HOBBE, ?HOBBE85}
             ]
     ].
 
@@ -169,10 +203,22 @@ decode_3_test_() ->
              {32, [{algo, zbase}], <<30:5, 2:5, 31:5, 28:5, 14:5>>, ~"6n9hq"},
              {32, [{algo, zbase}], <<26:5, 17:5, 29:5, 0:5, 8:5>>, ~"4t7ye"},
              {32, [{algo, zbase}], <<30:5,21:5,11:5,27:5,26:5,3:5>>, ~"6im54d"},
+             {58,
+              [{alphabet, flickr}, binary],
+              <<16#01, 16#98, 16#B9, 16#A1, 16#0F>>,
+              ~"brXijP"},
+             {58,
+              [{alphabet, ripple}, binary],
+              ~"Hello World!",
+              ~"p4NFofTZRRiLZS5p7"},
              {85,
               [{algo, z85}, binary],
               <<16#86, 16#4F, 16#D2, 16#6F, 16#B5, 16#59, 16#F7, 16#5B>>,
-              ~"HelloWorld"}
+              ~"HelloWorld"},
+             {85,
+              [{algo, ipv6}, binary],
+              ~"1080:0:0:0:8:800:200c:417a",
+              ~"4)+k&C#VzJ4br>0wv%Yp"}
             ]
     ].
 

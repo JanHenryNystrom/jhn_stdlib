@@ -56,7 +56,7 @@
 %%%     https://www.flickr.com/groups/51035612836@N01/discuss/72157616713786392/
 %%%     * Base58 flickr alphabet (flickr)
 %%%
-%%%   The Ripple Base58 alphabet
+%%%  The Ripple Base58 alphabet
 %%%     https://xrpl.org/docs/references/protocol/data-types/base58-encodings
 %%%     * Base58 Ripple alphabet (ripple)
 %%%
@@ -65,6 +65,9 @@
 %%%
 %%%  ZeroMQ spec:32/Z85: https://rfc.zeromq.org/spec/32/
 %%%     * The ZeroMQ base85 algorithm (z85)
+%%%
+%%%  rfc1924: A Compact Representation of IPv6 Addresses
+%%%     * The rfc1924 algorithm (ipv6) uses jhn_ip_addr to decode the address
 %%%
 %%% @end
 %% @author Jan Henry Nystrom <JanHenryNystrom@gmail.com>
@@ -84,7 +87,7 @@
         %% base32
         crockford | clockwork | zbase |
         %% base85
-        z85.
+        z85 | ipv6.
 -type base() :: 32 | 45 | 58 | 85.
 -type alphabet() :: standard | hex | geohash | flickr | ripple.
 -type opt()     :: return_type() | {return_type, return_type()} |
@@ -320,8 +323,28 @@
          16#11, 16#12, 16#13, 16#14, 16#15, 16#16, 16#17, 16#18,
          16#19, 16#1A, 16#1B, 16#1C, 16#1D, 16#1E, 16#1F, 16#20,
          16#21, 16#22, 16#23, 16#4F, 16#00, 16#50, 16#00, 16#00}).
+
 -define(Z85_85, [52200625, 614125,  7225, 85, 1]).
 -define(Z85_256, [16777216, 65536, 256, 1]).
+
+-define(IPV6_ALPHABET,
+        {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,
+         $A, $B, $C, $D, $E, $F, $G, $H, $I, $J,
+         $K, $L, $M, $N, $O, $P, $Q, $R, $S, $T,
+         $U, $V, $W, $X, $Y, $Z, $a, $b, $c, $d,
+         $e, $f, $g, $h, $i, $j, $k, $l, $m, $n,
+         $o, $p, $q, $r, $s, $t, $u, $v, $w, $x,
+         $y, $z, $!, $#, $$, $%, $&, $(, $), $*,
+         $+, $-, $;, $<, $=, $>, $?, $@, $^, $_,
+         $`, ${, $|, $}, $~}).
+-define(IPV6_DECODE,
+       {u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,
+   u,u,u,62,u,63,64,65,66,u,67,68,69,70,u,71,u,u,0,1,2,3,4,5,6,
+   7,8,9,u,72,73,74,75,76,77,10,11,12,13,14,15,16,17,18,19,20,
+   21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,u,u,u,78,79,80,
+   36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,
+   56,57,58,59,60,61,81,82,83,84}).
+
 
 %% ===================================================================
 %% Library functions.
@@ -410,10 +433,13 @@ opt({return_type, binary}, Opts) -> Opts#opts{return_type = binary};
 opt({alphabet, standard}, Opts) -> Opts#opts{alphabet = standard};
 opt({alphabet, hex}, Opts) -> Opts#opts{alphabet = hex};
 opt({alphabet, geohash}, Opts) -> Opts#opts{alphabet = geohash};
+opt({alphabet, flickr}, Opts) -> Opts#opts{alphabet = flickr};
+opt({alphabet, ripple}, Opts) -> Opts#opts{alphabet = ripple};
 opt({algo, standard}, Opts) -> Opts#opts{algo = standard};
 opt({algo, crockford}, Opts) -> Opts#opts{algo = crockford};
 opt({algo, clockwork}, Opts) -> Opts#opts{algo = clockwork};
 opt({algo, zbase}, Opts) -> Opts#opts{algo = zbase};
+opt({algo, ipv6}, Opts) -> Opts#opts{algo = ipv6};
 opt({algo, z85}, Opts) -> Opts#opts{algo = z85}.
 
 %% --------------------------------------------------------------------
@@ -434,12 +460,19 @@ do_encode(32, B, #opts{alphabet = geohash}) ->
     encode_b32(B, ?B32GEO_ALPHABET, false, true, []);
 do_encode(45, B, _) ->
     encode_b45(B, []);
+do_encode(58, B, #opts{alphabet = flickr}) ->
+    encode_b58(B, ?FLICKR_ALPHABET);
+do_encode(58, B, #opts{alphabet = ripple}) ->
+    encode_b58(B, ?RIPPLE_ALPHABET);
 do_encode(58, B, _) ->
     encode_b58(B, ?B58_ALPHABET);
 do_encode(85, B, #opts{algo = z85}) when (byte_size(B) rem 4) == 0 ->
     encode_z85(B, []);
-do_encode(85, B, _) when (byte_size(B) rem 4) == 0 ->
-    encode_b85(B, []).
+do_encode(85, B, #opts{algo = ipv6}) ->
+    encode_ipv6(B);
+do_encode(85, B, _) ->
+    Pad = (4 - (byte_size(B) rem 4)) rem 4,
+    encode_b85(<<B/binary, 0:(Pad * 8)>>, Pad, []).
 
 
 %% --------------------------------------------------------------------
@@ -513,13 +546,16 @@ e_b58_pad(_, Acc) -> Acc.
 
 %% --------------------------------------------------------------------
 %% b85
-encode_b85(<<>>, Acc) -> lists:reverse(Acc);
-encode_b85(<<0:32, T/binary>>, Acc) ->
-    encode_b85(T, [$z | Acc]);
-encode_b85(<<A, B, C, D, T/binary>>, Acc) ->
+encode_b85(<<>>, 0, Acc) -> lists:reverse(Acc);
+encode_b85(<<>>, 1, [[A, B, C, D | _] | Acc])->lists:reverse([[A, B, C,D]|Acc]);
+encode_b85(<<>>, 2, [[A, B, C | _] | Acc]) -> lists:reverse([[A, B, C] | Acc]);
+encode_b85(<<>>, 3, [[A, B | _] | Acc]) -> lists:reverse([[A, B] | Acc]);
+encode_b85(<<0:32, T/binary>>, Pad, Acc) ->
+    encode_b85(T, Pad, [$z | Acc]);
+encode_b85(<<A, B, C, D, T/binary>>, Pad, Acc) ->
     V = (((((A * 256) + B) * 256) + C) * 256) + D,
     Es = [(V div Div) rem 85 + 33 || Div <- ?Z85_85],
-    encode_b85(T, [Es | Acc]).
+    encode_b85(T, Pad, [Es | Acc]).
 
 %% --------------------------------------------------------------------
 %% Z85
@@ -528,6 +564,15 @@ encode_z85(<<A, B, C, D, T/binary>>, Acc) ->
     V = (((((A * 256) + B) * 256) + C) * 256) + D,
     Es = [element((V div Div) rem 85 + 1, ?Z85_ALPHABET) || Div <- ?Z85_85],
     encode_z85(T, [Es | Acc]).
+
+%% --------------------------------------------------------------------
+%% IPV6
+
+encode_ipv6(IPv6) -> encode_ipv6(jhn_ip_addr:decode(IPv6), []).
+
+encode_ipv6(0, Acc) -> Acc;
+encode_ipv6(I, Acc) ->
+    encode_ipv6(I div 85, [element(I rem 85 + 1, ?IPV6_ALPHABET) | Acc]).
 
 %% --------------------------------------------------------------------
 %% Decode
@@ -547,11 +592,17 @@ do_decode(32, B, #opts{alphabet = geohash}) ->
     decode_b32(B, ?B32GEO_DECODE, []);
 do_decode(45, B45, _) ->
     decode_b45(B45, []);
+do_decode(58, B, #opts{alphabet = flickr}) ->
+    decode_b58(B, ?FLICKR_DECODE);
+do_decode(58, B, #opts{alphabet = ripple}) ->
+    decode_b58(B, ?RIPPLE_DECODE);
 do_decode(58, B, _) ->
     decode_b58(B, ?B58_DECODE);
 do_decode(85, Z85, #opts{algo = z85}) when (byte_size(Z85) rem 5) == 0 ->
     decode_z85(Z85, []);
-do_decode(85, B85, _) when (byte_size(B85) rem 5) == 0 ->
+do_decode(85, Ipv6, #opts{algo = ipv6}) ->
+    decode_ipv6(Ipv6);
+do_decode(85, B85, _) ->
     decode_b85(B85, []).
 
 %% --------------------------------------------------------------------
@@ -705,9 +756,22 @@ decode_b85(<<$\r, T/binary>>, Acc) -> decode_b85(T, Acc);
 decode_b85(<<$\s, T/binary>>, Acc) -> decode_b85(T, Acc);
 %% Special all zero code
 decode_b85(<<$z, T/binary>>, Acc) -> decode_b85(T, [<<0:32>> | Acc]);
+%% Padding
 decode_b85(<<A, B, C, D, E, T/binary>>, Acc) ->
     V = lists:foldl(fun d_b85/2, 0, [A, B, C, D, E]),
-    decode_b85(T, [[(V div Div) rem 256 || Div <- ?Z85_256] | Acc]).
+    decode_b85(T, [[(V div Div) rem 256 || Div <- ?Z85_256] | Acc]);
+decode_b85(<<A, B, C, D>>, Acc) ->
+    V = lists:foldl(fun d_b85/2, 0, [A, B, C, D, $u]),
+    [A1, B1, C1 | _] = [(V div Div) rem 256 || Div <- ?Z85_256],
+    lists:reverse([[A1, B1, C1] | Acc]);
+decode_b85(<<A, B, C>>, Acc) ->
+    V = lists:foldl(fun d_b85/2, 0, [A, B, C, $u, $u]),
+    [A1, B1 | _] = [(V div Div) rem 256 || Div <- ?Z85_256],
+    lists:reverse([[A1, B1] | Acc]);
+decode_b85(<<A, B>>, Acc) ->
+    V = lists:foldl(fun d_b85/2, 0, [A, B, $u, $u, $u]),
+    [A1 | _] = [(V div Div) rem 256 || Div <- ?Z85_256],
+    lists:reverse([[A1] | Acc]).
 
 d_b85(V, Pre) -> (Pre * 85) + V - 33.
 
@@ -719,5 +783,16 @@ decode_z85(<<A, B, C, D, E, T/binary>>, Acc) ->
     decode_z85(T, [[(V div Div) rem 256 || Div <- ?Z85_256] | Acc]).
 
 d_z85(V, Pre) -> (Pre * 85) + element(V - 31, ?Z85_DECODE).
+
+%% --------------------------------------------------------------------
+%% Ipv6
+
+decode_ipv6(<<C, T/binary>>) ->
+    jhn_ip_addr:encode(decode_ipv6(T, element(C, ?IPV6_DECODE))).
+
+decode_ipv6(<<>>, C) -> C;
+decode_ipv6(<<H, T/binary>>, C) ->
+    decode_ipv6(T, C * 85 + element(H, ?IPV6_DECODE)).
+
 
 %% --------------------------------------------------------------------
