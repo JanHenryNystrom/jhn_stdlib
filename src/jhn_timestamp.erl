@@ -69,7 +69,7 @@
 %%%
 %%%
 %%%  The durations are based on the rfc5545 3.3.6 with a postive or negative
-%%%  oveduration in either weeks or days with optional time or simply time
+%%%  over a duration in either weeks or days with optional time or simply time
 %%%
 %%%  iso8601_duration : #{sign    := '+' | '-',
 %%%                       years   := pos_integer(),
@@ -168,9 +168,15 @@
 -define(SECONDS_PER_MINUTE, 60).
 -define(SECONDS_PER_HOUR, 3600).
 -define(SECONDS_PER_DAY, 86400).
+
 -define(DAYS_PER_YEAR, 365).
 -define(DAYS_PER_LEAP_YEAR, 366).
+
 -define(EPOCH, 62167219200).
+
+-define(MILLI, 1000).
+-define(MICRO, 1000_000).
+-define(NANO, 1000_000_000).
 
 -define(DIGIT(C), C >= 48, C =< 57).
 
@@ -247,7 +253,7 @@ valid(Time) -> valid(Time, #opts{}).
 %%     N.B. for binary format in rfc7231 or iso8601 format the rfc7231 or
 %%          iso8601 options must be provided and any precision other than
 %%          seconds that must be provided as an option otherwise the answer
-%%          may be false.
+%%          may be incorrect.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -370,7 +376,7 @@ decode(Binary, Opts) -> decode(Binary, parse_opts(Opts, #opts{})).
             binary() | posix() | datetime()) ->
           stamp() | {stamp(), binary()}.
 %%--------------------------------------------------------------------
-shift(Duration, Stamp) -> shift(Stamp, Duration, []).
+shift(Duration, Stamp) -> shift(Duration, Stamp, []).
 
 %%--------------------------------------------------------------------
 -spec shift(binary() | duration() | iso8601_duration() | integer(),
@@ -454,9 +460,9 @@ do_encode(Map = #{year := _}, #opts{return_type = posix, precision = P}) ->
         Second - ?EPOCH,
     case P of
         seconds -> Seconds;
-        milli -> Seconds * 1000 + Fraction;
-        micro -> Seconds * 1000000 + Fraction;
-        nano -> Seconds * 1000000000 + Fraction
+        milli -> Seconds * ?MILLI + Fraction;
+        micro -> Seconds * ?MICRO + Fraction;
+        nano -> Seconds * ?NANO + Fraction
     end;
 do_encode(Map = #{year := _}, #opts{precision = Precision,rfc7231 = RFC7231}) ->
     #{year := Year, month := Month, day := Day,
@@ -519,11 +525,11 @@ do_encode(Map = #{days := D, hours := H, minutes := M, seconds := S}, _) ->
 do_encode(Seconds, Opts = #opts{precision = seconds}) ->
     do_encode(decode_posix(Seconds, 0), Opts);
 do_encode(Milli, Opts = #opts{precision = milli}) ->
-    do_encode(decode_posix(Milli div 1000, Milli rem 1000), Opts);
+    do_encode(decode_posix(Milli div ?MILLI, Milli rem ?MILLI, Opts);
 do_encode(Micro, Opts = #opts{precision = micro}) ->
-    do_encode(decode_posix(Micro div 1000_000, Micro rem 1000_000), Opts);
+    do_encode(decode_posix(Micro div ?MICRO, Micro rem ?MICRO), Opts);
 do_encode(Nano, Opts = #opts{precision = nano}) ->
-    do_encode(decode_posix(Nano div 1000_000_000, Nano rem 1000_000_000), Opts).
+    do_encode(decode_posix(Nano div ?NANO, Nano rem ?NANO), Opts).
 
 int_or_empty(Key, Map, Letter) ->
     case maps:get(Key, Map, []) of
@@ -600,17 +606,17 @@ encode_datetime(Stamp, milli) ->
     #{year := Y, month := M, day := D,
       hour := H, minute := Mi, second:=S,
       fraction :=F } = Stamp,
-    {{Y, M, D}, {H, Mi, S + F/1000}};
+    {{Y, M, D}, {H, Mi, S + F/?MILLI}};
 encode_datetime(Stamp, micro) ->
     #{year := Y, month := M, day := D,
       hour := H, minute := Mi, second:=S,
       fraction :=F } = Stamp,
-    {{Y, M, D}, {H, Mi, S + F/1000_000}};
+    {{Y, M, D}, {H, Mi, S + F/?MICRO}};
 encode_datetime(Stamp, nano) ->
     #{year := Y, month := M, day := D,
       hour := H, minute := Mi, second:=S,
       fraction :=F } = Stamp,
-    {{Y, M, D}, {H, Mi, S + F/1000_000_000}}.
+    {{Y, M, D}, {H, Mi, S + F/?NANO}}.
 
 %% ===================================================================
 %% Decoding
@@ -637,11 +643,11 @@ do_decode(B, #opts{continue = Continue}) when is_binary(B) ->
 do_decode(Seconds, #opts{precision = seconds}) ->
     decode_posix(Seconds, 0);
 do_decode(Milli, #opts{precision = milli}) ->
-    decode_posix(Milli div 1000, Milli rem 1000);
+    decode_posix(Milli div ?MILLI, Milli rem ?MILLI);
 do_decode(Micro, #opts{precision = micro}) ->
-    decode_posix(Micro div 1000_000, Micro rem 1000_000);
+    decode_posix(Micro div ?MICRO, Micro rem ?MICRO);
 do_decode(Nano, #opts{precision = nano}) ->
-    decode_posix(Nano div 1000_000_000, Nano rem 1000_000_000).
+    decode_posix(Nano div ?NANO, Nano rem ?NANO).
 
 decode_duration(<<$T, T/binary>>, Sign, #opts{continue = Continue}) ->
     {H, T1} = decode_digit(2, T, $H, []),
@@ -953,19 +959,19 @@ decode_datetime({{Y, M, D}, {H, Mi, FS}}, seconds) when is_float(FS) ->
     #{year => Y, month => M, day => D, hour => H, minute => Mi, second => S};
 decode_datetime({{Y, M, D}, {H, Mi, FS}}, milli) ->
     S = trunc(FS),
-    F = trunc((FS - S) * 1000),
+    F = trunc((FS - S) * ?MILLI),
     #{year => Y, month => M, day => D,
       hour => H, minute => Mi, second => S,
       fraction => F};
 decode_datetime({{Y, M, D}, {H, Mi, FS}}, micro) ->
     S = trunc(FS),
-    F = trunc((FS - S) * 1000_000),
+    F = trunc((FS - S) * ?MICRO),
     #{year => Y, month => M, day => D,
       hour => H, minute => Mi, second => S,
       fraction => F};
 decode_datetime({{Y, M, D}, {H, Mi, FS}}, nano) ->
     S = trunc(FS),
-    F = trunc((FS - S) * 1000_000_000),
+    F = trunc((FS - S) * ?NANO),
     #{year => Y, month => M, day => D,
       hour => H, minute => Mi, second => S,
       fraction => F}.
@@ -974,28 +980,32 @@ decode_datetime({{Y, M, D}, {H, Mi, FS}}, nano) ->
 %% Mutate
 %% ===================================================================
 
-do_shift(Duration = #{}, Stamp, Opts = #opts{precision = Precision}) ->
+do_shift(Duration = #{days := _}, Stamp, Opts = #opts{precision = Precision}) ->
     #{sign := Sign, days := D, hours := H, minutes := M, seconds := S} =
         Duration,
-    Secs = D * H + H * 3600 + M * 60 + S,
-    TS = encode(Stamp, [posix]),
-    Posix =
-        case {Sign, Precision} of
-            {'+', seconds} -> TS + Secs;
-            {'+', milli} -> TS + Secs * 1000;
-            {'+', micco} -> TS + Secs * 1000_000;
-            {'+', nano} -> TS + Secs * 1000_000_000;
-            {'-', seconds} -> TS + Secs;
-            {'-', milli} -> TS + Secs * 1000;
-            {'-', micco} -> TS + Secs * 1000_000;
-            {'-', nano} -> TS + Secs * 1000_000_000
-        end,
+    Secs = D *?SECONDS_PER_DAY +
+           H * ?SECONDS_PER_HOUR +
+           M * ?SECONDS_PER_MINUTE +
+           S,
+    TS = encode(Stamp, [posix, Precision]),
+    Posix = shift_unit(Sign, Precision, TS ,Secs),
+    Posix1 = case valid(Posix) of
+                 true -> Posix1;
+                 false -> shift_unit(Sign, Precision, Posix, ?SECONDS_PER_DAY)
+             end,
     case Opts#opts.return_type of
-        posix -> Posix;
-        _ -> encode(Posix, Opts)
+        posix -> Posix1;
+        _ -> encode(Posix1, Opts)
     end.
 
-
+shift_unit('+', seconds, TS, Secs) -> TS + Secs;
+shift_unit('+', milli, TS, Secs) -> TS + Secs * ?MILLI;
+shift_unit('+', micro, TS, Secs) -> TS + Secs * ?MICRO;
+shift_unit('+', nano, TS, Secs) -> TS + Secs * ?NANO;
+shift_unit('-', seconds, TS, Secs) -> TS - Secs;
+shift_unit('-', milli, TS, Secs) -> TS - Secs * ?MILLI;
+shift_unit('-', micro, TS, Secs) -> TS - Secs * ?MICRO;
+shift_unit('-', nano, TS, Secs) -> TS - Secs * ?NANO;
 
 %% ===================================================================
 %% Compare
