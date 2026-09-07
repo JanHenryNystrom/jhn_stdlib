@@ -207,14 +207,14 @@ gen(<<?JPEG_MAGIC, _/binary>>, _) -> ~"image/jpeg";
 gen(<<?PNG_MAGIC, _/binary>>, _) -> ~"image/png";
 gen(<<?WEBP_MAGIC, _/binary>>, _) -> ~"image/webp";
 gen(<<"BEGIN:VCALENDAR", _/binary>>, _) -> ~"text/calendar";
+gen(Data, #opts{deep = true, relax = true}) -> deep_relax_scan(Data, true);
+gen(TEXT, #opts{deep = true}) -> deep_scan(TEXT);
+gen(Data, #opts{relax = true}) -> relax_scan(Data, 1024);
 gen(<<?UTF32BE_BOM, _/binary>>, _) -> ~"text/plain";
 gen(<<?UTF32LE_BOM, _/binary>>, _) -> ~"text/plain";
 gen(<<?UTF8_BOM, _/binary>>, _) -> ~"text/plain";
 gen(<<?UTF16BE_BOM, _/binary>>, _) -> ~"text/plain";
 gen(<<?UTF16LE_BOM, _/binary>>, _) -> ~"text/plain";
-gen(Data, #opts{deep = true, relax = true}) -> deep_relax_scan(Data, true);
-gen(TEXT, #opts{deep = true}) -> deep_scan(TEXT);
-gen(Data, #opts{relax = true}) -> relax_scan(Data, 1024);
 gen(_, _) -> undefined.
 
 xml(XML) ->
