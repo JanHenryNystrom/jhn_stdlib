@@ -37,7 +37,8 @@
 -copyright('Jan Henry Nystrom <JanHenryNystrom@gmail.com>').
 
 %% Library functions
--export([gen/1, gen/2,
+-export([is_uuid/1,
+         gen/1, gen/2,
          encode/1, encode/2,
          decode/1, decode/2]).
 
@@ -58,7 +59,8 @@
          hex            = false  :: boolean(),
          human          = false  :: boolean(),
          urn            = false  :: boolean(),
-         return_type    = iolist :: iolist | binary | list | hex | uuid}).
+         return_type    = iolist :: iolist | binary | list |
+                                    hex | decimal | uuid}).
 
 %% Types
 -type uuid() :: #{version => 1,
@@ -88,7 +90,8 @@
 
 -type type()       :: v1 | v3 | v4 | v5 | v6 | v7 | v8.
 
--type format_opt() :: iolist | binary | list | hex | uuid | urn | human.
+-type format_opt() :: iolist | binary | list |
+                      hex | decimal | uuid | urn | human.
 -type v1_opt()     :: {node, node_type()} | {clock_sequence, non_neg_integer()}.
 -type name_opt()   :: {name_space, iodata()} | {name, iodata()}.
 -type custom_opt() :: {custom, non_neg_integer() | binary()}.
@@ -114,6 +117,21 @@
 %% ===================================================================
 %% Library functions.
 %% ===================================================================
+
+%%--------------------------------------------------------------------
+%% Function: is_uuid(Binary or Integer) -> Bool.
+%% @doc
+%%   Checks if the argument is indeed an UUID
+%%   applicable)
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec is_uuid(binary() | integer()) -> boolean().
+%%--------------------------------------------------------------------
+is_uuid(UUID) ->
+    try decode(UUID) of _ -> true
+    catch _:_ -> false
+    end.
 
 %%--------------------------------------------------------------------
 %% Function: gen(Type) -> UUID.
@@ -155,7 +173,9 @@ gen(X) -> erlang:error(badarg, [X]).
 %%
 %%     list -> a flat list is returned
 %%
-%%     hex -> the raw hex format without the dashes (this is outside the spec).
+%%     hex -> the raw hex format without the dashes (this is outside the spec)
+%%
+%%     decimal -> the  decimal integer
 %%
 %%     uuid -> a map representing the UUID is generated that can be passed to
 %%             encode but can differ from the one generated from decode since
@@ -202,7 +222,7 @@ gen(X) -> erlang:error(badarg, [X]).
 %% @end
 %%--------------------------------------------------------------------
 -spec gen(type() | nil | max, opts() | #opts{}) ->
-          uuid() | binary() | list() |  iolist() | nil | max.
+          uuid() | binary() | list() |  iolist() | integer() | nil | max.
 %%--------------------------------------------------------------------
 gen(Type, Opts = #opts{return_type = uuid}) -> do_gen(Type, Opts);
 gen(Type, Opts = #opts{}) -> encode(do_gen(Type, Opts), Opts);
@@ -237,6 +257,8 @@ encode(UUID) -> encode(UUID, #opts{}).
 %%
 %%     hex -> the raw hex format without the dashes (this is outside the spec).
 %%
+%%     decimal -> the decimal integer
+%%
 %%     urn -> the URN is returned  (can be combined with  binary, iolist, list)
 %% @end
 %%--------------------------------------------------------------------
@@ -244,6 +266,7 @@ encode(UUID) -> encode(UUID, #opts{}).
 %%--------------------------------------------------------------------
 encode(UUID, #opts{return_type = Type, urn = URN, hex = Hex}) ->
     case {Type, URN, Hex} of
+        {decimal, _, _} -> decimal(iolist_to_binary(hex(do_encode(UUID))));
         {iolist, false, true} -> hex(do_encode(UUID));
         {iolist, false, _} -> do_encode(UUID);
         {iolist, true, _} -> [<<"urn:uuid:">>, do_encode(UUID)];
@@ -458,7 +481,10 @@ encode_node(<<M1:16, $-, M2:16, $-, M3:16, $-, M4:16, $-, M5:16,$-,M6:16>>) ->
 encode_node(Mac) when is_integer(Mac) ->
     Mac.
 
+hex(B = <<_/binary>>) -> << <<E>> || <<E>> <= B, E /= 45 >>;
 hex(L) -> [E || E <- L, E /= 45].
+
+decimal(B) -> <<I:128>> = binary:decode_hex(B), I.
 
 %% ===================================================================
 %% Decoding
@@ -525,6 +551,7 @@ parse_opt(v2, Opt, _) -> erlang:error(badarg, [v2, Opt]);
 parse_opt(_, binary, Opts) -> Opts#opts{return_type = binary};
 parse_opt(_, list, Opts) -> Opts#opts{return_type = list};
 parse_opt(_, iolist, Opts) -> Opts#opts{return_type = iolist};
+parse_opt(_, decimal, Opts) -> Opts#opts{return_type = decimal};
 parse_opt(_, uuid, Opts) -> Opts#opts{return_type = uuid};
 parse_opt(_, hex, Opts) -> Opts#opts{hex = true};
 parse_opt(_, urn, Opts) -> Opts#opts{urn = true};

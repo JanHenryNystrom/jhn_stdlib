@@ -37,6 +37,39 @@
 %% ===================================================================
 
 %%--------------------------------------------------------------------
+%% Check
+%%--------------------------------------------------------------------
+check_1_test_() ->
+    [{"check(v1)",
+      ?_test(?assertMatch(true, jhn_uuid:is_uuid(jhn_uuid:gen(v1, [binary]))))},
+     {"check(v4)",
+      ?_test(?assertMatch(true, jhn_uuid:is_uuid(jhn_uuid:gen(v4, [binary]))))},
+     {"check(v6)",
+      ?_test(?assertMatch(true, jhn_uuid:is_uuid(jhn_uuid:gen(v6, [binary]))))},
+     {"check(v7)",
+      ?_test(?assertMatch(true, jhn_uuid:is_uuid(jhn_uuid:gen(v7, [binary]))))},
+     {"check(nil)",
+      ?_test(?assertMatch(true,
+                          jhn_uuid:is_uuid(jhn_uuid:gen(nil, [binary]))))},
+     {"check(max)",
+      ?_test(?assertMatch(true,
+                          jhn_uuid:is_uuid(jhn_uuid:gen(max, [binary]))))},
+     {"check(v1, hash)",
+      ?_test(
+         ?assertMatch(true,
+                      jhn_uuid:is_uuid(jhn_uuid:gen(v1, [binary, hex]))))},
+     {"check(v1, urn)",
+      ?_test(
+         ?assertMatch(true,
+                      jhn_uuid:is_uuid(jhn_uuid:gen(v1, [binary, urn]))))},
+     {"check(integer)",
+      ?_test(
+         ?assertMatch(true, jhn_uuid:is_uuid(jhn_uuid:gen(v1, [decimal]))))},
+     {"check(cucumber)",
+      ?_test(?assertMatch(false, jhn_uuid:is_uuid(~"cucumber")))}
+    ].
+
+%%--------------------------------------------------------------------
 %% Generate
 %%--------------------------------------------------------------------
 gen_1_test_() ->
@@ -325,7 +358,12 @@ gen_2_test_() ->
       ?_test(?assertMatch([_ | _],
                           jhn_uuid:gen(v8, [{custom, custom(binary)}])))},
      {"gen(v2, [binary])",
-      ?_test(?assertError(badarg, jhn_uuid:gen(v2, [binary])))}
+      ?_test(?assertError(badarg, jhn_uuid:gen(v2, [binary])))},
+     %% decimal
+     {"gen(v1, [decimal])",
+      ?_test(?assertEqual(true, is_integer(jhn_uuid:gen(v1, [decimal]))))},
+     {"gen(v7, [decimal])",
+      ?_test(?assertEqual(true, is_integer(jhn_uuid:gen(v7, [decimal]))))}
     ].
 
 %%--------------------------------------------------------------------
@@ -356,7 +394,12 @@ encode_2_test_() ->
                           jhn_uuid:encode(
                             jhn_uuid:decode(jhn_uuid:gen(v7, [binary]),
                                             [human]),
-                            [binary])))}
+                            [binary])))},
+     {"encode(gen(v1, [uuid]), [decimal])",
+      ?_test(?assertEqual(
+                true,
+                is_integer(
+                  jhn_uuid:encode(jhn_uuid:gen(v1, [uuid]), [decimal]))))}
 
     ].
 
