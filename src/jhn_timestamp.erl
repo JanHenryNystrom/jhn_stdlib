@@ -378,9 +378,16 @@ do_encode(Map = #{}, #opts{return_type = datetime, precision = Precision}) ->
 do_encode(Map, #opts{return_type = posix, precision = P}) ->
     #{year := Year, month := Month, day := Day,
       hour := Hour, minute := Minute, second := Second} = Map,
-    'Z' = maps:get(offset, Map, 'Z'),
+    TZ = case maps:get(offset, Map, 'Z') of
+             'Z' -> 0;
+             #{sign := '+', hours := Hs, minutes := Ms} ->
+                 (Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE);
+             #{sign := '-', hours := Hs, minutes := Ms} ->
+                 - ((Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE))
+         end,
     Fraction = maps:get(fraction, Map, 0),
     Seconds =
+        TZ +
         ?SECONDS_PER_DAY * days(Year, Month, Day) +
         Hour * ?SECONDS_PER_HOUR +
         Minute * ?SECONDS_PER_MINUTE +
