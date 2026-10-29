@@ -741,7 +741,7 @@ d_b58(C, <<>>, _) -> C;
 d_b58(C, <<H, T/binary>>, Alphabet) ->
     d_b58(C * 58 + element(H, Alphabet), T, Alphabet).
 
-d_b58_pad(<<$1, T/binary>>, Acc) -> d_b58_pad(T, [0 | Acc]);
+d_b58_pad(<<$1, T/binary>>, Acc) -> d_b58_pad(T, <<0, Acc/binary>>);
 d_b58_pad(_, Acc) -> Acc.
 
 %% --------------------------------------------------------------------
