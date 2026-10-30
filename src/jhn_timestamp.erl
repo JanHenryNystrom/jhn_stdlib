@@ -381,9 +381,9 @@ do_encode(Map, #opts{return_type = posix, precision = P}) ->
     TZ = case maps:get(offset, Map, 'Z') of
              'Z' -> 0;
              #{sign := '+', hours := Hs, minutes := Ms} ->
-                 - (Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE);
+                 - ((Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE));
              #{sign := '-', hours := Hs, minutes := Ms} ->
-                 ((Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE))
+                 (Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE)
          end,
     Fraction = maps:get(fraction, Map, 0),
     Seconds =
