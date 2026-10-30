@@ -264,9 +264,9 @@ encode(Stamp) -> encode(Stamp, #opts{}).
 %%     binary -> a binary is returned
 %%     list -> a flat list is returned
 %%     iolist -> an iolist is returned
-%%     datetime -> a datetime nested tuple is returned
+%%     datetime -> a datetime nested tuple is returned (normalized to UTC)
 %%     rfc7231 -> the returned string is rfc7231 compatible
-%%     posix -> a posix integer timestamp is returned
+%%     posix -> a posix integer timestamp is returned (normalized to UTC)
 %% @end
 %%--------------------------------------------------------------------
 -spec encode(stamp() | posix() | datetime(), [opt()] | #opts{}) ->
@@ -374,16 +374,16 @@ valid_weekday(WD, #{year := Y, month := M, day := D}) ->
 do_encode(D = {{_, _, _}, {_, _, _}}, Opts = #opts{precision = P}) ->
     do_encode(decode_datetime(D, P), Opts);
 do_encode(Map = #{}, #opts{return_type = datetime, precision = Precision}) ->
-    encode_datetime(Map, Precision);
+    encode_datetime(to_utc(Map), Precision);
 do_encode(Map, #opts{return_type = posix, precision = P}) ->
     #{year := Year, month := Month, day := Day,
       hour := Hour, minute := Minute, second := Second} = Map,
     TZ = case maps:get(offset, Map, 'Z') of
              'Z' -> 0;
              #{sign := '+', hours := Hs, minutes := Ms} ->
-                 (Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE);
+                 - (Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE);
              #{sign := '-', hours := Hs, minutes := Ms} ->
-                 - ((Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE))
+                 ((Hs * ?SECONDS_PER_HOUR) + (Ms * ?SECONDS_PER_MINUTE))
          end,
     Fraction = maps:get(fraction, Map, 0),
     Seconds =
@@ -494,6 +494,9 @@ pad(N) -> integer_to_binary(N).
 pad(Integer, Size) ->
     List = integer_to_list(Integer),
     [lists:duplicate(Size - length(List), $0), List].
+
+to_utc(Map = #{offset := 'Z'}) -> Map;
+to_utc(Map) -> decode(encode(Map, [posix])).
 
 encode_datetime(Stamp, seconds) ->
     #{year := Y, month := M, day := D,
